@@ -85,8 +85,9 @@ export class RAGService {
             timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
           };
         }
+        throw new Error('Layanan RAG gagal. Tidak menggunakan respons demo sebagai pengganti.');
       } catch (err) {
-        console.warn('Custom RAG endpoint failed, falling back to local Agronomist engine:', err);
+        throw new Error('Layanan RAG tidak tersedia. Silakan coba lagi.', { cause: err });
       }
     }
 

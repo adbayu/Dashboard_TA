@@ -27,7 +27,7 @@ export default function App() {
   const [addSensorModalOpen, setAddSensorModalOpen] = useState(false);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/demo">
       <div className="min-h-screen flex flex-col text-on-surface">
         {/* Navigation Sidebar */}
         <Sidebar onOpenAddSensor={() => setAddSensorModalOpen(true)} />
@@ -46,6 +46,9 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="sm:ml-20 md:ml-24 pt-24 px-4 sm:px-8 pb-16 min-h-screen max-w-7xl mx-auto w-full">
+          <aside className="mb-6 rounded-xl border border-amber-700 bg-amber-50 p-4 text-amber-950">
+            <strong>Data contoh / Demo — bukan telemetri akun.</strong> Respons demo otomatis — bukan hasil RAG. Tidak ada email atau pembayaran nyata. <a className="underline" href="/">Buka pilot melalui backend</a>
+          </aside>
           <Routes>
             <Route
               path="/"

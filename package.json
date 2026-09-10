@@ -7,18 +7,34 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api": "node --env-file-if-exists=.env --import tsx server/index.ts",
+    "db:migrate": "npm run api -- migrate",
+    "db:admin": "npm run api -- admin",
+    "db:size": "npm run api -- size",
+    "simulator": "node --env-file-if-exists=.env --import tsx server/simulator.ts",
+    "typecheck": "tsc -p server/tsconfig.json",
+    "test:pilot": "node --env-file-if-exists=.env --import tsx --test server/pilot.test.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/rate-limit": "^11.2.0",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
+    "fastify": "^5.12.3",
+    "nodemailer": "^10.0.1",
+    "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "tsx": "^4.23.13"
   },
   "devDependencies": {
+    "@types/node": "^26.5.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
@@ -26,6 +42,7 @@
     "oxlint": "^1.79.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.17",
+    "typescript": "^7.0.2",
     "vite": "^8.2.2"
   }
 }
