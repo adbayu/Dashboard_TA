@@ -92,7 +92,7 @@ function Login({ onLogin, invitation, onAccepted }) {
       <Field label="Password (12–128 karakter)" name="password" type="password" minLength={12} maxLength={128} autoComplete={invitation ? 'new-password' : 'current-password'} required />
     </ActionForm>
     {message && <p role="status">{message}</p>}
-    <a className="pilot-link" href="/demo/">Lihat UI lama — Data contoh / Demo</a>
+    <a className="pilot-link" href="/">Kembali ke SmartDashboard Aquaponik</a>
   </section></div>;
 }
 
