@@ -52,14 +52,15 @@ export default function SmartSidebar({ open, onClose }) {
 
   return (
     <>
-      {/* Lapisan gelap untuk mobile */}
+      {/* Lapisan gelap hanya untuk layar sempit (< 640px) */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity lg:hidden ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity sm:hidden ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
 
+      {/* Sidebar selalu tampil mulai 640px (sm:) tanpa perlu klik; melebar bertahap di layar besar */}
       <aside
-        className={`fixed left-0 top-0 bottom-0 z-50 w-72 flex flex-col shadow-2xl transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 bottom-0 z-50 w-72 sm:w-56 md:w-64 xl:w-72 flex flex-col shadow-2xl transition-transform duration-300 sm:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ background: 'linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
@@ -73,7 +74,7 @@ export default function SmartSidebar({ open, onClose }) {
             <p className="text-white font-extrabold tracking-tight">JagoFarm</p>
             <p className="text-[11px] font-semibold text-emerald-accent">SmartDashboard Aquaponik</p>
           </div>
-          <button onClick={onClose} className="ml-auto text-white/70 hover:text-white lg:hidden" aria-label="Tutup menu">
+          <button onClick={onClose} className="ml-auto text-white/70 hover:text-white sm:hidden" aria-label="Tutup menu">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>

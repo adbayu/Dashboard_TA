@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  /* Kunci scroll horizontal di level html juga: body saja tidak cukup karena
+     halaman masih bisa bergeser saat font ikon Google sedang dimuat. */
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     background: linear-gradient(135deg, #f8fafb 0%, #eceeef 50%, #d8dadb 100%);
     min-height: 100vh;

@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 
 // ── Kartu dasar bergaya kaca (konsisten dengan tema Lumina Aqua) ──────────────
+// min-w-0 wajib: tanpa ini kartu menolak menyusut di dalam CSS grid dan tabel
+// di dalamnya mendorong halaman jadi bisa di-scroll ke samping di layar sempit.
 export function Card({ children, className = '', as: Tag = 'section' }) {
-  return <Tag className={`glass-card rounded-2xl p-5 ${className}`}>{children}</Tag>;
+  return <Tag className={`glass-card rounded-2xl p-5 min-w-0 ${className}`}>{children}</Tag>;
 }
 
 export function SectionTitle({ eyebrow, title, subtitle, action }) {
@@ -41,10 +43,10 @@ export const STATUS_LABEL = { online: 'Terhubung', warning: 'Perlu perhatian', m
 
 export function StatCard({ label, value, unit, icon, hint, tone = 'brand' }) {
   return (
-    <div className="glass-card rounded-2xl p-4 flex flex-col gap-1">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{label}</span>
-        {icon && <span className={`material-symbols-outlined text-[20px] ${tone === 'bad' ? 'text-red-600' : tone === 'warn' ? 'text-amber-600' : 'text-primary'}`}>{icon}</span>}
+    <div className="glass-card rounded-2xl p-4 flex flex-col gap-1 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant min-w-0">{label}</span>
+        {icon && <span className={`material-symbols-outlined text-[20px] shrink-0 ${tone === 'bad' ? 'text-red-600' : tone === 'warn' ? 'text-amber-600' : 'text-primary'}`}>{icon}</span>}
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-2xl font-extrabold text-on-surface">{value}</span>
@@ -67,7 +69,7 @@ export function Button({ children, onClick, variant = 'primary', type = 'button'
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${styles[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${styles[variant]} ${className}`}
     >
       {icon && <span className="material-symbols-outlined text-[18px]">{icon}</span>}
       {children}
@@ -86,7 +88,7 @@ export function Field({ label, hint, children, className = '' }) {
 }
 
 const inputCls =
-  'w-full rounded-xl glass-input px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40';
+  'w-full min-w-0 rounded-xl glass-input px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40';
 
 export function Input({ value, onChange, ...rest }) {
   return <input {...rest} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)} className={inputCls} />;

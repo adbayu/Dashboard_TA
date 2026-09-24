@@ -73,7 +73,7 @@ function Shell() {
     <div className="min-h-screen">
       <SmartSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="lg:pl-72 flex flex-col min-h-screen">
+      <div className="sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
         <SmartTopBar onOpenMenu={() => setSidebarOpen(true)} title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} />
 
         <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-[1500px] mx-auto pb-16">

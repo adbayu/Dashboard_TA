@@ -12,7 +12,7 @@ export default function SmartTopBar({ onOpenMenu, title, subtitle }) {
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMenu}
-          className="lg:hidden p-2 rounded-xl bg-white/60 dark:bg-white/10 border border-outline-variant/40"
+          className="sm:hidden p-2 rounded-xl bg-white/60 dark:bg-white/10 border border-outline-variant/40"
           aria-label="Buka menu"
         >
           <span className="material-symbols-outlined">menu</span>
