@@ -1,24 +1,5 @@
 // Seed data SmartDashboard AquaSmartponik — sistem aquaponik berbasis IoT
 
-export const ROLES = {
-  pengguna: {
-    key: 'pengguna',
-    label: 'Pengguna',
-    desc: 'Operator farm: pantau kolam, kelola area, rawat virtual pet, kumpulkan point.',
-    name: 'Budi Santoso',
-    email: 'budi@jagofarm.id',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-  },
-  pengelola: {
-    key: 'pengelola',
-    label: 'Pengelola (Admin)',
-    desc: 'Admin sistem: kelola user, perangkat IoT, kategori, area, virtual pet, dan point.',
-    name: 'Hendra Wicaksono',
-    email: 'hendra@jagofarm.id',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  },
-};
-
 // ── Kategori Device ────────────────────────────────────────────────────────────
 export const SEED_CATEGORIES = [
   {
@@ -245,11 +226,37 @@ export const SEED_DEVICES = [
 ];
 
 // ── Pengguna (untuk kelola user oleh admin) ────────────────────────────────────
+// ── Akun demo (login) ─────────────────────────────────────────────────────────
+// CATATAN PENTING: password di bawah ini HANYA untuk demo di browser.
+// Belum ada backend, jadi akun & password tersimpan apa adanya di localStorage —
+// jangan dipakai untuk data sungguhan sebelum server autentikasi dibuat.
+export const DEMO_PASSWORD = 'jagofarm123';
+
 export const SEED_USERS = [
-  { id: 'U-001', name: 'Budi Santoso', email: 'budi@jagofarm.id', role: 'pengguna', areaIds: ['AR-01', 'AR-03'], status: 'aktif', joinedAt: '2026-01-12', points: 1240 },
-  { id: 'U-002', name: 'Siti Rahmawati', email: 'siti@jagofarm.id', role: 'pengguna', areaIds: ['AR-02'], status: 'aktif', joinedAt: '2026-01-20', points: 980 },
-  { id: 'U-003', name: 'Agus Priyanto', email: 'agus@jagofarm.id', role: 'pengguna', areaIds: ['AR-03'], status: 'nonaktif', joinedAt: '2026-02-02', points: 410 },
-  { id: 'U-004', name: 'Hendra Wicaksono', email: 'hendra@jagofarm.id', role: 'pengelola', areaIds: [], status: 'aktif', joinedAt: '2026-01-01', points: 0 },
+  {
+    id: 'U-001', name: 'Budi Santoso', email: 'budi@jagofarm.id', password: DEMO_PASSWORD,
+    role: 'pengguna', areaIds: ['AR-01', 'AR-03'], status: 'aktif', joinedAt: '2026-01-12', points: 1240,
+    phone: '0812-3456-7890', jabatan: 'Operator Kolam', bio: 'Mengurus kolam nila dan pakcoy sejak 2026.',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+  },
+  {
+    id: 'U-002', name: 'Siti Rahmawati', email: 'siti@jagofarm.id', password: DEMO_PASSWORD,
+    role: 'pengguna', areaIds: ['AR-02'], status: 'aktif', joinedAt: '2026-01-20', points: 980,
+    phone: '0813-2233-4455', jabatan: 'Operator Growbed', bio: 'Fokus pada sayuran daun dan kualitas air.',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
+  },
+  {
+    id: 'U-003', name: 'Agus Priyanto', email: 'agus@jagofarm.id', password: DEMO_PASSWORD,
+    role: 'pengguna', areaIds: ['AR-03'], status: 'nonaktif', joinedAt: '2026-02-02', points: 410,
+    phone: '0857-9988-7766', jabatan: 'Operator Tandon', bio: 'Menangani tandon dan pompa.',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+  },
+  {
+    id: 'U-004', name: 'Hendra Wicaksono', email: 'hendra@jagofarm.id', password: DEMO_PASSWORD,
+    role: 'pengelola', areaIds: [], status: 'aktif', joinedAt: '2026-01-01', points: 0,
+    phone: '0811-1122-3344', jabatan: 'Pengelola Farm', bio: 'Mengelola perangkat IoT dan data seluruh area.',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+  },
 ];
 
 // ── Virtual Pet ────────────────────────────────────────────────────────────────

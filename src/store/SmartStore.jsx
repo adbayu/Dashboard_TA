@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   PET_STAGES,
-  ROLES,
   SEED_AREAS,
   SEED_BADGES,
   SEED_CATEGORIES,
@@ -42,7 +42,6 @@ const METRIC_RANGE = {
 };
 
 const DEFAULT_STATE = {
-  role: 'pengguna',
   theme: 'light',
   categories: SEED_CATEGORIES,
   areas: SEED_AREAS,
@@ -69,6 +68,8 @@ const DEFAULT_STATE = {
   attendance: 'Budi Santoso',
   deviceLive: {},
   points: 1240,
+  // Sesi login: null = belum masuk (belum ada yang login di browser ini)
+  sessionUserId: null,
 };
 
 function loadState() {
@@ -94,6 +95,11 @@ export function SmartProvider({ children }) {
   const [state, setState] = useState(loadState);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
+
+  // Role datang dari akun yang login:
+  // - pengguna → halaman akar, pengelola → /admin (dijaga di Shell).
+  // - bila belum login, ikut URL supaya alamat /admin tetap punya konteks.
+  const { pathname } = useLocation();
 
   // Persist seluruh state ke localStorage
   useEffect(() => {
@@ -136,9 +142,11 @@ export function SmartProvider({ children }) {
   // ── helper penulisan ────────────────────────────────────────────────────────
   const patch = useCallback((updater) => setState((prev) => ({ ...prev, ...updater(prev) })), []);
 
+  // Poin mengikuti akun yang sedang login supaya saldo tiap akun berbeda.
   const logPoints = (prev, activity, points) => ({
     ledger: [{ id: uid('L'), at: now(), activity, points }, ...prev.ledger].slice(0, 60),
     points: prev.points + points,
+    users: prev.users.map((u) => (u.id === prev.sessionUserId ? { ...u, points: (u.points || 0) + points } : u)),
   });
 
   const award = useCallback(
@@ -153,9 +161,46 @@ export function SmartProvider({ children }) {
 
   const actions = useMemo(
     () => ({
-      setRole: (role) => setState((prev) => ({ ...prev, role })),
       toggleTheme: () => setState((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' })),
       notify,
+
+      // ── Login / logout ──────────────────────────────────────────────────────
+      // Verifikasi sederhana di sisi browser. Belum ada backend, jadi ini BUKAN
+      // pengamanan sungguhan — cukup untuk alur demo.
+      login: async (email, password) => {
+        const akun = state.users.find(
+          (u) => (u.email || '').toLowerCase() === (email || '').trim().toLowerCase(),
+        );
+        if (!akun) return { ok: false, pesan: 'Email tidak terdaftar.' };
+        if (akun.password !== password) return { ok: false, pesan: 'Password salah.' };
+        if (akun.status === 'nonaktif') return { ok: false, pesan: 'Akun ini dinonaktifkan pengelola.' };
+        setState((prev) => ({ ...prev, sessionUserId: akun.id }));
+        return { ok: true, akun };
+      },
+      logout: () => {
+        setState((prev) => ({ ...prev, sessionUserId: null }));
+        return { ok: true };
+      },
+      // Perubahan profil oleh pemilik akun sendiri
+      updateProfile: (perubahan) => {
+        setState((prev) => ({
+          ...prev,
+          users: prev.users.map((u) => (u.id === prev.sessionUserId ? { ...u, ...perubahan } : u)),
+        }));
+        notify('Profil berhasil diperbarui.');
+      },
+      changePassword: (lama, baru) => {
+        const akun = state.users.find((u) => u.id === state.sessionUserId);
+        if (!akun) return { ok: false, pesan: 'Sesi tidak ditemukan.' };
+        if (akun.password !== lama) return { ok: false, pesan: 'Password lama tidak cocok.' };
+        if (!baru || baru.length < 6) return { ok: false, pesan: 'Password baru minimal 6 karakter.' };
+        setState((prev) => ({
+          ...prev,
+          users: prev.users.map((u) => (u.id === prev.sessionUserId ? { ...u, password: baru } : u)),
+        }));
+        notify('Password berhasil diganti.');
+        return { ok: true };
+      },
 
       // ── Device ───────────────────────────────────────────────────────────────
       saveDevice: (device) =>
@@ -401,12 +446,22 @@ export function SmartProvider({ children }) {
         notify('Riwayat percakapan dibersihkan.');
       },
       resetDemo: () => {
-        setState({ ...DEFAULT_STATE, theme: state.theme, role: state.role });
+        setState({ ...DEFAULT_STATE, theme: state.theme, sessionUserId: state.sessionUserId });
         notify('Data demo dikembalikan ke kondisi awal.', 'warn');
       },
     }),
-    [award, notify, patch, state.role, state.theme],
+    [award, notify, patch, state.theme, state.users, state.sessionUserId],
   );
+
+  // Pengguna yang sedang login (akun dari daftar users) — null bila belum masuk.
+  const currentUser = useMemo(
+    () => state.users.find((u) => u.id === state.sessionUserId) || null,
+    [state.users, state.sessionUserId],
+  );
+
+  // Role mengikuti akun yang login. Kalau belum login, role ikut URL supaya
+  // halaman login masih bisa menampilkan pemisahan pengguna/pengelola.
+  const role = currentUser ? currentUser.role : pathname === '/admin' || pathname.startsWith('/admin/') ? 'pengelola' : 'pengguna';
 
   const derived = useMemo(() => {
     const hppTotal = (areaId) => {
@@ -418,7 +473,6 @@ export function SmartProvider({ children }) {
     };
     return {
       hppTotal,
-      currentUser: ROLES[state.role] || ROLES.pengguna,
       devicesByArea: (areaId) => state.devices.filter((d) => d.areaId === areaId),
       categoryOf: (id) => state.categories.find((c) => c.id === id),
       areaOf: (id) => state.areas.find((a) => a.id === id),
@@ -427,7 +481,20 @@ export function SmartProvider({ children }) {
     };
   }, [state]);
 
-  const value = useMemo(() => ({ ...state, ...actions, ...derived, toast }), [state, actions, derived, toast]);
+  const value = useMemo(
+    () => ({
+      ...state,
+      ...actions,
+      ...derived,
+      role,
+      currentUser,
+      isLoggedIn: !!currentUser,
+      // Saldo poin tampil = poin akun yang login (bukan angka global).
+      points: currentUser ? currentUser.points || 0 : state.points,
+      toast,
+    }),
+    [state, actions, derived, role, currentUser, toast],
+  );
   return <SmartCtx.Provider value={value}>{children}</SmartCtx.Provider>;
 }
 

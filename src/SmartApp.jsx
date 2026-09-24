@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SmartProvider, useSmart } from './store/SmartStore';
 import SmartSidebar from './components/SmartSidebar';
 import SmartTopBar from './components/SmartTopBar';
 
 import Dashboard from './pages/Dashboard';
+import Profil from './pages/Profil';
+import Login from './pages/Login';
 import ListIot, { DeviceDetail } from './pages/ListIot';
 import KelolaArea from './pages/KelolaArea';
 import AreaDetail from './pages/AreaDetail';
@@ -29,6 +30,7 @@ const TITLES = [
   { path: '/admin/v-pet', title: 'Kelola Virtual Pet', subtitle: 'Jenis, kondisi, dan area pemantauan virtual pet' },
   { path: '/admin/point', title: 'Sistem Point', subtitle: 'Aturan poin, badge, dan saldo pengguna' },
   { path: '/admin', title: 'Dashboard Pengelola', subtitle: 'Ringkasan seluruh sistem aquaponik' },
+  { path: '/profil', title: 'Profil Saya', subtitle: 'Ubah data diri, foto, dan password akun Anda' },
   { path: '/iot', title: 'List IoT', subtitle: 'Perangkat yang terpasang di farm' },
   { path: '/area', title: 'Kelola Area', subtitle: 'HPP dan pemantauan kolam Anda' },
   { path: '/v-pet', title: 'Virtual Pet', subtitle: 'Pemantauan farm dalam bentuk hewan peliharaan' },
@@ -58,28 +60,49 @@ function Toast() {
 }
 
 function Shell() {
-  const { role } = useSmart();
+  const { role, isLoggedIn } = useSmart();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Belum masuk → hanya halaman /masuk yang boleh dibuka.
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Routes>
+          <Route path="/masuk" element={<Login />} />
+          <Route path="*" element={<Navigate to="/masuk" replace />} />
+        </Routes>
+        <Toast />
+      </div>
+    );
+  }
+
+  // Pengguna biasa tidak boleh membuka alamat /admin, dan sebaliknya.
+  // (Bila dipaksa lewat alamat, langsung dialihkan ke beranda role-nya.)
+  const diAreaAdmin = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+  if (role === 'pengguna' && diAreaAdmin) return <Navigate to="/" replace />;
+  if (role === 'pengelola' && !diAreaAdmin && location.pathname !== '/profil') {
+    return <Navigate to="/admin" replace />;
+  }
 
   const match = TITLES.filter((row) => {
     if (row.path === '/') return location.pathname === '/' || location.pathname === '';
     return location.pathname === row.path || location.pathname.startsWith(row.path + '/');
   }).sort((a, b) => b.path.length - a.path.length)[0];
 
-  const home = role === 'pengelola' ? '/admin' : '/';
-
   return (
     <div className="min-h-screen">
-      <SmartSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <SmartSidebar />
 
-      <div className="sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
-        <SmartTopBar onOpenMenu={() => setSidebarOpen(true)} title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} />
+      <div className="pl-52 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
+        <SmartTopBar title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} />
 
         <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-[1500px] mx-auto pb-16">
           <Routes>
-            {/* ── Role Pengguna ── */}
-            <Route path="/" element={role === 'pengelola' ? <Navigate to="/admin" replace /> : <Dashboard />} />
+            {/* ── Profil: tersedia untuk kedua role ── */}
+            <Route path="/profil" element={<Profil />} />
+
+            {/* ── Role Pengguna: alamat akar ── */}
+            <Route path="/" element={<Dashboard />} />
             <Route path="/iot" element={<ListIot />} />
             <Route path="/iot/:id" element={<DeviceDetail />} />
             <Route path="/area" element={<KelolaArea />} />
@@ -88,7 +111,7 @@ function Shell() {
             <Route path="/gamifikasi" element={<Gamifikasi />} />
             <Route path="/chatbot" element={<Chatbot />} />
 
-            {/* ── Role Pengelola ── */}
+            {/* ── Role Pengelola: alamat berawalan /admin ── */}
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/pengguna" element={<AdminUsers />} />
             <Route path="/admin/iot" element={<AdminIot />} />
@@ -97,7 +120,9 @@ function Shell() {
             <Route path="/admin/v-pet" element={<AdminVPet />} />
             <Route path="/admin/point" element={<AdminPoints />} />
 
-            <Route path="*" element={<Navigate to={home} replace />} />
+            {/* Alamat tak dikenal: kembali ke beranda role yang sesuai */}
+            <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
+            <Route path="*" element={<Navigate to={role === 'pengelola' ? '/admin' : '/'} replace />} />
           </Routes>
         </main>
 

@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
@@ -45,24 +45,23 @@ export const MENUS = {
   ],
 };
 
-export default function SmartSidebar({ open, onClose }) {
-  const { role, setRole, currentUser, points, activeAlerts } = useSmart();
+// ── Sidebar per role: menu diambil dari MENUS sesuai role aktif (dari URL) ───
+export default function SmartSidebar({ role: roleProp }) {
+  const { role: roleCtx, currentUser, points, activeAlerts, logout } = useSmart();
+  const navigate = useNavigate();
+  const role = roleProp || roleCtx;
   const menu = MENUS[role] || MENUS.pengguna;
   const pending = activeAlerts.length;
 
+  function keluar() {
+    logout();
+    navigate('/masuk', { replace: true });
+  }
+
   return (
     <>
-      {/* Lapisan gelap hanya untuk layar sempit (< 640px) */}
-      <div
-        onClick={onClose}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity sm:hidden ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-      />
-
-      {/* Sidebar selalu tampil mulai 640px (sm:) tanpa perlu klik; melebar bertahap di layar besar */}
       <aside
-        className={`fixed left-0 top-0 bottom-0 z-50 w-72 sm:w-56 md:w-64 xl:w-72 flex flex-col shadow-2xl transition-transform duration-300 sm:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className="fixed left-0 top-0 bottom-0 z-50 w-52 sm:w-56 md:w-64 xl:w-72 flex flex-col shadow-2xl"
         style={{ background: 'linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
       >
         {/* Kepala: brand */}
@@ -70,42 +69,36 @@ export default function SmartSidebar({ open, onClose }) {
           <div className="w-11 h-11 rounded-2xl bg-emerald-accent/20 border border-white/20 flex items-center justify-center">
             <span className="material-symbols-outlined text-white text-[24px] fill">eco</span>
           </div>
-          <div className="leading-tight">
+          <div className="leading-tight min-w-0">
             <p className="text-white font-extrabold tracking-tight">JagoFarm</p>
             <p className="text-[11px] font-semibold text-emerald-accent">SmartDashboard Aquaponik</p>
           </div>
-          <button onClick={onClose} className="ml-auto text-white/70 hover:text-white sm:hidden" aria-label="Tutup menu">
-            <span className="material-symbols-outlined">close</span>
-          </button>
         </div>
 
-        {/* Identitas pengguna aktif */}
-        <div className="px-4 py-4 border-b border-white/10">
-          <div className="flex items-center gap-3 rounded-2xl bg-white/10 border border-white/10 p-3">
+        {/* Identitas pengguna aktif — bisa diklik menuju halaman profil */}
+        <div className="px-4 py-4 border-b border-white/10 space-y-2">
+          <Link
+            to="/profil"
+            title="Buka profil saya"
+            className="flex items-center gap-3 rounded-2xl bg-white/10 border border-white/10 p-3 hover:bg-white/20 transition-colors group"
+          >
             <img src={currentUser.avatar} alt="" className="w-10 h-10 rounded-xl object-cover ring-2 ring-emerald-accent/40" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-white text-sm font-bold truncate">{currentUser.name}</p>
-              <p className="text-[11px] text-white/60 truncate">{currentUser.email}</p>
+              <p className="text-[11px] text-white/60 truncate">
+                {role === 'pengelola' ? 'Akun Pengelola' : 'Akun Pengguna'}
+              </p>
             </div>
-          </div>
-          {/* Pemilih role */}
-          <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-xl bg-black/25 p-1.5">
-            {[
-              { key: 'pengguna', label: 'Pengguna', icon: 'person' },
-              { key: 'pengelola', label: 'Pengelola', icon: 'shield_person' },
-            ].map((option) => (
-              <button
-                key={option.key}
-                onClick={() => setRole(option.key)}
-                className={`flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold transition-all ${
-                  role === option.key ? 'bg-emerald-accent text-white shadow-emerald-glow' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[15px]">{option.icon}</span>
-                {option.label}
-              </button>
-            ))}
-          </div>
+            <span className="material-symbols-outlined text-[18px] text-white/50 group-hover:text-white">chevron_right</span>
+          </Link>
+
+          <Link
+            to="/profil"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-2 py-1.5 text-[11px] font-bold text-white/80 hover:bg-white/15 hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined text-[15px]">account_circle</span>
+            Profil Saya
+          </Link>
         </div>
 
         {/* Daftar menu */}
@@ -119,7 +112,6 @@ export default function SmartSidebar({ open, onClose }) {
                     key={item.to}
                     to={item.to}
                     end={item.end}
-                    onClick={onClose}
                     className={({ isActive }) =>
                       `flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all group ${
                         isActive ? 'bg-white text-primary shadow-lg' : 'text-white/80 hover:bg-white/10 hover:text-white'
@@ -158,6 +150,15 @@ export default function SmartSidebar({ open, onClose }) {
             </p>
           )}
           <p className="text-[10px] text-white/40 leading-snug">Data demo lokal — belum terhubung hardware IoT fisik.</p>
+
+          <button
+            type="button"
+            onClick={() => keluar()}
+            className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-red-500/15 border border-red-400/30 px-3 py-2 text-[12px] font-bold text-red-200 hover:bg-red-500/25 hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">logout</span>
+            Keluar
+          </button>
         </div>
       </aside>
     </>

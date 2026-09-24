@@ -1,7 +1,7 @@
 import { useSmart } from '../store/SmartStore';
 import { STATUS_LABEL } from './ui';
 
-export default function SmartTopBar({ onOpenMenu, title, subtitle }) {
+export default function SmartTopBar({ title, subtitle }) {
   const { theme, toggleTheme, role, activeAlerts, devices, resetDemo } = useSmart();
 
   const online = devices.filter((d) => d.status === 'online').length;
@@ -10,14 +10,6 @@ export default function SmartTopBar({ onOpenMenu, title, subtitle }) {
   return (
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-[#191e1b]/80 border-b border-white/40 dark:border-white/10 px-4 sm:px-6 py-3">
       <div className="flex items-center gap-3">
-        <button
-          onClick={onOpenMenu}
-          className="sm:hidden p-2 rounded-xl bg-white/60 dark:bg-white/10 border border-outline-variant/40"
-          aria-label="Buka menu"
-        >
-          <span className="material-symbols-outlined">menu</span>
-        </button>
-
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-widest text-primary/70">
             {role === 'pengelola' ? 'Mode Pengelola' : 'Mode Pengguna'}
