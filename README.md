@@ -65,22 +65,56 @@ UI demo lama (`/demo/*`, `src/App.jsx`) **sudah dihapus seluruhnya**.
 
 ---
 
-## 3. Role & fitur
+## 3. Login, role & fitur
 
-Role diganti langsung dari sidebar (tombol **Pengguna** / **Pengelola**) — tidak ada login
-di tahap ini; role disimpan di `localStorage`.
+### Cara masuk
+
+Aplikasi kini punya halaman masuk (`/masuk`). Tanpa login, semua alamat otomatis
+dialihkan ke halaman ini. Akun demo (semuanya berpassword `jagofarm123`):
+
+| Email | Password | Nama | Role | Area |
+| --- | --- | --- | --- | --- |
+| budi@jagofarm.id | jagofarm123 | Budi Santoso | Pengguna | AR-01, AR-03 |
+| siti@jagofarm.id | jagofarm123 | Siti Rahmawati | Pengguna | AR-02 |
+| hendra@jagofarm.id | jagofarm123 | Hendra Wicaksono | Pengelola | — |
+| agus@jagofarm.id | jagofarm123 | Agus Priyanto | Pengguna (nonaktif) | AR-03 |
+
+Halaman masuk menyediakan tombol **isi otomatis** untuk tiga akun utama, jadi tidak
+perlu mengetik password saat demo.
+
+Setelah masuk, **role ditentukan oleh akun** — bukan lagi pilihan manual:
+
+- Akun Pengguna → beranda `/`, hanya boleh membuka halaman pengguna.
+- Akun Pengelola → beranda `/admin`, membuka menu pengelolaan.
+- Bila alamat dipaksa (mis. pengguna mengetik `/admin`), otomatis dialihkan kembali.
+- Sesi bertahan setelah halaman di-refresh; tombol **Keluar** ada di footer sidebar.
+- Halaman `/profil` tersedia untuk kedua role.
+
+### Halaman profil (`/profil`)
+
+Foto dan identitas di sidebar bisa diklik untuk membuka halaman ini. Yang bisa diubah:
+
+- Nama, email, nomor telepon, jabatan, dan "tentang saya"
+- Foto profil dari 6 pilihan avatar
+- Ganti password (wajib mengisi password lama, minimal 6 karakter, konfirmasi harus sama)
+
+Perubahan langsung tampil di sidebar dan tersimpan di `localStorage`.
+
+> **Catatan keamanan:** ini login demo untuk keperluan tugas akhir. Password disimpan
+> apa adanya di `localStorage` browser — tidak terenkripsi dan tidak aman untuk produksi.
+> Bila nanti dipakai sungguhan, autentikasi harus dipindahkan ke backend (hash password
+> + token sesi).
 
 ### Tata letak & responsif
 
-Sidebar **selalu tampil tanpa perlu klik tombol** mulai lebar jendela 640px, dengan lebar
+Sidebar **selalu tampil tanpa perlu klik tombol** di semua ukuran jendela, dengan lebar
 yang menyesuaikan ruang:
 
 | Lebar jendela | Sidebar | Tombol menu |
 | --- | --- | --- |
 | ≥ 1280px | 288px | tidak ada |
 | 768 – 1279px | 256px | tidak ada |
-| 640 – 767px | 224px | tidak ada |
-| < 640px | tersembunyi | muncul (buka/tutup) |
+| < 768px | 208px | tidak ada |
 
 Untuk memastikan tampilan tidak rusak, halaman diuji pada 13 lebar jendela
 (1600 → 380px) × 15 halaman = **195 pemeriksaan**: sidebar muncul sesuai aturan dan
@@ -272,19 +306,27 @@ Aplikasi tetap "berjalan" walau jaringan dimatikan — itu tandanya data masih d
 - Uji fungsional: tambah item HPP (Rp1.530.000 → Rp1.605.000; Rp3.060 → Rp3.210 per ekor),
   catat pemantauan (poin 1.240 → 1.255), beri pakan V-Pet (kenyang 72% → 90%, poin +10),
   QR tergenerate, data bertahan setelah refresh
+- Sesi login & profil: login benar/salah, akun nonaktif ditolak, isi otomatis akun demo,
+  ubah data profil & foto (tersimpan ke `localStorage`), ganti password (validasi password
+  lama, panjang minimal, konfirmasi sama), logout, sesi bertahan setelah refresh
+- Kontrol akses: akun pengguna yang mengetik `/admin` dialihkan ke `/`, dan sebaliknya
 - Chatbot diuji dengan 13 pertanyaan (12 topik aquaponik + 1 pertanyaan di luar topik
   "resep rendang padang") → **13/13 benar**, termasuk menolak menjawab saat di luar cakupan
 - Responsif: 13 lebar jendela (1600, 1280, 1024, 940, 820, 768, 700, 660, 640, 639, 500,
   420, 380px) × 15 halaman = **195 pemeriksaan** → sidebar tampil sesuai aturan, tanpa
   geser horizontal, tanpa error runtime
+- 7 menu sidebar pengelola dan 6 menu sidebar pengguna diklik satu per satu → semua
+  halaman terbuka dengan benar dan penanda menu aktif berpindah
 
 ---
 
 ## 8. Yang belum ada
 
-- Autentikasi/login nyata dan kontrol akses berbasis server (role masih di `localStorage`)
+- Autentikasi berbasis server: password masih tersimpan apa adanya di `localStorage`
+  (tidak terenkripsi, tidak ada token sesi) — lihat catatan keamanan di bagian 3
+- Registrasi akun baru lewat halaman masuk (akun sekarang hanya bisa ditambah pengelola)
 - Penyambungan data IoT asli (lihat bagian 6)
 - Payment gateway, notifikasi email/WhatsApp
-- Halaman pengaturan profil pengguna dan ekspor data
+- Ekspor data dan unggah foto profil sendiri (sekarang memilih dari 6 avatar)
 - Riwayat pembacaan sensor per device (grafik tren) — sekarang hanya nilai saat ini
 - Sebagian aturan poin belum terhubung ke aksi otomatis (lihat bagian 5)
