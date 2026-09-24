@@ -70,6 +70,22 @@ UI demo lama (`/demo/*`, `src/App.jsx`) **sudah dihapus seluruhnya**.
 Role diganti langsung dari sidebar (tombol **Pengguna** / **Pengelola**) — tidak ada login
 di tahap ini; role disimpan di `localStorage`.
 
+### Tata letak & responsif
+
+Sidebar **selalu tampil tanpa perlu klik tombol** mulai lebar jendela 640px, dengan lebar
+yang menyesuaikan ruang:
+
+| Lebar jendela | Sidebar | Tombol menu |
+| --- | --- | --- |
+| ≥ 1280px | 288px | tidak ada |
+| 768 – 1279px | 256px | tidak ada |
+| 640 – 767px | 224px | tidak ada |
+| < 640px | tersembunyi | muncul (buka/tutup) |
+
+Untuk memastikan tampilan tidak rusak, halaman diuji pada 13 lebar jendela
+(1600 → 380px) × 15 halaman = **195 pemeriksaan**: sidebar muncul sesuai aturan dan
+tidak ada geser horizontal di semua kombinasi.
+
 ### 3.1 Role Pengguna (operator farm)
 
 | Route | Halaman | Isi |
@@ -108,8 +124,8 @@ nama alat, kategori, deskripsi, daftar fungsi, lokasi, dan status unit.
 src/SmartApp.jsx                   122  Shell aplikasi: router, judul halaman, toast
 src/store/SmartStore.jsx           456  Sumber data tunggal (state global + aksi)
 src/data/seed.js                   367  Seluruh data awal + basis pengetahuan chatbot
-src/components/ui.jsx              191  Komponen dasar (Card, Button, Modal, Table, ...)
-src/components/SmartSidebar.jsx    164  Sidebar + definisi menu per role
+src/components/ui.jsx              193  Komponen dasar (Card, Button, Modal, Table, ...)
+src/components/SmartSidebar.jsx    165  Sidebar + definisi menu per role
 src/components/SmartTopBar.jsx      78  Top bar: status device, tema, reset demo
 src/components/QrCode.jsx           46  QR asli (paket qrcode) berisi URL perangkat
 src/services/aquaBot.js            139  Mesin pencarian jawaban chatbot
@@ -131,12 +147,17 @@ src/pages/admin/AdminVPet.jsx      158
 src/pages/admin/AdminPoints.jsx    244
 ```
 
-### 4.2 Berkas yang diubah (4)
+### 4.2 Berkas yang diubah (9)
 
 | Berkas | Perubahan |
 | --- | --- |
 | `src/main.jsx` | Pemilih aplikasi: `/pilot` → `PilotApp.jsx`, lainnya → `SmartApp.jsx` (sebelumnya `/demo` → `App.jsx`) |
 | `src/PilotApp.jsx` | Tautan "Lihat UI lama" diganti menjadi "Kembali ke SmartDashboard Aquaponik" |
+| `src/components/SmartSidebar.jsx` | Sidebar tampil otomatis dari 640px (sebelumnya 1024px); lebar menyesuaikan lebar layar |
+| `src/components/SmartTopBar.jsx` | Tombol menu hanya muncul di bawah 640px |
+| `src/components/ui.jsx` | `min-w-0` pada Card/StatCard/input agar tabel dan input tidak memaksa halaman melebar |
+| `src/SmartApp.jsx` | Jarak kiri konten mengikuti lebar sidebar (`sm:pl-56 md:pl-64 xl:pl-72`) |
+| `src/index.css` | `overflow-x: hidden` juga di `html`, bukan hanya `body` |
 | `package.json` | Tambah dependency `qrcode` untuk QR alat |
 | `package-lock.json` | Ikut menyesuaikan dependency |
 
@@ -152,7 +173,7 @@ UI demo lama beserta state/simulator/RAG-nya:
 - State & layanan: `store/useFarmStore.js`, `services/iotSimulator.js`, `services/ragService.js`
 - Lain-lain: `App.jsx`, `App.css`
 
-**Total: 47 berkas berubah, 4.815 baris ditambah, 4.631 baris dihapus.**
+**Total: 49 berkas berubah, 4.824 baris ditambah, 4.631 baris dihapus.**
 
 ### 4.4 Sidebar lama vs baru
 
@@ -253,6 +274,9 @@ Aplikasi tetap "berjalan" walau jaringan dimatikan — itu tandanya data masih d
   QR tergenerate, data bertahan setelah refresh
 - Chatbot diuji dengan 13 pertanyaan (12 topik aquaponik + 1 pertanyaan di luar topik
   "resep rendang padang") → **13/13 benar**, termasuk menolak menjawab saat di luar cakupan
+- Responsif: 13 lebar jendela (1600, 1280, 1024, 940, 820, 768, 700, 660, 640, 639, 500,
+  420, 380px) × 15 halaman = **195 pemeriksaan** → sidebar tampil sesuai aturan, tanpa
+  geser horizontal, tanpa error runtime
 
 ---
 
