@@ -1,4 +1,5 @@
 import { useSmart } from '../store/SmartStore';
+import { IconButton } from './ui';
 import { STATUS_LABEL } from './ui';
 
 export default function SmartTopBar({ title, subtitle }) {
@@ -11,7 +12,7 @@ export default function SmartTopBar({ title, subtitle }) {
     <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-[#191e1b]/80 border-b border-white/40 dark:border-white/10 px-4 sm:px-6 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-primary/70">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">
             {role === 'pengelola' ? 'Mode Pengelola' : 'Mode Pengguna'}
           </p>
           <h1 className="text-lg sm:text-xl font-extrabold text-on-surface truncate leading-tight">{title}</h1>
@@ -35,21 +36,21 @@ export default function SmartTopBar({ title, subtitle }) {
           </span>
         </div>
 
-        <button
+        <IconButton
+          icon={theme === 'dark' ? 'light_mode' : 'dark_mode'}
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}
-          className="p-2 rounded-xl bg-white/60 dark:bg-white/10 border border-outline-variant/40 text-on-surface-variant hover:text-primary"
-        >
-          <span className="material-symbols-outlined text-[20px]">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
-        </button>
+          tone="netral"
+          className="panel-inset"
+        />
 
-        <button
+        <IconButton
+          icon="restart_alt"
           onClick={resetDemo}
           title="Kembalikan data demo ke kondisi awal"
-          className="p-2 rounded-xl bg-white/60 dark:bg-white/10 border border-outline-variant/40 text-on-surface-variant hover:text-primary"
-        >
-          <span className="material-symbols-outlined text-[20px]">restart_alt</span>
-        </button>
+          tone="netral"
+          className="panel-inset"
+        />
       </div>
 
       {activeAlerts.length > 0 && (

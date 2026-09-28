@@ -1,4 +1,4 @@
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SmartProvider, useSmart } from './store/SmartStore';
 import SmartSidebar from './components/SmartSidebar';
 import SmartTopBar from './components/SmartTopBar';
@@ -6,7 +6,9 @@ import SmartTopBar from './components/SmartTopBar';
 import Dashboard from './pages/Dashboard';
 import Profil from './pages/Profil';
 import Login from './pages/Login';
+import Daftar from './pages/Daftar';
 import ListIot, { DeviceDetail } from './pages/ListIot';
+import DetailInformation from './pages/DetailInformation';
 import KelolaArea from './pages/KelolaArea';
 import AreaDetail from './pages/AreaDetail';
 import VPet from './pages/VPet';
@@ -20,17 +22,20 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminAreas from './pages/admin/AdminAreas';
 import AdminVPet from './pages/admin/AdminVPet';
 import AdminPoints from './pages/admin/AdminPoints';
+import AdminDetailInformation from './pages/admin/AdminDetailInformation';
 
 // Judul halaman untuk top bar
 const TITLES = [
   { path: '/admin/pengguna', title: 'Kelola User', subtitle: 'Akun pengguna, peran, dan area tanggung jawab' },
   { path: '/admin/iot', title: 'Kelola IoT', subtitle: 'Registrasi perangkat, kalibrasi, dan QR penjelas alat' },
   { path: '/admin/kategori', title: 'Kategori Device', subtitle: 'Jenis alat beserta parameter dan ambang idealnya' },
+  { path: '/admin/detail-informasi', title: 'Detail Information', subtitle: 'Penjelasan alat yang sama dengan yang dibaca pengguna' },
   { path: '/admin/area', title: 'Kelola Area', subtitle: 'Kolam, growbed, dan tandon yang sudah dipasangi IoT' },
   { path: '/admin/v-pet', title: 'Kelola Virtual Pet', subtitle: 'Jenis, kondisi, dan area pemantauan virtual pet' },
   { path: '/admin/point', title: 'Sistem Point', subtitle: 'Aturan poin, badge, dan saldo pengguna' },
   { path: '/admin', title: 'Dashboard Pengelola', subtitle: 'Ringkasan seluruh sistem aquaponik' },
   { path: '/profil', title: 'Profil Saya', subtitle: 'Ubah data diri, foto, dan password akun Anda' },
+  { path: '/detail-informasi', title: 'Detail Information', subtitle: 'Pindai QR alat untuk penjelasan lengkap perangkat' },
   { path: '/iot', title: 'List IoT', subtitle: 'Perangkat yang terpasang di farm' },
   { path: '/area', title: 'Kelola Area', subtitle: 'HPP dan pemantauan kolam Anda' },
   { path: '/v-pet', title: 'Virtual Pet', subtitle: 'Pemantauan farm dalam bentuk hewan peliharaan' },
@@ -63,12 +68,13 @@ function Shell() {
   const { role, isLoggedIn } = useSmart();
   const location = useLocation();
 
-  // Belum masuk → hanya halaman /masuk yang boleh dibuka.
+  // Belum masuk → hanya halaman /masuk dan /daftar yang boleh dibuka.
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen flex flex-col">
         <Routes>
           <Route path="/masuk" element={<Login />} />
+          <Route path="/daftar" element={<Daftar />} />
           <Route path="*" element={<Navigate to="/masuk" replace />} />
         </Routes>
         <Toast />
@@ -105,6 +111,7 @@ function Shell() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/iot" element={<ListIot />} />
             <Route path="/iot/:id" element={<DeviceDetail />} />
+            <Route path="/detail-informasi" element={<DetailInformation />} />
             <Route path="/area" element={<KelolaArea />} />
             <Route path="/area/:id" element={<AreaDetail />} />
             <Route path="/v-pet" element={<VPet />} />
@@ -116,6 +123,7 @@ function Shell() {
             <Route path="/admin/pengguna" element={<AdminUsers />} />
             <Route path="/admin/iot" element={<AdminIot />} />
             <Route path="/admin/kategori" element={<AdminCategories />} />
+            <Route path="/admin/detail-informasi" element={<AdminDetailInformation />} />
             <Route path="/admin/area" element={<AdminAreas />} />
             <Route path="/admin/v-pet" element={<AdminVPet />} />
             <Route path="/admin/point" element={<AdminPoints />} />

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { useSmart } from '../../store/SmartStore';
+import { Link } from 'react-router-dom';
+import { ambilKodeAlat, useSmart } from '../../store/SmartStore';
 import QrCode from '../../components/QrCode';
-import { Badge, Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, Select, StatCard, Table, STATUS_LABEL, STATUS_TONE } from '../../components/ui';
+import PanelInfoAlat from '../../components/PanelInfoAlat';
+import { AksiBaris, Button, Card, Empty, Field, IconButton, Input, Modal, NumberInput, SectionTitle, Select, StatCard, Table, STATUS_LABEL } from '../../components/ui';
 
 const empty = { code: '', name: '', categoryId: '', areaId: '', model: '', firmware: 'v1.0.0', status: 'online', battery: 100, signal: 'LoRaWAN 95%', metricKey: 'ph', metricValue: 7 };
 
@@ -13,8 +15,13 @@ export default function AdminIot() {
   const [confirm, setConfirm] = useState(null);
   const [filter, setFilter] = useState('');
 
-  const open = editing !== null || form !== empty;
-  const closeModal = () => { setEditing(null); setForm(empty); };
+  // Pintu modal "tambah" tidak bisa memakai `form !== empty`: saat menambah, form
+// di-set ke objek `empty` itu sendiri, sehingga perbandingannya SELALU false dan
+// modal tidak pernah terbuka. Dipakai state khusus supaya tidak ada ketergantungan
+// pada identitas objek.
+  const [terbuka, setTerbuka] = useState(false);
+  const open = terbuka;
+  const closeModal = () => { setEditing(null); setForm(empty); setTerbuka(false); };
 
   const category = categories.find((c) => c.id === form.categoryId) || categories[0];
 
@@ -26,6 +33,7 @@ export default function AdminIot() {
       metricKey: device.metric?.key || categoryOf(device.categoryId)?.metrics[0].key || 'ph',
       metricValue: device.metric?.value ?? 7,
     });
+    setTerbuka(true);
   };
 
   const submit = (event) => {
@@ -49,7 +57,7 @@ export default function AdminIot() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Total Perangkat" value={devices.length} icon="devices" hint="Terdaftar di sistem" />
         <StatCard label="Terhubung" value={devices.filter((d) => d.status === 'online').length} icon="wifi" hint="Mengirim telemetri" />
         <StatCard label="Butuh Tindakan" value={devices.filter((d) => d.status !== 'online').length} icon="build" tone="warn" hint="Kalibrasi / offline" />
@@ -61,7 +69,7 @@ export default function AdminIot() {
           eyebrow="Kelola IoT"
           title="Registrasi & pemeliharaan perangkat"
           subtitle="Setiap alat memiliki kode QR. Saat dipindai, aplikasi menampilkan nama alat, kategori, fungsi, dan lokasinya."
-          action={<Button icon="add" onClick={() => { setEditing(null); setForm({ ...empty, categoryId: categories[0]?.id || '' }); }}>Tambah device</Button>}
+          action={<Button icon="add" onClick={() => { setEditing(null); setForm({ ...empty, categoryId: categories[0]?.id || '' }); setTerbuka(true); }}>Tambah device</Button>}
         />
 
         <div className="mb-4 max-w-md">
@@ -78,7 +86,10 @@ export default function AdminIot() {
               <tr key={device.id} className="hover:bg-primary/5">
                 <td className="px-3 py-2">
                   <p className="font-mono text-xs font-bold text-on-surface">{device.code}</p>
-                  <button onClick={() => setQrDevice(device)} className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1">
+                  <button
+                    onClick={() => setQrDevice(device)}
+                    className="mt-0.5 inline-flex items-center gap-1 h-6 rounded-full border border-primary/30 bg-primary/5 px-2 text-[11px] font-bold text-primary hover:bg-primary/15 transition-colors"
+                  >
                     <span className="material-symbols-outlined text-[13px]">qr_code_2</span> QR
                   </button>
                 </td>
@@ -107,17 +118,11 @@ export default function AdminIot() {
                 <td className={`px-3 py-2 font-semibold ${device.battery < 40 ? 'text-red-600' : 'text-on-surface-variant'}`}>{device.battery}%</td>
                 <td className="px-3 py-2 text-on-surface-variant whitespace-nowrap">{device.lastCalibration}</td>
                 <td className="px-3 py-2">
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => calibrateDevice(device.id)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary" title="Kalibrasi ulang">
-                      <span className="material-symbols-outlined text-[18px]">build_circle</span>
-                    </button>
-                    <button onClick={() => startEdit(device)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary" title="Ubah perangkat">
-                      <span className="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                    <button onClick={() => setConfirm(device)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-600" title="Hapus perangkat">
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
-                  </div>
+                  <AksiBaris>
+                    <IconButton icon="build_circle" size="sm" onClick={() => calibrateDevice(device.id)} title="Kalibrasi ulang" />
+                    <IconButton icon="edit" size="sm" onClick={() => startEdit(device)} title="Ubah perangkat" />
+                    <IconButton icon="delete" tone="bad" size="sm" onClick={() => setConfirm(device)} title="Hapus perangkat" />
+                  </AksiBaris>
                 </td>
               </tr>
             ))}
@@ -182,37 +187,35 @@ export default function AdminIot() {
         </form>
       </Modal>
 
-      <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title={qrDevice ? `QR alat — ${qrDevice.code}` : ''}>
+      <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title={qrDevice ? `QR alat — ${qrDevice.code}` : ''} wide>
         {qrDevice && (
           <div className="space-y-4">
             <div className="flex justify-center">
-              <QrCode value={`JAGOFARM|${qrDevice.code}|${qrDevice.id}`} size={220} />
+              <QrCode value={ambilKodeAlat(qrDevice)} size={200} />
             </div>
-            <div className="rounded-xl border border-outline-variant/40 p-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">info</span>
-                <p className="font-bold text-on-surface">Yang tampil saat QR dipindai</p>
-              </div>
-              <p className="text-on-surface-variant">
-                <strong className="text-on-surface">{qrDevice.name}</strong> · kategori{' '}
-                <strong className="text-on-surface">{categoryOf(qrDevice.categoryId)?.name}</strong> · model {qrDevice.model}
+            <div className="rounded-xl panel-inset p-3 text-sm text-on-surface-variant">
+              <p className="font-bold text-on-surface">Yang tampil saat QR dipindai</p>
+              <p className="mt-1">
+                Isi QR ini dibaca oleh halaman <strong className="text-on-surface">Detail Information</strong> — teks
+                penjelasan lengkapnya bisa Anda periksa langsung, persis seperti yang dilihat pengguna.
               </p>
-              <p className="text-on-surface-variant">{categoryOf(qrDevice.categoryId)?.description}</p>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant pt-1">Fungsi alat</p>
-              <ul className="space-y-1">
-                {qrDevice.functions?.map((fn) => (
-                  <li key={fn} className="flex gap-2 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-primary text-[16px] mt-0.5">chevron_right</span>
-                    {fn}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Badge tone="info">Lokasi: {areaOf(qrDevice.areaId)?.name || 'belum ditempatkan'}</Badge>
-                <Badge tone={STATUS_TONE[qrDevice.status]}>{STATUS_LABEL[qrDevice.status]}</Badge>
-                <Badge>Baterai {qrDevice.battery}%</Badge>
-              </div>
             </div>
+
+            {/* Panel penjelasan BERSAMA: isi yang sama dengan yang dibaca pengguna
+                di menu Detail Information, jadi pengelola bisa memastikan
+                penjelasan, ambang, dan catatan perawatan yang dibaca pengguna. */}
+            <PanelInfoAlat
+              device={qrDevice}
+              kategori={categoryOf(qrDevice.categoryId)}
+              area={areaOf(qrDevice.areaId)}
+              aksi={
+                <Link to="/admin/detail-informasi" onClick={() => setQrDevice(null)} className="inline-flex">
+                  <Button variant="soft" icon="open_in_new">
+                    Buka halaman penuh
+                  </Button>
+                </Link>
+              }
+            />
           </div>
         )}
       </Modal>

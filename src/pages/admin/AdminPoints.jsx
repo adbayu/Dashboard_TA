@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useSmart } from '../../store/SmartStore';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, StatCard, Table } from '../../components/ui';
+import { IconButton, Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, StatCard, Table } from '../../components/ui';
 
 const emptyRule = { activity: '', points: 10, daily: 1, active: true };
 const emptyBadge = { name: '', icon: 'emoji_events', minPoints: 100, desc: '' };
 
 export default function AdminPoints() {
-  const { pointRules, badges, savePointRule, removePointRule, saveBadge, removeBadge, leaderboard, adjustPoints, ledger, points, users } = useSmart();
+  const { pointRules, badges, savePointRule, removePointRule, saveBadge, removeBadge, leaderboard, adjustPoints, ledger, users } = useSmart();
   const [rule, setRule] = useState(emptyRule);
   const [editRule, setEditRule] = useState(null);
   const [badge, setBadge] = useState(emptyBadge);
@@ -39,7 +39,7 @@ export default function AdminPoints() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Poin Beredar" value={totalPoints.toLocaleString('id-ID')} icon="stars" hint="Total saldo semua pengguna" />
         <StatCard label="Aturan Aktif" value={`${activeRules}/${pointRules.length}`} icon="rule" hint="Aktivitas yang memberi poin" />
         <StatCard label="Batas Harian" value={dailyCap.toLocaleString('id-ID')} icon="speed" hint="Maksimal poin per pengguna/hari" />
@@ -66,7 +66,7 @@ export default function AdminPoints() {
                 <td className="px-3 py-2">
                   <button
                     onClick={() => savePointRule({ ...row, active: !row.active })}
-                    className={`text-[11px] font-bold rounded-full px-2.5 py-1 border ${
+                    className={`inline-flex items-center h-6 text-[11px] font-bold rounded-full px-2.5 border transition-colors ${
                       row.active ? 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-surface-container text-on-surface-variant border-outline-variant/40'
                     }`}
                   >
@@ -75,12 +75,8 @@ export default function AdminPoints() {
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
-                    <button onClick={() => { setEditRule(row); setRule(row); }} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary" title="Ubah aturan">
-                      <span className="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                    <button onClick={() => removePointRule(row.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-600" title="Hapus aturan">
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
+                    <IconButton icon="edit" size="sm" onClick={() => { setEditRule(row); setRule(row); }} title="Ubah aturan" />
+                    <IconButton icon="delete" tone="bad" size="sm" onClick={() => removePointRule(row.id)} title="Hapus aturan" />
                   </div>
                 </td>
               </tr>
@@ -112,12 +108,8 @@ export default function AdminPoints() {
                       Ambang {row.minPoints.toLocaleString('id-ID')} point · {users.filter((u) => (u.points || 0) >= row.minPoints).length} pengguna tercapai
                     </p>
                   </div>
-                  <button onClick={() => { setEditBadge(row); setBadge(row); }} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary" title="Ubah badge">
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                  </button>
-                  <button onClick={() => removeBadge(row.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-600" title="Hapus badge">
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
+                  <IconButton icon="edit" size="sm" onClick={() => { setEditBadge(row); setBadge(row); }} title="Ubah badge" />
+                  <IconButton icon="delete" tone="bad" size="sm" onClick={() => removeBadge(row.id)} title="Hapus badge" />
                 </div>
               ))}
             </div>
@@ -184,7 +176,8 @@ export default function AdminPoints() {
               {ledger.length === 0 && <Empty title="Belum ada riwayat" icon="history" />}
             </ul>
             <p className="mt-3 text-[11px] text-on-surface-variant">
-              Saldo akun peraga saat ini: <strong className="text-on-surface">{points.toLocaleString('id-ID')} point</strong>
+              Total poin beredar di seluruh akun:{' '}
+              <strong className="text-on-surface">{leaderboard.reduce((n, r) => n + r.points, 0).toLocaleString('id-ID')} point</strong>
             </p>
           </Card>
         </div>

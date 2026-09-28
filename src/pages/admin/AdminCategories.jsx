@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useSmart } from '../../store/SmartStore';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, StatCard, Table } from '../../components/ui';
+import { IconButton, Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, StatCard, Table } from '../../components/ui';
 
-const empty = { name: '', icon: 'sensors', color: '#0f5238', description: '', metrics: [{ key: 'ph', label: 'pH Air', unit: 'pH', min: 6.2, max: 7.2 }] };
+const empty = { name: '', icon: 'sensors', color: '#0f5238', description: '', metrics: [{ key: 'ph', label: 'pH Air', unit: 'pH', min: 6.2, max: 7.6 }] };
 const ICONS = ['water_ec', 'device_thermostat', 'settings_input_component', 'bolt', 'sensors', 'science', 'opacity', 'air', 'thermostat', 'speed'];
 
 export default function AdminCategories() {
@@ -11,12 +11,18 @@ export default function AdminCategories() {
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
-  const open = editing !== null || form !== empty;
-  const closeModal = () => { setEditing(null); setForm(empty); };
+  // Pintu modal "tambah" tidak bisa memakai `form !== empty`: saat menambah, form
+// di-set ke objek `empty` itu sendiri, sehingga perbandingannya SELALU false dan
+// modal tidak pernah terbuka. Dipakai state khusus supaya tidak ada ketergantungan
+// pada identitas objek.
+  const [terbuka, setTerbuka] = useState(false);
+  const open = terbuka;
+  const closeModal = () => { setEditing(null); setForm(empty); setTerbuka(false); };
 
   const startEdit = (category) => {
     setEditing(category);
     setForm({ ...empty, ...category, metrics: category.metrics.map((m) => ({ ...m })) });
+    setTerbuka(true);
   };
 
   const submit = (event) => {
@@ -32,7 +38,7 @@ export default function AdminCategories() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Kategori Device" value={categories.length} icon="category" hint="Jenis alat terdaftar" />
         <StatCard label="Total Parameter" value={categories.reduce((n, c) => n + c.metrics.length, 0)} icon="tune" hint="Metrik yang diukur" />
         <StatCard label="Perangkat Terklasifikasi" value={devices.length} icon="devices" hint="Tersebar di seluruh kategori" />
@@ -44,7 +50,7 @@ export default function AdminCategories() {
           eyebrow="Kategori Device"
           title="Jenis perangkat & parameter ukurnya"
           subtitle="Kategori menentukan ikon alat, ambang ideal, dan daftar parameter yang bisa dipilih saat menambah perangkat."
-          action={<Button icon="add" onClick={() => { setEditing(null); setForm(empty); }}>Tambah kategori</Button>}
+          action={<Button icon="add" onClick={() => { setEditing(null); setForm(empty); setTerbuka(true); }}>Tambah kategori</Button>}
         />
         {categories.length === 0 ? (
           <Empty title="Belum ada kategori" icon="category" hint="Tambahkan kategori pertama, misalnya sensor kualitas air." />
@@ -65,12 +71,8 @@ export default function AdminCategories() {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => startEdit(category)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary" title="Ubah kategori">
-                        <span className="material-symbols-outlined text-[18px]">edit</span>
-                      </button>
-                      <button onClick={() => setConfirm(category)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-600" title="Hapus kategori">
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
+                      <IconButton icon="edit" size="sm" onClick={() => startEdit(category)} title="Ubah kategori" />
+                <IconButton icon="delete" tone="bad" size="sm" onClick={() => setConfirm(category)} title="Hapus kategori" />
                     </div>
                   </div>
                   <p className="mt-3 text-sm text-on-surface-variant">{category.description}</p>
@@ -124,8 +126,8 @@ export default function AdminCategories() {
                 key={icon}
                 type="button"
                 onClick={() => setForm({ ...form, icon })}
-                className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${
-                  form.icon === icon ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/50 text-on-surface-variant'
+                className={`inline-flex items-center gap-1 h-7 rounded-full border px-2.5 text-[11px] font-semibold transition-colors ${
+                  form.icon === icon ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/50'
                 }`}
               >
                 <span className="material-symbols-outlined text-[14px]">{icon}</span>
@@ -147,7 +149,7 @@ export default function AdminCategories() {
             </div>
             <div className="space-y-2">
               {form.metrics.map((metric, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-[1fr,1.2fr,0.8fr,0.8fr,0.8fr,auto] items-end rounded-xl border border-outline-variant/40 p-2">
+                <div key={index} className="grid gap-2 sm:grid-cols-[1fr,1.2fr,0.8fr,0.8fr,0.8fr,auto] items-start rounded-xl border border-outline-variant/40 p-2">
                   <Field label="Key">
                     <Input value={metric.key} onChange={(v) => updateMetric(index, { key: v })} placeholder="ph" />
                   </Field>
@@ -163,14 +165,14 @@ export default function AdminCategories() {
                   <Field label="Max">
                     <NumberInput step="any" value={metric.max} onChange={(v) => updateMetric(index, { max: v })} />
                   </Field>
-                  <button
-                    type="button"
+                  <IconButton
+                    icon="delete"
+                    tone="bad"
+                    size="sm"
+                    className="mb-0.5"
                     onClick={() => setForm((prev) => ({ ...prev, metrics: prev.metrics.filter((_, i) => i !== index) }))}
-                    className="p-2 rounded-lg hover:bg-red-500/10 text-red-600 mb-0.5"
                     title="Hapus parameter"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
+                  />
                 </div>
               ))}
             </div>

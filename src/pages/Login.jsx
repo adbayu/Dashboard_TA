@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { Button, Field, Input } from '../components/ui';
 import { DEMO_PASSWORD } from '../data/seed';
@@ -7,7 +7,7 @@ import { DEMO_PASSWORD } from '../data/seed';
 // Halaman masuk. Role TIDAK dipilih di sini — ditentukan oleh akun yang dipakai:
 // akun pengguna masuk ke "/", akun pengelola masuk ke "/admin".
 export default function Login() {
-  const { login, users } = useSmart();
+  const { login, users, resetDemoPassword } = useSmart();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +16,7 @@ export default function Login() {
   const [proses, setProses] = useState(false);
 
   const akunDemo = users.filter((u) => u.status === 'aktif');
+  const adaMenunggu = users.filter((u) => u.status === 'menunggu');
 
   async function kirim(e) {
     e.preventDefault();
@@ -31,6 +32,9 @@ export default function Login() {
   }
 
   function pakaiAkun(akun) {
+    // Kembalikan password akun demo ke nilai seed dulu. Tanpa ini, akun demo yang
+    // pernah diganti password-nya akan terus gagal login walau kolom sudah terisi.
+    resetDemoPassword(akun.email);
     setEmail(akun.email);
     setPassword(DEMO_PASSWORD);
     setGalat('');
@@ -75,7 +79,12 @@ export default function Login() {
         {/* Sisi kanan: formulir */}
         <div className="glass-panel rounded-3xl px-7 py-8 shadow-2xl flex flex-col">
           <h2 className="text-xl font-extrabold text-on-surface">Masuk</h2>
-          <p className="text-sm text-on-surface-variant mt-1">Gunakan email dan password akun Anda.</p>
+          <p className="text-sm text-on-surface-variant mt-1">
+            Belum punya akun?{' '}
+            <Link to="/daftar" className="font-bold text-primary hover:underline">
+              Daftar di sini
+            </Link>
+          </p>
 
           <form onSubmit={kirim} className="mt-6 space-y-4">
             <Field label="Email">
@@ -102,7 +111,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setLihatPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-on-surface-variant hover:text-primary"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-8 w-8 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
                   aria-label={lihatPassword ? 'Sembunyikan password' : 'Tampilkan password'}
                 >
                   <span className="material-symbols-outlined text-[18px]">{lihatPassword ? 'visibility_off' : 'visibility'}</span>
@@ -133,7 +142,7 @@ export default function Login() {
                   key={u.id}
                   type="button"
                   onClick={() => pakaiAkun(u)}
-                  className="w-full flex items-center gap-3 rounded-xl border border-outline-variant/40 bg-white/60 dark:bg-white/5 px-3 py-2 text-left hover:border-primary/50 hover:bg-primary/5 transition-all"
+                  className="w-full flex items-center gap-3 rounded-xl panel-inset px-3 py-2 text-left hover:border-primary/50 hover:bg-primary/10 transition-all"
                 >
                   <img src={u.avatar} alt="" className="w-9 h-9 rounded-lg object-cover" />
                   <span className="min-w-0 flex-1">
@@ -149,6 +158,13 @@ export default function Login() {
             <p className="mt-3 text-[11px] text-on-surface-variant">
               Password semua akun demo: <span className="font-bold text-on-surface">{DEMO_PASSWORD}</span>
             </p>
+            {adaMenunggu.length > 0 && (
+              <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-amber-900/20 px-3 py-2 text-[11px] text-on-surface-variant">
+                <span className="material-symbols-outlined text-[14px] text-amber-600">hourglass_top</span>
+                {adaMenunggu.length} pendaftar pengelola menunggu persetujuan — belum bisa masuk sampai
+                disetujui di menu Kelola User.
+              </p>
+            )}
           </div>
         </div>
       </div>

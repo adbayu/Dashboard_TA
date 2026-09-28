@@ -3,14 +3,14 @@ import { useSmart } from '../store/SmartStore';
 import { Badge, Bar, Button, Card, Empty, Modal, SectionTitle, StatCard, Table } from '../components/ui';
 
 export default function Gamifikasi() {
-  const { points, badges, missions, leaderboard, ledger, toggleMission, claimBadge, pet } = useSmart();
+  const { points, badges, missions, leaderboard, ledger, toggleMission, claimBadge, pet, currentUser } = useSmart();
   const [openBadge, setOpenBadge] = useState(null);
 
   const nextBadge = useMemo(
     () => badges.filter((b) => !b.claimed).sort((a, b) => a.minPoints - b.minPoints).find((b) => b.minPoints > points),
     [badges, points],
   );
-  const myRank = leaderboard.findIndex((row) => row.name === 'Budi Santoso') + 1;
+  const myRank = leaderboard.findIndex((row) => row.id === currentUser?.id) + 1;
   const doneMissions = missions.filter((m) => m.done).length;
   const missionPoints = missions.filter((m) => m.done).reduce((sum, m) => sum + m.points, 0);
 
@@ -18,7 +18,7 @@ export default function Gamifikasi() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Poin Anda" value={points.toLocaleString('id-ID')} icon="stars" hint="Dari seluruh aktivitas farm" />
         <StatCard label="Peringkat" value={myRank || '—'} unit={`/ ${leaderboard.length}`} icon="leaderboard" hint="Papan peringkat pengguna" />
         <StatCard label="Misi Selesai" value={`${doneMissions}/${missions.length}`} icon="task_alt" hint={`${missionPoints} point dari misi`} />
@@ -42,7 +42,7 @@ export default function Gamifikasi() {
               >
                 <button
                   onClick={() => toggleMission(mission.id)}
-                  className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                  className={`w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center transition-colors ${
                     mission.done ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-outline-variant'
                   }`}
                   aria-label={mission.done ? 'Batalkan misi' : 'Tandai misi selesai'}
@@ -121,7 +121,7 @@ export default function Gamifikasi() {
               {[...leaderboard]
                 .sort((a, b) => b.points - a.points)
                 .map((row, index) => (
-                  <tr key={row.id} className={row.name === 'Budi Santoso' ? 'bg-primary/5' : 'hover:bg-primary/5'}>
+                  <tr key={row.id} className={row.id === currentUser?.id ? 'bg-primary/5' : 'hover:bg-primary/5'}>
                     <td className="px-3 py-2 font-extrabold text-on-surface">
                       {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
                     </td>
@@ -151,7 +151,7 @@ export default function Gamifikasi() {
               ))}
             </ul>
           )}
-          <div className="mt-4 flex items-center gap-3 rounded-xl bg-surface-container/60 p-3">
+          <div className="mt-4 flex items-center gap-3 rounded-xl panel-inset p-3">
             <span className="material-symbols-outlined text-primary">pets</span>
             <p className="text-[11px] text-on-surface-variant">
               Pet <strong className="text-on-surface">{pet.name}</strong> ikut berkembang setiap Anda mengumpulkan poin perawatan.

@@ -3,11 +3,13 @@ import { formatRupiah, useSmart } from '../../store/SmartStore';
 import { Badge, Card, Empty, SectionTitle, StatCard, Table, STATUS_LABEL, STATUS_TONE } from '../../components/ui';
 
 export default function AdminDashboard() {
-  const { devices, areas, users, categories, pet, pointRules, badges, activeAlerts, hppTotal, leaderboard } = useSmart();
+  const { devices, areas, users, categories, pet, pointRules, badges, activeAlerts, hppTotal, leaderboard, kematian, totalKematianHariIni } = useSmart();
 
   const totalHpp = areas.reduce((sum, area) => sum + hppTotal(area.id).total, 0);
   const orphan = devices.filter((d) => !d.areaId);
   const activeRules = pointRules.filter((r) => r.active).length;
+  const hariIni = new Date().toLocaleDateString('en-CA');
+  const kematianHariIni = (kematian || []).filter((k) => k.tanggal === hariIni);
 
   const shortcut = [
     { to: '/admin/pengguna', label: 'Kelola User', icon: 'group', desc: `${users.length} akun terdaftar`, tone: 'brand' },
@@ -26,12 +28,15 @@ export default function AdminDashboard() {
           title="Ringkasan pengelolaan sistem aquaponik"
           subtitle="Kelola pengguna, perangkat IoT beserta QR penjelasannya, kategori alat, area yang sudah dipasangi sensor, virtual pet, dan sistem poin."
         />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
           <StatCard label="Pengguna" value={users.length} icon="group" hint={`${users.filter((u) => u.status === 'aktif').length} aktif`} />
           <StatCard label="Perangkat IoT" value={devices.length} icon="devices" hint={`${devices.filter((d) => d.status === 'online').length} terhubung`} />
           <StatCard label="Area Terpasang IoT" value={areas.filter((a) => a.deviceIds.length > 0).length} unit={`/ ${areas.length}`} icon="water" hint="Kolam & growbed" />
-          <StatCard label="Nilai HPP Sistem" value={formatRupiah(totalHpp)} icon="payments" hint="Akumulasi biaya tercatat pengguna" />
+          <StatCard label="Ikan Mati Hari Ini" value={totalKematianHariIni()} unit="ekor" icon="heart_broken" tone={totalKematianHariIni() > 0 ? 'warn' : 'ok'} hint="Dilaporkan pengguna" />
         </div>
+        <p className="mt-3 text-xs text-on-surface-variant">
+          Nilai HPP sistem: <strong className="text-on-surface">{formatRupiah(totalHpp)}</strong> — akumulasi biaya yang dicatat pengguna.
+        </p>
       </Card>
 
       <Card>
@@ -82,6 +87,34 @@ export default function AdminDashboard() {
                   <td className={`px-3 py-2 font-semibold ${device.battery < 40 ? 'text-red-600' : 'text-on-surface-variant'}`}>
                     {device.battery}%
                   </td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Card>
+
+        <Card>
+          <SectionTitle
+            eyebrow="Catatan Ikan Mati"
+            title="Laporan kematian hari ini"
+            subtitle="Diisi manual oleh pengguna dari menu Kelola Area."
+            action={
+              <Link to="/admin/area" className="text-sm font-bold text-primary hover:underline">
+                Kelola Area
+              </Link>
+            }
+          />
+          {kematianHariIni.length === 0 ? (
+            <Empty title="Tidak ada laporan kematian" hint="Belum ada pengguna yang mencatat ikan mati hari ini." icon="verified" />
+          ) : (
+            <Table head={['Kolam', 'Jumlah', 'Catatan']}>
+              {kematianHariIni.map((row) => (
+                <tr key={row.id} className="hover:bg-primary/5">
+                  <td className="px-3 py-2 font-semibold text-on-surface">
+                    {areas.find((a) => a.id === row.areaId)?.name || row.areaId}
+                  </td>
+                  <td className="px-3 py-2 font-bold text-on-surface">{row.jumlah} ekor</td>
+                  <td className="px-3 py-2 text-on-surface-variant">{row.catatan || '—'}</td>
                 </tr>
               ))}
             </Table>

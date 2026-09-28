@@ -7,11 +7,12 @@ import { CHAT_SUGGESTIONS } from '../data/seed';
 const uid = () => `MSG-${Math.random().toString(36).slice(2, 8)}`;
 
 export default function Chatbot() {
-  const { chat, pushChat, clearChat, areas, devices, points } = useSmart();
+  const { chat, pushChat, clearChat, areasSaya, devices, points } = useSmart();
   const [text, setText] = useState('');
-  const [areaId, setAreaId] = useState('AR-01');
+  const [areaId, setAreaId] = useState(areasSaya[0]?.id || '');
   const [thinking, setThinking] = useState(false);
   const scroller = useRef(null);
+  const areas = areasSaya;
 
   const messages = chat.length ? chat : [{ id: 'greet', role: 'bot', text: CHAT_GREETING.text, sources: [], suggestions: CHAT_SUGGESTIONS }];
 
@@ -74,7 +75,7 @@ export default function Chatbot() {
                   className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-line ${
                     message.role === 'user'
                       ? 'bg-primary text-white rounded-br-sm'
-                      : 'bg-white/70 dark:bg-white/10 border border-outline-variant/40 text-on-surface rounded-bl-sm'
+                      : 'panel-inset text-on-surface rounded-bl-sm'
                   }`}
                 >
                   {message.role === 'bot' && (
@@ -100,7 +101,7 @@ export default function Chatbot() {
                         <button
                           key={suggestion}
                           onClick={() => send(suggestion)}
-                          className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/15"
+                          className="inline-flex items-center h-8 rounded-full border border-primary/30 bg-primary/5 px-3 text-[12px] font-semibold text-primary hover:bg-primary/15 transition-colors"
                         >
                           {suggestion}
                         </button>
@@ -112,7 +113,7 @@ export default function Chatbot() {
             ))}
             {thinking && (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-sm bg-white/70 dark:bg-white/10 border border-outline-variant/40 px-4 py-3">
+                <div className="rounded-2xl rounded-bl-sm panel-inset px-4 py-3">
                   <span className="flex items-center gap-2 text-sm text-on-surface-variant">
                     <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                     Menelusuri basis pengetahuan aquaponik…

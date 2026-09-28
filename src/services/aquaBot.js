@@ -8,6 +8,10 @@ const STOPWORDS = new Set([
 ]);
 
 // Token pendek yang justru penting secara teknis — jangan dibuang.
+// 'do', 'ec', 'uv', 'rh' tetap di sini walau SENSOR-nya belum terpasang: pertanyaan
+// pengetahuan soal istilah itu tetap harus terjawab (jawabannya sudah menyebut
+// bahwa alatnya belum ada di farm ini). Menghapusnya membuat "berapa EC ideal?"
+// tidak dikenali sama sekali — regresi yang harus dihindari.
 const SHORT_TERMS = new Set(['ph', 'do', 'ec', 'tds', 'uv', 'hpp', 'iot', 'xp', 'nh3', 'no2', 'no3', 'rh', 'v']);
 
 const normalize = (text) => text.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ');
@@ -93,7 +97,7 @@ export function askAquaponik(question, context = {}) {
   if (!best || best.score < MIN_SCORE || !best.coreHit) {
     return {
       answer:
-        'Pertanyaan ini belum ada di basis pengetahuan demo saya. Coba tanyakan soal pH, amonia/nitrat, oksigen terlarut, suhu air, pakan, jenis sayur, EC/TDS, HPP, sensor IoT, hama, atau cara kerja aquaponik.',
+        'Pertanyaan ini belum ada di basis pengetahuan demo saya. Coba tanyakan soal pH, amonia/nitrat, suhu air, pakan, jenis sayur, TDS, HPP, sensor IoT, hama, atau cara kerja aquaponik.',
       sources: [],
       confidence: 0,
     };
@@ -111,21 +115,21 @@ function buildContextNote(question, context) {
   const { area, devices = [] } = context;
   if (!area) return '';
   const q = normalize(question);
-  const wantsAir = ['ph', 'amonia', 'oksigen', 'suhu', 'air', 'kolam', 'ec', 'tds', 'kualitas', 'pakan'].some((key) => q.includes(key));
+  const wantsAir = ['ph', 'amonia', 'oksigen', 'suhu', 'air', 'kolam', 'tds', 'kualitas', 'pakan'].some((key) => q.includes(key));
   if (!wantsAir) return '';
 
   const read = (key) => devices.find((device) => device.metric?.key === key)?.metric.value ?? null;
   const ph = read('ph');
-  const doVal = read('do');
   const temp = read('temp');
+  const tds = read('tds');
 
   const notes = [];
   if (ph != null) {
     const state = ph >= 6.5 && ph <= 7.5 ? 'ideal' : ph < 6.2 || ph > 7.8 ? 'di luar ambang aman' : 'mulai menyimpang';
     notes.push(`pH terbaca ${ph} (${state})`);
   }
-  if (doVal != null) notes.push(`oksigen terlarut ${doVal} mg/L`);
   if (temp != null) notes.push(`suhu air ${temp} °C`);
+  if (tds != null) notes.push(`TDS ${tds} ppm`);
   if (!notes.length) return '';
 
   return `Sesuai pembacaan sensor ${area.name} saat ini: ${notes.join(', ')}. Bandingkan dengan angka ideal di atas sebelum mengambil tindakan.`;

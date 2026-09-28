@@ -1,19 +1,32 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useSmart } from '../store/SmartStore';
-import QrCode from '../components/QrCode';
+import { ambangUntuk, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../store/SmartStore';
+import PanelInfoAlat from '../components/PanelInfoAlat';
 import { Badge, Button, Card, Empty, Field, Input, Modal, SectionTitle, Select, StatCard, STATUS_LABEL, STATUS_TONE } from '../components/ui';
 
+// Pengguna hanya boleh melihat perangkat di area yang menjadi tanggung jawabnya
+// (diatur pengelola di Kelola User). Perangkat yang BELUM ditempatkan juga tidak
+// terlihat oleh pengguna — bukan barang siapa pun sampai pengelola menugaskannya.
+// Pengelola melihat semuanya.
+const deviceTerlihat = (device, role, areaIds) =>
+  role === 'pengelola' || (!!device.areaId && (areaIds || []).includes(device.areaId));
+
 export default function ListIot() {
-  const { devices, categories, areas, categoryOf, areaOf } = useSmart();
+  const { devices, categories, areas, categoryOf, areaOf, role, currentUser } = useSmart();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [area, setArea] = useState('');
   const [status, setStatus] = useState('');
 
+  const areaSaya = role === 'pengelola' ? areas : areas.filter((a) => (currentUser?.areaIds || []).includes(a.id));
+  const devicesSaya = useMemo(
+    () => devices.filter((d) => deviceTerlihat(d, role, currentUser?.areaIds)),
+    [devices, role, currentUser],
+  );
+
   const filtered = useMemo(
     () =>
-      devices.filter((device) => {
+      devicesSaya.filter((device) => {
         const matchQuery =
           !query ||
           [device.name, device.code, device.model].join(' ').toLowerCase().includes(query.toLowerCase());
@@ -24,23 +37,27 @@ export default function ListIot() {
           (!status || device.status === status)
         );
       }),
-    [devices, query, category, area, status],
+    [devicesSaya, query, category, area, status],
   );
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Device" value={devices.length} icon="devices" hint="Terdaftar di sistem" />
-        <StatCard label="Terhubung" value={devices.filter((d) => d.status === 'online').length} icon="wifi" hint="Mengirim data aktif" />
-        <StatCard label="Perlu Perhatian" value={devices.filter((d) => d.status === 'warning').length} icon="warning" tone="warn" hint="Nilai atau baterai menyimpang" />
-        <StatCard label="Perawatan" value={devices.filter((d) => d.status !== 'online' && d.status !== 'warning').length} icon="build" tone="bad" hint="Kalibrasi atau offline" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
+        <StatCard label="Total Device" value={devicesSaya.length} icon="devices" hint={role === 'pengelola' ? 'Terdaftar di sistem' : 'Di area yang Anda ampu'} />
+        <StatCard label="Terhubung" value={devicesSaya.filter((d) => d.status === 'online').length} icon="wifi" hint="Mengirim data aktif" />
+        <StatCard label="Perlu Perhatian" value={devicesSaya.filter((d) => d.status === 'warning').length} icon="warning" tone="warn" hint="Nilai atau baterai menyimpang" />
+        <StatCard label="Perawatan" value={devicesSaya.filter((d) => d.status !== 'online' && d.status !== 'warning').length} icon="build" tone="bad" hint="Kalibrasi atau offline" />
       </div>
 
       <Card>
         <SectionTitle
           eyebrow="List IoT"
           title="Perangkat terpasang di farm"
-          subtitle="Setiap alat punya halaman detail berisi fungsi, parameter ukur, baterai, sinyal, dan jadwal kalibrasi."
+          subtitle={
+            role === 'pengelola'
+              ? 'Setiap alat punya halaman detail berisi fungsi, parameter ukur, baterai, sinyal, dan jadwal kalibrasi.'
+              : 'Menampilkan perangkat di area yang menjadi tanggung jawab Anda. Detail berisi fungsi alat, parameter ukur, baterai, sinyal, dan jadwal kalibrasi.'
+          }
         />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5">
           <Field label="Cari device">
@@ -55,7 +72,7 @@ export default function ListIot() {
             />
           </Field>
           <Field label="Area">
-            <Select value={area} onChange={setArea} placeholder="Semua area" options={areas.map((a) => ({ value: a.id, label: a.name }))} />
+            <Select value={area} onChange={setArea} placeholder="Semua area" options={areaSaya.map((a) => ({ value: a.id, label: a.name }))} />
           </Field>
           <Field label="Status">
             <Select
@@ -81,8 +98,8 @@ export default function ListIot() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span
-                      className="material-symbols-outlined text-[24px]"
-                      style={{ color: cat?.color || '#0f5238' }}
+                      className="material-symbols-outlined text-[24px] kat-icon"
+                      style={{ '--kat': cat?.color || '#0f5238' }}
                     >
                       {cat?.icon || 'sensors'}
                     </span>
@@ -92,7 +109,7 @@ export default function ListIot() {
                   <p className="text-[11px] text-on-surface-variant mt-0.5">
                     {device.code} · {device.model}
                   </p>
-                  <div className="mt-3 flex items-end justify-between">
+                  <div className="mt-3 flex items-start justify-between gap-2">
                     <div>
                       <p className="text-2xl font-extrabold text-on-surface">
                         {device.metric?.value ?? '—'}
@@ -121,9 +138,24 @@ export default function ListIot() {
 // ── Detail informasi device ───────────────────────────────────────────────────
 export function DeviceDetail() {
   const { id } = useParams();
-  const { devices, areas, categoryOf, areaOf, calibrateDevice, assignDeviceArea, monitoring } = useSmart();
+  const { devices, areas, categoryOf, areaOf, calibrateDevice, assignDeviceArea, monitoring, role, currentUser } = useSmart();
   const [showQr, setShowQr] = useState(false);
   const device = devices.find((d) => d.id === id);
+
+  // Perangkat di luar area yang diampu tidak boleh dibuka oleh pengguna —
+  // samakan dengan aturan yang berlaku di halaman List IoT.
+  // Untuk perangkat yang tidak ada sama sekali, biarkan jatuh ke pesan
+  // "tidak ditemukan" di bawah supaya pesannya tidak menyesatkan.
+  if (device && !deviceTerlihat(device, role, currentUser?.areaIds)) {
+    return (
+      <Card>
+        <Empty title="Perangkat ini bukan di area Anda" icon="lock" hint="Hubungi pengelola bila Anda perlu akses ke perangkat ini." />
+        <Link to="/iot" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
+          <span className="material-symbols-outlined text-[16px]">arrow_back</span> Kembali ke List IoT
+        </Link>
+      </Card>
+    );
+  }
 
   if (!device) {
     return (
@@ -137,11 +169,12 @@ export function DeviceDetail() {
   }
 
   const cat = categoryOf(device.categoryId);
-  const metric = cat?.metrics.find((m) => m.key === device.metric?.key);
   const area = areaOf(device.areaId);
+  // Ambang memakai helper bersama supaya label di halaman ini tidak berbeda
+  // dari dashboard dan statistik harian.
+  const ambang = ambangUntuk(area, cat, device.metric?.key);
+  const posisi = nilaiTerhadapAmbang(device.metric?.value, ambang);
   const relatedNotes = monitoring.filter((m) => m.areaId === device.areaId).slice(0, 3);
-  const inRange =
-    metric && device.metric ? device.metric.value >= metric.min && device.metric.value <= metric.max : null;
 
   return (
     <div className="space-y-6">
@@ -163,13 +196,13 @@ export function DeviceDetail() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <span
-              className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/70 dark:bg-white/10 border border-outline-variant/40"
-              style={{ color: cat?.color || '#0f5238' }}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center panel-inset kat-icon"
+              style={{ '--kat': cat?.color || '#0f5238' }}
             >
               <span className="material-symbols-outlined text-[28px]">{cat?.icon || 'sensors'}</span>
             </span>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-primary/70">{cat?.name}</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">{cat?.name}</p>
               <h2 className="text-2xl font-extrabold text-on-surface">{device.name}</h2>
               <p className="text-sm text-on-surface-variant">
                 {device.code} · {device.model} · Firmware {device.firmware}
@@ -199,24 +232,37 @@ export function DeviceDetail() {
 
           <Card>
             <SectionTitle eyebrow="Pembacaan" title="Nilai sensor saat ini" subtitle="Diperbarui otomatis setiap 5 detik (simulasi)." />
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3 items-stretch">
               <div className="rounded-2xl border border-outline-variant/40 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                  {metric?.label || device.metric?.key}
+                  {METRIC_META[device.metric?.key]?.label || device.metric?.key}
                 </p>
                 <p className="text-3xl font-extrabold text-on-surface mt-1">
-                  {device.metric?.value ?? '—'} <small className="text-xs text-on-surface-variant">{metric?.unit}</small>
+                  {device.metric?.value ?? '—'} <small className="text-xs text-on-surface-variant">{METRIC_META[device.metric?.key]?.unit}</small>
                 </p>
-                <Badge tone={inRange === null ? 'muted' : inRange ? 'ok' : 'bad'} className="mt-2">
-                  {inRange === null ? 'Tanpa ambang' : inRange ? 'Dalam ambang ideal' : 'Keluar ambang ideal'}
+                <Badge
+                  tone={posisi === null ? 'muted' : posisi === 'dalam' ? 'ok' : 'bad'}
+                  className="mt-2"
+                >
+                  {posisi === null
+                    ? 'Tanpa ambang'
+                    : posisi === 'dalam'
+                      ? 'Dalam ambang ideal'
+                      : posisi === 'atas'
+                        ? 'Di atas ambang ideal'
+                        : 'Di bawah ambang ideal'}
                 </Badge>
               </div>
               <div className="rounded-2xl border border-outline-variant/40 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Rentang ideal</p>
                 <p className="text-lg font-extrabold text-on-surface mt-1">
-                  {metric ? `${metric.min} – ${metric.max} ${metric.unit}` : '—'}
+                  {ambang ? `${ambang[0]} – ${ambang[1]} ${METRIC_META[device.metric?.key]?.unit || ''}` : '—'}
                 </p>
-                <p className="text-[11px] text-on-surface-variant mt-2">Ambang ditetapkan di Kategori Device.</p>
+                <p className="text-[11px] text-on-surface-variant mt-2">
+                  {area?.targets?.[device.metric?.key]
+                    ? 'Ambang khusus area ini (diatur pengelola lewat Kelola Area).'
+                    : 'Ambang bawaan kategori device.'}
+                </p>
               </div>
               <div className="rounded-2xl border border-outline-variant/40 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Penempatan</p>
@@ -250,8 +296,8 @@ export function DeviceDetail() {
                     <p className="text-[11px] text-on-surface-variant mt-1">
                       oleh {note.by}
                       {note.ph != null && ` · pH ${note.ph}`}
-                      {note.doVal != null && ` · DO ${note.doVal}`}
                       {note.temp != null && ` · ${note.temp} °C`}
+                      {note.tds != null && ` · TDS ${note.tds} ppm`}
                     </p>
                   </div>
                 ))}
@@ -303,46 +349,13 @@ export function DeviceDetail() {
         </div>
       </div>
 
-      <Modal open={showQr} onClose={() => setShowQr(false)} title={`QR alat — ${device.code}`}>
-        <QrPanel device={device} category={cat} area={area} />
+      <Modal open={showQr} onClose={() => setShowQr(false)} title={`QR alat — ${device.code}`} wide>
+        {/* Panel penjelasan BERSAMA: isi yang sama dengan yang dibaca pengguna di
+            menu Detail Information dan dengan yang dipakai pengelola di Kelola IoT.
+            Sebelumnya halaman ini punya QrPanel sendiri, sehingga penjelasan alat
+            hidup di TIGA tempat dengan isi yang berbeda-beda. */}
+        <PanelInfoAlat device={device} kategori={cat} area={area} />
       </Modal>
-    </div>
-  );
-}
-
-function QrPanel({ device, category, area }) {
-  const url = `http://127.0.0.1:4173/iot/${device.id}`;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-center">
-        <QrCode value={url} size={220} caption={device.code} />
-      </div>
-      <p className="text-center text-[11px] text-on-surface-variant">
-        Pindai untuk membuka halaman perangkat: <span className="font-mono">{url}</span>
-      </p>
-      <div className="rounded-xl border border-outline-variant/40 p-4 space-y-2 text-sm">
-        <p className="font-bold text-on-surface flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-[18px]">info</span>
-          Penjelasan saat QR dipindai
-        </p>
-        <p className="text-on-surface-variant">
-          <strong className="text-on-surface">{device.name}</strong> ({device.code}) adalah {category?.name?.toLowerCase()}. {device.description}
-        </p>
-        <p className="text-on-surface-variant">Fungsinya:</p>
-        <ul className="space-y-1">
-          {device.functions.map((fn) => (
-            <li key={fn} className="flex items-start gap-2 text-on-surface-variant">
-              <span className="material-symbols-outlined text-primary text-[16px] mt-0.5">chevron_right</span>
-              {fn}
-            </li>
-          ))}
-        </ul>
-        <p className="text-on-surface-variant">
-          Lokasi: <strong className="text-on-surface">{area?.name || 'belum ditempatkan'}</strong>. Status unit:{' '}
-          <strong className="text-on-surface">{STATUS_LABEL[device.status]}</strong>.
-        </p>
-      </div>
     </div>
   );
 }

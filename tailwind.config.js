@@ -36,25 +36,32 @@ export default {
         "on-tertiary-fixed": "#001d33",
         "on-tertiary-fixed-variant": "#124a73",
 
-        background: "#f8fafb",
-        "on-background": "#191c1d",
-        surface: "#f8fafb",
-        "on-surface": "#191c1d",
-        "surface-dim": "#d8dadb",
-        "surface-bright": "#f8fafb",
-        "surface-container-lowest": "#ffffff",
-        "surface-container-low": "#f2f4f5",
-        "surface-container": "#eceeef",
-        "surface-container-high": "#e6e8e9",
-        "surface-container-highest": "#e1e3e4",
-        "surface-variant": "#e1e3e4",
-        "on-surface-variant": "#404943",
-        "inverse-surface": "#2e3132",
-        "inverse-on-surface": "#eff1f2",
+        // ── Token semantik (dipakai ~300x di seluruh halaman) ─────────────────
+        // Nilainya adalah CSS variable dalam bentuk triplet RGB agar modifier
+        // opacity Tailwind (mis. border-outline-variant/40) tetap bekerja.
+        // Variable diisi di src/index.css: nilai terang di :root, nilai gelap di
+        // .dark. JANGAN kembalikan ke hex statis — hex statis membuat dark mode
+        // memakai warna tema terang (teks #191c1d di atas latar gelap, kontras
+        // 1.01:1 sehingga tidak terbaca).
+        background: "rgb(var(--c-background) / <alpha-value>)",
+        "on-background": "rgb(var(--c-on-background) / <alpha-value>)",
+        surface: "rgb(var(--c-surface) / <alpha-value>)",
+        "on-surface": "rgb(var(--c-on-surface) / <alpha-value>)",
+        "surface-dim": "rgb(var(--c-surface-dim) / <alpha-value>)",
+        "surface-bright": "rgb(var(--c-surface-bright) / <alpha-value>)",
+        "surface-container-lowest": "rgb(var(--c-surface-container-lowest) / <alpha-value>)",
+        "surface-container-low": "rgb(var(--c-surface-container-low) / <alpha-value>)",
+        "surface-container": "rgb(var(--c-surface-container) / <alpha-value>)",
+        "surface-container-high": "rgb(var(--c-surface-container-high) / <alpha-value>)",
+        "surface-container-highest": "rgb(var(--c-surface-container-highest) / <alpha-value>)",
+        "surface-variant": "rgb(var(--c-surface-variant) / <alpha-value>)",
+        "on-surface-variant": "rgb(var(--c-on-surface-variant) / <alpha-value>)",
+        "inverse-surface": "rgb(var(--c-inverse-surface) / <alpha-value>)",
+        "inverse-on-surface": "rgb(var(--c-inverse-on-surface) / <alpha-value>)",
         "surface-tint": "#2c694e",
 
-        outline: "#707973",
-        "outline-variant": "#bfc9c1",
+        outline: "rgb(var(--c-outline) / <alpha-value>)",
+        "outline-variant": "rgb(var(--c-outline-variant) / <alpha-value>)",
 
         error: "#ba1a1a",
         "error-container": "#ffdad6",

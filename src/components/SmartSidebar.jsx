@@ -1,4 +1,4 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
@@ -9,6 +9,7 @@ export const MENUS = {
       items: [
         { to: '/', end: true, label: 'Dashboard', icon: 'dashboard', hint: 'Ringkasan kolam & sensor aktif' },
         { to: '/iot', label: 'List IoT', icon: 'sensors', hint: 'Semua perangkat terpasang' },
+        { to: '/detail-informasi', label: 'Detail Information', icon: 'qr_code_scanner', hint: 'Pindai QR alat & baca penjelasannya' },
       ],
     },
     {
@@ -36,6 +37,7 @@ export const MENUS = {
       items: [
         { to: '/admin/pengguna', label: 'Kelola User', icon: 'group', hint: 'Akun pengguna & hak akses area' },
         { to: '/admin/iot', label: 'Kelola IoT', icon: 'devices', hint: 'Perangkat, kalibrasi & QR alat' },
+        { to: '/admin/detail-informasi', label: 'Detail Information', icon: 'qr_code_2', hint: 'Penjelasan alat yang dibaca pengguna' },
         { to: '/admin/kategori', label: 'Kategori Device', icon: 'category', hint: 'Jenis alat & parameter ukurnya' },
         { to: '/admin/area', label: 'Kelola Area', icon: 'water', hint: 'Kolam/growbed yang sudah dipasangi IoT' },
         { to: '/admin/v-pet', label: 'Kelola Virtual Pet', icon: 'pets', hint: 'Jenis pet, kondisi & reset' },
@@ -46,17 +48,12 @@ export const MENUS = {
 };
 
 // ── Sidebar per role: menu diambil dari MENUS sesuai role aktif (dari URL) ───
+// Tombol Keluar sengaja TIDAK ada di sini — logout ada di halaman /profil.
 export default function SmartSidebar({ role: roleProp }) {
-  const { role: roleCtx, currentUser, points, activeAlerts, logout } = useSmart();
-  const navigate = useNavigate();
+  const { role: roleCtx, currentUser, points, activeAlerts } = useSmart();
   const role = roleProp || roleCtx;
   const menu = MENUS[role] || MENUS.pengguna;
   const pending = activeAlerts.length;
-
-  function keluar() {
-    logout();
-    navigate('/masuk', { replace: true });
-  }
 
   return (
     <>
@@ -105,7 +102,7 @@ export default function SmartSidebar({ role: roleProp }) {
         <nav className="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-5">
           {menu.map((section) => (
             <div key={section.group}>
-              <p className="px-2 mb-2 text-[10px] font-extrabold uppercase tracking-widest text-white/40">{section.group}</p>
+              <p className="px-2 mb-2 text-[10px] font-extrabold uppercase tracking-widest text-white/60">{section.group}</p>
               <div className="space-y-1">
                 {section.items.map((item) => (
                   <NavLink
@@ -114,7 +111,9 @@ export default function SmartSidebar({ role: roleProp }) {
                     end={item.end}
                     className={({ isActive }) =>
                       `flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all group ${
-                        isActive ? 'bg-white text-primary shadow-lg' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        isActive
+                          ? 'bg-white text-primary shadow-lg dark:bg-inverse-primary/15 dark:text-inverse-primary dark:shadow-none'
+                          : 'text-white/80 hover:bg-white/10 hover:text-white'
                       }`
                     }
                   >
@@ -123,7 +122,7 @@ export default function SmartSidebar({ role: roleProp }) {
                         <span className={`material-symbols-outlined text-[20px] mt-0.5 ${isActive ? 'fill text-primary' : ''}`}>{item.icon}</span>
                         <span className="min-w-0">
                           <span className="block text-[13px] font-bold leading-tight">{item.label}</span>
-                          <span className={`block text-[11px] leading-tight ${isActive ? 'text-on-surface-variant' : 'text-white/50'}`}>{item.hint}</span>
+                          <span className={`block text-[11px] leading-tight ${isActive ? 'text-on-surface-variant dark:text-inverse-primary' : 'text-white/60'}`}>{item.hint}</span>
                         </span>
                       </>
                     )}
@@ -149,16 +148,7 @@ export default function SmartSidebar({ role: roleProp }) {
               {pending} device butuh perhatian
             </p>
           )}
-          <p className="text-[10px] text-white/40 leading-snug">Data demo lokal — belum terhubung hardware IoT fisik.</p>
-
-          <button
-            type="button"
-            onClick={() => keluar()}
-            className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-red-500/15 border border-red-400/30 px-3 py-2 text-[12px] font-bold text-red-200 hover:bg-red-500/25 hover:text-white transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">logout</span>
-            Keluar
-          </button>
+          <p className="text-[10px] text-white/60 leading-snug">Data demo lokal — belum terhubung hardware IoT fisik.</p>
         </div>
       </aside>
     </>

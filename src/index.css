@@ -3,6 +3,54 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Token warna semantik ────────────────────────────────────────────────
+     Dipakai lewat Tailwind (text-on-surface, bg-surface-container, ...) di
+     ~300 tempat. Nilai terang ada di :root, nilai gelap ditimpa di .dark.
+     Ditulis sebagai triplet RGB (tanpa rgb()) supaya modifier opacity seperti
+     border-outline-variant/40 tetap bekerja. */
+  :root {
+    --c-background: 248 250 251;
+    --c-on-background: 25 28 29;
+    --c-surface: 248 250 251;
+    --c-on-surface: 25 28 29;
+    --c-surface-dim: 216 218 219;
+    --c-surface-bright: 248 250 251;
+    --c-surface-container-lowest: 255 255 255;
+    --c-surface-container-low: 242 244 245;
+    --c-surface-container: 236 238 239;
+    --c-surface-container-high: 230 232 233;
+    --c-surface-container-highest: 225 227 228;
+    --c-surface-variant: 225 227 228;
+    --c-on-surface-variant: 64 73 67;
+    --c-inverse-surface: 46 49 50;
+    --c-inverse-on-surface: 239 241 242;
+    --c-outline: 92 101 95;
+    --c-outline-variant: 191 201 193;
+    /* Hijau tua tema terang: tetap dipakai sebagai latar tombol (teks putih di
+       atasnya sudah kontras). Untuk TEKS, .dark menimpanya di @layer utilities. */
+    --c-primary: 15 82 56;
+  }
+
+  .dark {
+    --c-background: 17 21 19;
+    --c-on-background: 240 244 241;
+    --c-surface: 23 28 25;
+    --c-on-surface: 233 238 234;
+    --c-surface-dim: 12 16 14;
+    --c-surface-bright: 33 40 36;
+    --c-surface-container-lowest: 12 16 14;
+    --c-surface-container-low: 21 26 23;
+    --c-surface-container: 26 32 28;
+    --c-surface-container-high: 33 40 36;
+    --c-surface-container-highest: 41 49 44;
+    --c-surface-variant: 44 52 47;
+    --c-on-surface-variant: 186 199 190;
+    --c-inverse-surface: 233 238 234;
+    --c-inverse-on-surface: 23 28 25;
+    --c-outline: 158 170 162;
+    --c-outline-variant: 60 71 64;
+  }
+
   /* Kunci scroll horizontal di level html juga: body saja tidak cukup karena
      halaman masih bisa bergeser saat font ikon Google sedang dimuat. */
   html {
@@ -10,19 +58,98 @@
   }
 
   body {
-    background: linear-gradient(135deg, #f8fafb 0%, #eceeef 50%, #d8dadb 100%);
+    /* Gradien latar mode terang sengaja dibuat LEBIH TEDUH daripada kartu.
+       Sebelumnya #f8fafb -> #d8dadb (terlalu terang): kartu putih di atasnya
+       hanya berjarak 1.07:1 sehingga seluruh halaman tampak menyatu dan batas
+       kartu tidak terlihat. Dengan latar lebih dalam, kartu putih terbaca
+       sebagai bidang terpisah. */
+    background: linear-gradient(135deg, #e7eef2 0%, #d9e3e9 50%, #c4d3db 100%);
     min-height: 100vh;
     font-family: 'Hanken Grotesk', sans-serif;
-    color: #191c1d;
+    /* Pakai variable, BUKAN hex statis: hex di sini berada di @layer base
+       sehingga menimpa .text-on-surface milik Tailwind (utilities) dan membuat
+       SEMUA teks yang tidak punya kelas warna tetap gelap di mode gelap. */
+    color: rgb(var(--c-on-surface));
   }
 
   .dark body {
     background: linear-gradient(135deg, #131715 0%, #191c1d 50%, #0d1210 100%);
-    color: #eff1f2;
+    color: rgb(var(--c-on-surface));
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Manrope', sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Hijau tua #0f5238 di atas latar gelap hanya 1.97:1 (praktis tak terbaca).
+     Karena `primary` yang sama juga dipakai sebagai LATAR tombol, tokennya tidak
+     bisa diubah; teks beraksen ditimpa di sini dengan primary-fixed-dim (#95d4b3,
+     kontras 10.2:1) sehingga tidak perlu menyunting 70 pemakaian text-primary. */
+  .dark .text-primary {
+    color: #95d4b3;
+  }
+  .dark .hover\:text-primary:hover {
+    color: #b1f0ce;
+  }
+  /* Warna status: versi 600 dari palet Tailwind terlalu gelap di atas permukaan
+     gelap (mis. #dc2626 hanya 3.29:1, #d97706 hanya 2.13:1). Ditimpa di sini
+     supaya 19 pemakaian text-red-600/text-amber-600 tidak perlu disunting satu
+     per satu dan tetap konsisten. */
+  .dark .text-red-600 {
+    color: #f87171;
+  }
+  /* Tombol "Keluar" (di halaman Profil) memakai latar merah transparan
+     (bg-red-500/15) yang di atas permukaan gelap jadi cokelat gelap; teks
+     #f87171 hanya 2.45:1 di situ. Di mode gelap tombolnya dibalik: latar merah
+     pekat + teks gelap -> kontras tinggi dan tetap terbaca sebagai tindakan
+     berbahaya. */
+  .dark .tombol-keluar {
+    background-color: rgba(248, 113, 113, 0.9);
+    border-color: rgba(248, 113, 113, 0.9);
+    color: #1c1917;
+  }
+  .dark .tombol-keluar:hover {
+    background-color: #fca5a5;
+    border-color: #fca5a5;
+    color: #1c1917;
+  }
+  .dark .text-amber-600 {
+    color: #fcd34d;
+  }
+  .dark .hover\:text-red-600:hover {
+    color: #fca5a5;
+  }
+  /* Warna kategori device datang dari data seed (#0369a1, #b45309, #7c3aed,
+     #be123c). Di atas permukaan gelap warna itu hanya 2.0-3.2:1 sehingga ikon
+     sulit dikenali. Dicampur 50% ke putih HANYA di mode gelap -> 4.9-7.5:1.
+     Tanpa color-mix (browser lama) aturan ini diabaikan dan warna kembali ke
+     perilaku semula, jadi tidak ada yang rusak. */
+  .kat-icon {
+    color: var(--kat, currentColor);
+  }
+  .dark .kat-icon {
+    color: color-mix(in srgb, var(--kat, currentColor) 50%, white);
+  }
+  /* Panel bersarang DI DALAM kartu (kotak metrik, gelembung chat, tombol
+     sekunder). Sebelumnya memakai bg-white/50-70 yang di atas kartu putih
+     nyaris tak terlihat (kontras 1.02-1.07:1). Versi ini memakai tint hijau
+     tipis + garis tepi sehingga kotak dalam tetap terbaca sebagai bidang
+     terpisah tanpa mengubah nuansa kaca. */
+  .panel-inset {
+    background-color: rgba(15, 82, 56, 0.05);
+    border: 1px solid rgba(15, 82, 56, 0.22);
+  }
+  .dark .panel-inset {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .panel-inset:hover {
+    background-color: rgba(15, 82, 56, 0.10);
+  }
+  .dark .panel-inset:hover {
+    background-color: rgba(255, 255, 255, 0.11);
   }
 }
 
@@ -37,13 +164,20 @@
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Glassmorphism Styles matching Stitch Lumina Aqua */
+/* Glassmorphism Styles matching Stitch Lumina Aqua
+   Mode terang: kartu dibuat hampir pekat (0.92) dan BORDER-nya diberi warna
+   hijau tua tipis, bukan putih. Border putih di atas kartu putih tidak terlihat
+   sama sekali (kontras 1.02:1) — itu penyebab utama tampilan "menyatu dengan
+   background". Sekarang batas kartu terbaca, dan shadow dibuat berlapis
+   (dekat + jauh) supaya kartu terasa mengambang. */
 .glass-card {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 8px 32px 0 rgba(15, 82, 56, 0.05);
+  border: 1px solid rgba(15, 82, 56, 0.20);
+  box-shadow:
+    0 1px 2px 0 rgba(15, 82, 56, 0.06),
+    0 8px 24px -4px rgba(15, 82, 56, 0.10);
   transition: all 0.2s ease-in-out;
 }
 
@@ -56,14 +190,17 @@
 }
 
 .glass-card:hover {
-  box-shadow: 0 12px 40px 0 rgba(15, 82, 56, 0.09);
+  box-shadow:
+    0 1px 2px 0 rgba(15, 82, 56, 0.06),
+    0 12px 36px -4px rgba(15, 82, 56, 0.16);
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 82, 56, 0.14);
+  box-shadow: 0 12px 40px -8px rgba(15, 82, 56, 0.18);
 }
 
 .dark .glass-panel {
@@ -72,8 +209,8 @@
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(191, 201, 193, 0.5);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 82, 56, 0.20);
   backdrop-filter: blur(10px);
 }
 

@@ -1,8 +1,9 @@
-import { useSmart } from '../store/SmartStore';
-import { Badge, Bar, Button, Card, Empty, SectionTitle, Table } from '../components/ui';
+import { ambangUntuk, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../store/SmartStore';
+import { Badge, Bar, Button, Card, Empty, SectionTitle, Table, Select } from '../components/ui';
 
 export default function VPet() {
-  const { pet, feedPet, playPet, cleanPet, healPet, decayPet, areas, applyPetToArea, devices } = useSmart();
+  const { pet, feedPet, playPet, cleanPet, healPet, decayPet, areasSaya, applyPetToArea, devices, categoryOf } = useSmart();
+  const areas = areasSaya;
 
   const status = [
     { key: 'hunger', label: 'Kenyang', value: pet.hunger, icon: 'restaurant', low: 'Lapar — beri pakan' },
@@ -13,16 +14,23 @@ export default function VPet() {
 
   const area = areas.find((a) => a.id === pet.appliedToAreaId);
   const areaDevices = devices.filter((d) => d.areaId === pet.appliedToAreaId);
-  const waterQuality = () => {
-    const ph = areaDevices.find((d) => d.metric?.key === 'ph');
-    const doVal = areaDevices.find((d) => d.metric?.key === 'do');
-    const temp = areaDevices.find((d) => d.metric?.key === 'temp');
-    const notes = [];
-    if (ph) notes.push({ label: 'pH', value: ph.metric.value, ok: ph.metric.value >= 6.5 && ph.metric.value <= 7.5 });
-    if (doVal) notes.push({ label: 'DO', value: doVal.metric.value, ok: doVal.metric.value >= 5.5 });
-    if (temp) notes.push({ label: 'Suhu', value: temp.metric.value, ok: temp.metric.value >= 25 && temp.metric.value <= 29 });
-    return notes;
-  };
+  // Ambang memakai helper bersama: sebelumnya halaman ini menyimpan angka
+  // sendiri (pH 6,5–7,5 / suhu 25–29 / TDS 400–900) sehingga penilaian kondisi
+  // air pet bisa berbeda dari dashboard dan statistik harian.
+  const waterQuality = () =>
+    areaDevices
+      .filter((d) => METRIC_META[d.metric?.key])
+      .map((d) => {
+        const ambang = ambangUntuk(area, categoryOf(d.categoryId), d.metric.key);
+        return {
+          key: d.metric.key,
+          label: METRIC_META[d.metric.key].label.replace(' Air', ''),
+          unit: METRIC_META[d.metric.key].unit,
+          value: d.metric.value,
+          ambang,
+          ok: nilaiTerhadapAmbang(d.metric.value, ambang) === 'dalam',
+        };
+      });
   const readings = waterQuality();
   const avgHealth = Math.round(status.reduce((sum, row) => sum + row.value, 0) / status.length);
 
@@ -32,7 +40,7 @@ export default function VPet() {
         <Card className="bg-gradient-to-br from-primary/10 to-transparent text-center">
           <SectionTitle eyebrow="Virtual Pet" title={pet.name} subtitle={`${pet.species} · Level ${pet.level} · Tahap ${pet.stage}`} />
           <div className="my-4 flex justify-center">
-            <div className="relative w-40 h-40 rounded-full bg-white/60 dark:bg-white/10 border-4 border-primary/20 flex items-center justify-center">
+            <div className="relative w-40 h-40 rounded-full panel-inset border-4 border-primary/25 flex items-center justify-center">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '76px' }}>
                 {pet.species?.toLowerCase().includes('lele') ? 'phishing' : 'set_meal'}
               </span>
@@ -96,32 +104,41 @@ export default function VPet() {
               title="Kualitas air area pet"
               subtitle="Kesehatan pet mengikuti kualitas air area yang ditautkan."
             />
-            <div className="grid gap-3 sm:grid-cols-[1fr,auto] items-end">
-              <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,240px),1fr] sm:items-start">
+              <div className="grid grid-cols-3 gap-3 sm:order-2">
                 {readings.length === 0 ? (
                   <p className="col-span-3 text-sm text-on-surface-variant">Belum ada sensor air di area ini.</p>
                 ) : (
                   readings.map((read) => (
-                    <div key={read.label} className="rounded-xl border border-outline-variant/40 p-3 text-center">
+                    <div key={read.key} className="rounded-xl border border-outline-variant/40 p-3 text-center">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{read.label}</p>
-                      <p className="text-lg font-extrabold text-on-surface">{read.value}</p>
+                      <p className="text-lg font-extrabold text-on-surface">
+                        {read.value} <small className="text-[11px] font-semibold text-on-surface-variant">{read.unit}</small>
+                      </p>
                       <Badge tone={read.ok ? 'ok' : 'warn'}>{read.ok ? 'Aman' : 'Cek'}</Badge>
+                      {read.ambang && (
+                        <p className="text-[10px] text-outline mt-1">
+                          Ideal {read.ambang[0]}–{read.ambang[1]}
+                        </p>
+                      )}
                     </div>
                   ))
                 )}
               </div>
-              <select
-                value={pet.appliedToAreaId || ''}
-                onChange={(event) => applyPetToArea(event.target.value)}
-                className="w-full rounded-xl glass-input px-3 py-2 text-sm text-on-surface"
-              >
-                <option value="">Pilih area pemantauan…</option>
-                {areas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+              {/* Pemilih area diletakkan SEJAJAR dengan kartu metrik (order-2 di
+                  atas), bukan di bawahnya. Sebelumnya ia jatuh sebagai satu-satunya
+                  elemen baris kedua sehingga tampak "menempel" di bawah kartu. */}
+              <div className="sm:order-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
+                  Area pemantauan
+                </p>
+                <Select
+                  value={pet.appliedToAreaId || ''}
+                  onChange={applyPetToArea}
+                  placeholder="Pilih area pemantauan…"
+                  options={areas.map((a) => ({ value: a.id, label: a.name }))}
+                />
+              </div>
             </div>
             <p className="text-[11px] text-on-surface-variant mt-2">
               Area aktif: <strong className="text-on-surface">{area?.name || 'belum dipilih'}</strong>

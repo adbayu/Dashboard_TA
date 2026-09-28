@@ -1,25 +1,48 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { formatRupiah, useSmart } from '../store/SmartStore';
-import {
+import { formatRupiah, METRIC_META, useSmart } from '../store/SmartStore';
+import { IconButton,
   Badge, Button, Card, Empty, Field, Input, NumberInput, SectionTitle, StatCard, STATUS_LABEL,
   STATUS_TONE, Select, Table, TextArea,
 } from '../components/ui';
 
 const emptyHpp = { name: '', qty: 1, unit: 'unit', unitPrice: '' };
-const emptyNote = { ph: '', doVal: '', temp: '', ec: '', note: '' };
+// Pemantauan manual memakai tiga parameter yang sama dengan sensor: pH, suhu, TDS.
+const emptyNote = { ph: '', temp: '', tds: '', note: '' };
+const emptyMati = { jumlah: '', catatan: '' };
+
+const WARNA_STATUS = { aman: 'ok', waspada: 'warn', bahaya: 'bad', 'tanpa-ambang': 'muted' };
+const TEKS_STATUS = { aman: 'Aman', waspada: 'Waspada', bahaya: 'Keluar ambang', 'tanpa-ambang': 'Tanpa ambang' };
+const angka = (value, digit) => (value == null ? '—' : Number(value).toFixed(digit));
 
 export default function AreaDetail() {
   const { id } = useParams();
   const {
-    areas, devicesByArea, hppTotal, monitoring, harvests, saveHpp, removeHpp, addMonitoring, removeMonitoring, addHarvest,
+    areasSaya, bolehAksesArea, devicesByArea, hppTotal, monitoring, harvests, saveHpp, removeHpp, addMonitoring,
+    removeMonitoring, addHarvest, statistikArea, kematian, catatKematian, removeKematian, currentUser,
   } = useSmart();
   const [hppForm, setHppForm] = useState(emptyHpp);
   const [editingHpp, setEditingHpp] = useState(null);
   const [noteForm, setNoteForm] = useState(emptyNote);
+  const [matiForm, setMatiForm] = useState(emptyMati);
   const [harvest, setHarvest] = useState({ qty: '', unit: 'kg', revenue: '', note: '', date: new Date().toISOString().slice(0, 10) });
 
-  const area = areas.find((a) => a.id === id);
+  const area = areasSaya.find((a) => a.id === id);
+
+  // Periksa HAK AKSES lebih dulu, sebelum mencari areanya. Kalau urutannya
+  // dibalik, area milik operator lain tidak ditemukan di `areasSaya` sehingga
+  // yang muncul justru pesan "area tidak ditemukan" — padahal masalahnya izin.
+  if (!bolehAksesArea(id)) {
+    return (
+      <Card>
+        <Empty title="Area ini bukan tanggung jawab Anda" icon="lock" hint="Hubungi pengelola bila Anda perlu akses ke area ini." />
+        <Link to="/area" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
+          <span className="material-symbols-outlined text-[16px]">arrow_back</span> Kembali ke Kelola Area
+        </Link>
+      </Card>
+    );
+  }
+
   if (!area) {
     return (
       <Card>
@@ -38,6 +61,14 @@ export default function AreaDetail() {
   const revenue = crops.reduce((sum, h) => sum + Number(h.revenue || 0), 0);
   const margin = revenue - total;
 
+  const stats = statistikArea(area.id);
+  const catatanMati = kematian.filter((k) => k.areaId === area.id);
+  const matiHariIni = catatanMati.reduce((sum, k) => sum + Number(k.jumlah || 0), 0);
+  const punyaSensor = areaDevices.some((d) => d.metric);
+  // Ikan mati hanya relevan untuk kolam ikan; growbed dan tandon tidak berisi ikan.
+  const isKolam = area.type === 'kolam';
+  const satuanPopulasi = area.populationUnit || 'ekor';
+
   const submitHpp = (event) => {
     event.preventDefault();
     if (!hppForm.name || !hppForm.unitPrice) return;
@@ -48,13 +79,20 @@ export default function AreaDetail() {
 
   const submitNote = (event) => {
     event.preventDefault();
-    const entry = { areaId: area.id, areaName: area.name, by: 'Budi Santoso' };
-    for (const key of ['ph', 'doVal', 'temp', 'ec']) {
+    const entry = { areaId: area.id, areaName: area.name, by: currentUser?.name || 'Pengguna' };
+    for (const key of ['ph', 'temp', 'tds']) {
       if (noteForm[key] !== '' && noteForm[key] != null) entry[key] = Number(noteForm[key]);
     }
     entry.note = noteForm.note;
     addMonitoring(entry);
     setNoteForm(emptyNote);
+  };
+
+  const submitMati = (event) => {
+    event.preventDefault();
+    if (matiForm.jumlah === '') return;
+    catatKematian(area.id, matiForm.jumlah, matiForm.catatan);
+    setMatiForm(emptyMati);
   };
 
   const submitHarvest = (event) => {
@@ -73,7 +111,7 @@ export default function AreaDetail() {
       <Card className="bg-gradient-to-br from-primary/10 to-transparent">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-primary/70">{area.type} · {area.location}</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">{area.type} · {area.location}</p>
             <h2 className="text-2xl font-extrabold text-on-surface">{area.name}</h2>
             <p className="text-sm text-on-surface-variant mt-1">
               {area.commodity} · {Number(area.population).toLocaleString('id-ID')} {area.populationUnit} ·{' '}
@@ -81,11 +119,14 @@ export default function AreaDetail() {
             </p>
             {area.note && <p className="text-sm text-on-surface-variant mt-2 max-w-2xl">{area.note}</p>}
           </div>
-          <Badge tone={area.status === 'aktif' ? 'ok' : 'muted'}>{area.status === 'aktif' ? 'Area aktif' : 'Tidak aktif'}</Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge tone={area.status === 'aktif' ? 'ok' : 'muted'}>{area.status === 'aktif' ? 'Area aktif' : 'Tidak aktif'}</Badge>
+            {isKolam && <Badge tone={matiHariIni > 0 ? 'bad' : 'ok'}>Mati hari ini: {matiHariIni} ekor</Badge>}
+          </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Total HPP" value={formatRupiah(total)} icon="payments" hint={`${area.hpp.length} item biaya`} />
         <StatCard label="HPP / Unit" value={perUnit ? formatRupiah(perUnit) : '—'} icon="calculate" hint={`per ${area.populationUnit}`} />
         <StatCard label="Pendapatan" value={formatRupiah(revenue)} icon="savings" hint={`${crops.length} catatan panen`} />
@@ -98,6 +139,118 @@ export default function AreaDetail() {
         />
       </div>
 
+      {/* ── Statistik harian kolam dari sensor ── */}
+      <Card>
+        <SectionTitle
+          eyebrow="Statistik Harian"
+          title="Rekap sensor hari ini"
+          subtitle="Terendah, rata-rata, dan tertinggi hari ini dari sensor pH, suhu air, dan TDS yang terpasang di area ini."
+        />
+        {!punyaSensor ? (
+          <Empty
+            title="Area ini belum dipasangi sensor"
+            hint="Statistik harian hanya muncul untuk area yang punya perangkat pH, suhu, atau TDS."
+            icon="sensors_off"
+          />
+        ) : (
+          <>
+            <p className="text-[11px] text-on-surface-variant mb-3">
+              {stats.jumlah} pembacaan hari ini{stats.jam ? ` · pembacaan terakhir ${stats.jam}` : ''}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3 items-stretch">
+              {stats.banding.map((row) => {
+                const meta = METRIC_META[row.key];
+                const s = row.stats;
+                return (
+                  <div key={row.key} className="rounded-2xl border border-outline-variant/40 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{meta.label}</span>
+                      {s && <Badge tone={WARNA_STATUS[row.status]}>{TEKS_STATUS[row.status]}</Badge>}
+                    </div>
+                    {s ? (
+                      <>
+                        <p className="mt-1 text-3xl font-extrabold text-on-surface">
+                          {angka(s.avg, meta.precision)}{' '}
+                          <small className="text-xs font-semibold text-on-surface-variant">{meta.unit} rata-rata</small>
+                        </p>
+                        <dl className="mt-2 space-y-1 text-[11px] text-on-surface-variant">
+                          <div className="flex justify-between">
+                            <dt>Terendah</dt>
+                            <dd className="font-semibold text-on-surface">{angka(s.min, meta.precision)} {meta.unit}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt>Tertinggi</dt>
+                            <dd className="font-semibold text-on-surface">{angka(s.max, meta.precision)} {meta.unit}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt>Jumlah pembacaan</dt>
+                            <dd className="font-semibold text-on-surface">{s.n}</dd>
+                          </div>
+                        </dl>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-sm text-on-surface-variant">Belum ada pembacaan sensor ini hari ini.</p>
+                    )}
+                    {row.ambang && (
+                      <p className="text-[11px] text-outline mt-2">
+                        Ambang ideal {row.ambang[0]}–{row.ambang[1]} {meta.unit}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {isKolam && (
+        <Card>
+          <SectionTitle
+            eyebrow="Kematian Ikan"
+            title="Catat jumlah ikan mati hari ini"
+            subtitle="Diisi manual sesuai hitungan di kolam. Satu kolam satu catatan per hari — mengisi ulang di hari yang sama memperbarui angkanya, dan populasi kolam ikut disesuaikan."
+          />
+          <div className="grid gap-4 lg:grid-cols-[2fr,3fr]">
+            <form onSubmit={submitMati} className="space-y-3">
+              <Field label="Jumlah ikan mati (ekor)" hint={`Tanggal hari ini. Populasi tercatat: ${Number(area.population).toLocaleString('id-ID')} ${satuanPopulasi}`}>
+                <NumberInput min="0" step="1" placeholder="0" value={matiForm.jumlah} onChange={(v) => setMatiForm({ ...matiForm, jumlah: v })} required />
+              </Field>
+              <Field label="Catatan (opsional)" hint="cth. ditemukan pagi, diduga kekurangan oksigen">
+                <Input placeholder="Sebab atau temuan di lapangan" value={matiForm.catatan} onChange={(v) => setMatiForm({ ...matiForm, catatan: v })} />
+              </Field>
+              <Button type="submit" icon="save" className="w-full justify-center">Simpan catatan hari ini</Button>
+              {matiHariIni > 0 && (
+                <p className="text-[11px] text-on-surface-variant">
+                  Tercatat hari ini: <strong className="text-on-surface">{matiHariIni} ekor</strong> untuk {area.name}.
+                </p>
+              )}
+            </form>
+
+            <div>
+              {catatanMati.length === 0 ? (
+                <Empty title="Belum ada catatan kematian" hint="Isi formulir di samping untuk mencatat hari ini." icon="heart_broken" />
+              ) : (
+                <Table head={['Tanggal', 'Jumlah', 'Catatan', '']}>
+                  {catatanMati.map((row) => (
+                    <tr key={row.id} className="hover:bg-primary/5">
+                      <td className="px-3 py-2 whitespace-nowrap text-on-surface-variant">{row.tanggal}</td>
+                      <td className="px-3 py-2 font-bold text-on-surface">{row.jumlah} ekor</td>
+                      <td className="px-3 py-2 text-on-surface-variant">{row.catatan || '—'}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-end">
+                          <IconButton icon="delete" tone="bad" size="sm" onClick={() => removeKematian(row.id)} title="Hapus catatan (populasi dikembalikan)" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
         {/* ── HPP ── */}
         <Card>
@@ -106,7 +259,7 @@ export default function AreaDetail() {
             title="Item biaya area ini"
             subtitle="Masukkan setiap komponen biaya; sistem menjumlahkan dan menghitung HPP per unit secara otomatis."
           />
-          <form onSubmit={submitHpp} className="grid gap-3 sm:grid-cols-[2fr,1fr,1fr,1fr,auto] items-end mb-4">
+          <form onSubmit={submitHpp} className="grid gap-3 sm:grid-cols-[2fr,1fr,1fr,1fr,auto] items-start mb-4">
             <Field label="Nama item biaya">
               <Input
                 placeholder="cth. Pakan apung 781-2"
@@ -141,22 +294,8 @@ export default function AreaDetail() {
                   <td className="px-3 py-2 font-bold text-on-surface">{formatRupiah(item.qty * item.unitPrice)}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => { setEditingHpp(item); setHppForm({ name: item.name, qty: item.qty, unit: item.unit, unitPrice: item.unitPrice, id: item.id }); }}
-                        className="p-1.5 rounded-lg hover:bg-primary/10 text-primary"
-                        title="Ubah item"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeHpp(area.id, item.id)}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-600"
-                        title="Hapus item"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
+                      <IconButton icon="edit" size="sm" onClick={() => { setEditingHpp(item); setHppForm({ name: item.name, qty: item.qty, unit: item.unit, unitPrice: item.unitPrice, id: item.id }); }} title="Ubah item" />
+                      <IconButton icon="delete" tone="bad" size="sm" onClick={() => removeHpp(area.id, item.id)} title="Hapus item" />
                     </div>
                   </td>
                 </tr>
@@ -174,22 +313,19 @@ export default function AreaDetail() {
           )}
         </Card>
 
-        {/* ── Pemantauan ── */}
+        {/* ── Pemantauan manual ── */}
         <Card>
           <SectionTitle eyebrow="Pemantauan" title="Catat kondisi kolam" subtitle="Isi minimal satu parameter. Setiap catatan memberi +15 point." />
           <form onSubmit={submitNote} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Field label="pH air">
-                <NumberInput step="0.1" placeholder="6.8" value={noteForm.ph} onChange={(v) => setNoteForm({ ...noteForm, ph: v })} />
-              </Field>
-              <Field label="Oksigen (mg/L)">
-                <NumberInput step="0.1" placeholder="6.9" value={noteForm.doVal} onChange={(v) => setNoteForm({ ...noteForm, doVal: v })} />
+                <NumberInput step="0.01" placeholder="6.80" value={noteForm.ph} onChange={(v) => setNoteForm({ ...noteForm, ph: v })} />
               </Field>
               <Field label="Suhu air (°C)">
                 <NumberInput step="0.1" placeholder="25.8" value={noteForm.temp} onChange={(v) => setNoteForm({ ...noteForm, temp: v })} />
               </Field>
-              <Field label="EC (mS/cm)">
-                <NumberInput step="0.01" placeholder="1.8" value={noteForm.ec} onChange={(v) => setNoteForm({ ...noteForm, ec: v })} />
+              <Field label="TDS (ppm)">
+                <NumberInput step="1" placeholder="780" value={noteForm.tds} onChange={(v) => setNoteForm({ ...noteForm, tds: v })} />
               </Field>
             </div>
             <Field label="Catatan kondisi">
@@ -221,14 +357,11 @@ export default function AreaDetail() {
                       </p>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {note.ph != null && <Badge tone="info">pH {note.ph}</Badge>}
-                        {note.doVal != null && <Badge tone="info">DO {note.doVal}</Badge>}
                         {note.temp != null && <Badge tone="info">{note.temp} °C</Badge>}
-                        {note.ec != null && <Badge tone="info">EC {note.ec}</Badge>}
+                        {note.tds != null && <Badge tone="info">TDS {note.tds} ppm</Badge>}
                       </div>
                     </div>
-                    <button onClick={() => removeMonitoring(note.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-600" title="Hapus catatan">
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
+                    <IconButton icon="delete" tone="bad" size="sm" onClick={() => removeMonitoring(note.id)} title="Hapus catatan" />
                   </div>
                 </li>
               ))}

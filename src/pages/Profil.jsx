@@ -1,19 +1,14 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { Badge, Button, Card, Field, Input, SectionTitle, StatCard, TextArea } from '../components/ui';
-
-const AVATAR_PILIHAN = [
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250',
-  'https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&q=80&w=250',
-];
+import { AVATAR_PILIHAN } from '../data/seed';
 
 // Halaman profil: pemilik akun dapat mengubah data dirinya sendiri + ganti password.
+// Tombol Keluar ada di sini (bukan di sidebar) — di kartu ringkasan akun.
 export default function Profil() {
-  const { currentUser, updateProfile, changePassword, areas, role, points } = useSmart();
+  const { currentUser, updateProfile, changePassword, areas, role, points, logout } = useSmart();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState(() => ({
     name: currentUser?.name || '',
@@ -35,6 +30,11 @@ export default function Profil() {
   }
 
   const areaSaya = areas.filter((a) => (currentUser.areaIds || []).includes(a.id));
+
+  function keluar() {
+    logout();
+    navigate('/masuk', { replace: true });
+  }
 
   function simpan(e) {
     e.preventDefault();
@@ -75,7 +75,7 @@ export default function Profil() {
             className="w-20 h-20 rounded-2xl object-cover ring-4 ring-primary/20"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-primary/70">Profil Saya</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">Profil Saya</p>
             <h2 className="text-2xl font-extrabold text-on-surface leading-tight">{form.name || currentUser.name}</h2>
             <p className="text-sm text-on-surface-variant">{form.jabatan || 'Belum ada jabatan'} · {form.email}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -88,10 +88,20 @@ export default function Profil() {
               <Badge tone="info">Sejak {currentUser.joinedAt}</Badge>
             </div>
           </div>
+
+          {/* Tombol keluar akun — sengaja ditaruh di profil, bukan sidebar */}
+          <button
+            type="button"
+            onClick={keluar}
+            className="tombol-keluar shrink-0 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-red-500/40 px-4 text-[13px] font-bold text-red-600 hover:bg-red-600/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">logout</span>
+            Keluar
+          </button>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Total Point" value={points.toLocaleString('id-ID')} icon="stars" hint="Dari aktivitas Anda" />
         <StatCard label="Area Diampu" value={areaSaya.length} icon="water" hint="Kolam / growbed" />
         <StatCard label="Kode Akun" value={currentUser.id} icon="badge" hint="Identitas di sistem" />
@@ -210,7 +220,7 @@ export default function Profil() {
         ) : (
           <div className="flex flex-wrap gap-2">
             {areaSaya.map((a) => (
-              <span key={a.id} className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/40 bg-white/60 dark:bg-white/5 px-3 py-2">
+              <span key={a.id} className="inline-flex items-center gap-2 rounded-xl panel-inset px-3 py-2">
                 <span className="material-symbols-outlined text-[18px] text-primary">water</span>
                 <span>
                   <span className="block text-sm font-bold text-on-surface">{a.name}</span>

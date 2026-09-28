@@ -28,7 +28,7 @@ export default function AdminVPet() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Jenis Pet Aktif" value={pet.species} icon="pets" hint={`Level ${pet.level} · ${pet.stage}`} />
         <StatCard label="Kondisi Rata-rata" value={`${avg}%`} icon="favorite" tone={avg < 50 ? 'bad' : 'ok'} hint="Gabungan 4 indikator" />
         <StatCard label="Pengalaman" value={`${pet.xp}/${pet.xpNext}`} icon="trending_up" hint="Progres ke level berikutnya" />
@@ -39,7 +39,7 @@ export default function AdminVPet() {
         <Card className="text-center bg-gradient-to-br from-primary/10 to-transparent">
           <SectionTitle eyebrow="Virtual Pet Aktif" title={pet.name} subtitle={`${pet.species} · tahap ${pet.stage}`} />
           <div className="my-3 flex justify-center">
-            <div className="w-32 h-32 rounded-full bg-white/60 dark:bg-white/10 border-4 border-primary/20 flex items-center justify-center">
+            <div className="w-32 h-32 rounded-full panel-inset border-4 border-primary/25 flex items-center justify-center">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '60px' }}>
                 {pet.species.toLowerCase().includes('lele') ? 'phishing' : 'set_meal'}
               </span>
