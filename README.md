@@ -565,7 +565,25 @@ Aplikasi tetap "berjalan" walau jaringan dimatikan — itu tandanya data masih d
 
 ---
 
-## 8. Portal tampilan: satu sistem ukuran
+## 8. Galeri tampilan
+
+Tangkapan layar asli dari aplikasi yang berjalan (mode hasil build), tersimpan di
+`docs/tampilan/`:
+
+| Berkas | Isi |
+| --- | --- |
+| `01-dashboard-pengguna.png` | Dashboard pengguna (mode terang) — 3 sensor, statistik harian |
+| `02-detail-informasi-qr.png` | Detail Information setelah pindai QR — kartu "Kode QR Alat" + 3 tombol aksi |
+| `03-dashboard-gelap.png` | Dashboard pengguna (mode gelap) |
+| `04-modal-qr-pengelola.png` | Modal QR di Kelola IoT (pengelola) — 3 tombol aksi |
+| `05-detail-informasi-pengelola.png` | Detail Information sisi pengelola — ada tombol pemindai kamera |
+| `06-halaman-masuk.png` | Halaman masuk (`/masuk`) |
+
+Semua diambil pada 1280x800 px. Cara memperbarui: jalankan `npm run preview`, buka halamannya,
+lalu tangkap layar viewport (bukan seluruh halaman — halaman Detail Information sangat panjang
+sehingga penangkapan penuh waktu habis).
+
+## 9. Portal tampilan: satu sistem ukuran
 
 Seluruh halaman memakai **satu skala ukuran** dari `src/components/ui.jsx` (`UKURAN`).
 Sebelumnya tiap halaman menulis padding tombolnya sendiri sehingga tinggi tombol berbeda-beda
@@ -625,7 +643,7 @@ lingkungan uji (teks ligatur seperti `restaurant` merentang sampai 130px). Selal
 
 ---
 
-## 9. Yang belum ada
+## 10. Yang belum ada
 
 - Autentikasi berbasis server: password masih tersimpan apa adanya di `localStorage`
   (tidak terenkripsi, tidak ada token sesi) — lihat catatan keamanan di bagian 3
