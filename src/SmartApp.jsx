@@ -50,7 +50,7 @@ function Toast() {
   return (
     <div className="fixed bottom-5 right-5 z-[70] max-w-sm">
       <div
-        className={`flex items-start gap-2 rounded-2xl px-4 py-3 shadow-2xl border text-sm font-semibold ${
+        className={`flex items-start gap-2 rounded-2xl px-4 py-3 shadow-glass-elevated border text-sm font-semibold ${
           toast.tone === 'warn'
             ? 'bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700'
             : 'bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-700'
@@ -65,8 +65,29 @@ function Toast() {
 }
 
 function Shell() {
-  const { role, isLoggedIn } = useSmart();
+  const { role, isLoggedIn, kondisi, resetDemo } = useSmart();
   const location = useLocation();
+
+  // Kondisi penyimpanan yang dulu tidak pernah ditampilkan (R-27). Hanya satu
+  // yang bisa terjadi di aplikasi ini: data localStorage tidak bisa dibaca
+  // (JSON rusak / disunting manual). Kondisi "belum ada data" tidak mungkin
+  // muncul karena data awal sistem selalu terisi, jadi tidak dibuat cabang
+  // mati untuknya. Saat nanti tersambung backend, keadaan memuat/gagal jaringan
+  // ditambahkan di sini juga.
+  const catatanPenyimpanan =
+    kondisi === 'rusak' ? (
+      <div role="alert" className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
+        <strong className="block">Data tersimpan di browser ini tidak bisa dibaca.</strong>
+        Sistem memakai data awal agar tetap bisa dipakai. Pilih Kembalikan data demo untuk memulai ulang dari data contoh.
+        <button
+          type="button"
+          onClick={resetDemo}
+          className="ml-2 underline font-semibold"
+        >
+          Kembalikan data demo
+        </button>
+      </div>
+    ) : null;
 
   // Belum masuk → hanya halaman /masuk dan /daftar yang boleh dibuka.
   if (!isLoggedIn) {
@@ -103,6 +124,7 @@ function Shell() {
         <SmartTopBar title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} />
 
         <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-[1500px] mx-auto pb-16">
+          {catatanPenyimpanan}
           <Routes>
             {/* ── Profil: tersedia untuk kedua role ── */}
             <Route path="/profil" element={<Profil />} />

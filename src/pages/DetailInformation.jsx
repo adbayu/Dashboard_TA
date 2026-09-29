@@ -34,7 +34,7 @@ export default function DetailInformation() {
     setPindai(false);
     setTeksQr(mentah);
     if (!mentah) {
-      setGalat('Isi QR kosong — coba pindai ulang atau ketik kode alatnya.');
+      setGalat('Isi QR kosong. Coba pindai ulang atau ketik kode alatnya.');
       setHasil(null);
       return;
     }

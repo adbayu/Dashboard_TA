@@ -155,7 +155,7 @@ export default function AdminAreas() {
                     </p>
                   </td>
                   <td className="px-3 py-2 text-on-surface-variant">
-                    {owners.length ? owners.map((o) => o.name).join(', ') : '—'}
+                    {owners.length ? owners.map((o) => o.name).join(', ') : '·'}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
@@ -170,7 +170,7 @@ export default function AdminAreas() {
         )}
       </Card>
 
-      <Modal open={open} onClose={closeModal} title={editing ? `Ubah area — ${editing.name}` : 'Tambah area baru'} wide>
+      <Modal open={open} onClose={closeModal} title={editing ? `Ubah area: ${editing.name}` : 'Tambah area baru'} wide>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nama area">
@@ -180,7 +180,7 @@ export default function AdminAreas() {
               <Select value={form.type} onChange={(v) => setForm({ ...form, type: v })} options={TYPES} />
             </Field>
             <Field label="Lokasi / blok">
-              <Input value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="cth. Blok Barat — Unit 3" />
+              <Input value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="cth. Blok Barat, Unit 3" />
             </Field>
             <Field label="Komoditas">
               <Input value={form.commodity} onChange={(v) => setForm({ ...form, commodity: v })} placeholder="cth. Ikan Nila / Kangkung" />
@@ -223,7 +223,7 @@ export default function AdminAreas() {
             </p>
             <p className="text-[11px] text-on-surface-variant mb-3">
               Kosongkan bila area ini cukup memakai ambang bawaan kategori device. Isi bila kolam ini punya
-              target sendiri — nilai di sini yang dipakai dashboard dan statistik harian.
+              target sendiri. Nilai di sini yang dipakai dashboard dan statistik harian.
             </p>
             <div className="grid gap-3 sm:grid-cols-3 items-stretch">
               {METRIC_KEYS.map((key) => {

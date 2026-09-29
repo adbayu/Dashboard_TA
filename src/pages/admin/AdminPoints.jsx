@@ -129,7 +129,7 @@ export default function AdminPoints() {
                   <option value="">Pilih pengguna…</option>
                   {leaderboard.map((row) => (
                     <option key={row.id} value={row.id}>
-                      {row.name} — {row.points.toLocaleString('id-ID')} point
+                      {row.name}: {row.points.toLocaleString('id-ID')} point
                     </option>
                   ))}
                 </select>
@@ -183,7 +183,7 @@ export default function AdminPoints() {
         </div>
       </div>
 
-      <Modal open={ruleOpen} onClose={closeRule} title={editRule ? `Ubah aturan — ${editRule.activity}` : 'Tambah aturan poin'}>
+      <Modal open={ruleOpen} onClose={closeRule} title={editRule ? `Ubah aturan: ${editRule.activity}` : 'Tambah aturan poin'}>
         <form onSubmit={submitRule} className="space-y-4">
           <Field label="Nama aktivitas">
             <Input value={rule.activity} onChange={(v) => setRule({ ...rule, activity: v })} placeholder="cth. Catat pemantauan kolam" required />
@@ -207,7 +207,7 @@ export default function AdminPoints() {
         </form>
       </Modal>
 
-      <Modal open={badgeOpen} onClose={closeBadge} title={editBadge ? `Ubah badge — ${editBadge.name}` : 'Tambah badge'}>
+      <Modal open={badgeOpen} onClose={closeBadge} title={editBadge ? `Ubah badge: ${editBadge.name}` : 'Tambah badge'}>
         <form onSubmit={submitBadge} className="space-y-4">
           <Field label="Nama badge">
             <Input value={badge.name} onChange={(v) => setBadge({ ...badge, name: v })} placeholder="cth. Ahli Kualitas Air" required />

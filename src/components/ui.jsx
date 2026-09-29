@@ -58,6 +58,54 @@ const TONES = {
 
 // Tinggi badge dipatok h-6 supaya deretan badge selalu sejajar, termasuk saat
 // badge berdampingan dengan tombol berukuran sm.
+//
+// ── Avatar akun (R-23 / R-38) ─────────────────────────────────────────────────
+// Identitas akun demo divalidasi: inisial nama di atas warna yang dipilih
+// pengguna. Sebelumnya dipakai foto orang dari Unsplash, yaitu aset yang dibuat
+// seolah identitas nyata padahal bukan. Bentuk data avatar = {id, warna, warnaTeks}.
+export function Avatar({ avatar, nama = '', size = 40, className = '' }) {
+  const inisial = (nama || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((k) => k[0])
+    .join('')
+    .toUpperCase();
+  const gaya = {
+    width: size, height: size, minWidth: size,
+    backgroundColor: avatar?.warna || '#0f5238',
+    color: avatar?.warnaTeks || '#eafff4',
+    fontSize: Math.max(11, Math.round(size * 0.36)),
+  };
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex items-center justify-center rounded-xl font-extrabold select-none ${className}`}
+      style={gaya}
+    >
+      {inisial}
+    </span>
+  );
+}
+
+// Tombol pemilih avatar: bentuk yang sama dengan yang tampil di sidebar/profil,
+// jadi yang dilihat pengguna di daftar pilihan persis sama dengan hasilnya.
+export function AvatarPilih({ avatar, nama, terpilih, onClick, size = 48, label = 'Pilih avatar' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={terpilih}
+      className={`rounded-xl overflow-hidden border-2 transition-all ${
+        terpilih ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-primary/40'
+      }`}
+    >
+      <Avatar avatar={avatar} nama={nama} size={size} className="rounded-xl" />
+    </button>
+  );
+}
+
 export function Badge({ children, tone = 'muted', icon, className = '' }) {
   return (
     <span
@@ -157,9 +205,12 @@ export function IconButton({ icon, onClick, title, tone = 'brand', size = 'md', 
 }
 
 export function Field({ label, hint, children, className = '' }) {
+  // Label dipatok satu baris (h-4 + truncate). Sebelumnya label panjang seperti
+  // "Harga satuan" membungkus jadi dua baris, sehingga kotak input di kolom itu
+  // turun 16px dibanding kolom sebelahnya pada baris form yang sama.
   return (
     <label className={`block min-w-0 ${className}`}>
-      <span className="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</span>
+      <span className="block h-4 truncate text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</span>
       {children}
       {hint && <span className="block text-[11px] text-on-surface-variant mt-1">{hint}</span>}
     </label>
@@ -236,12 +287,17 @@ export function Modal({ open, onClose, title, children, wide }) {
   }, [open, onClose]);
   if (!open) return null;
   return (
+    // Dialog dibatasi pada RUANG KONTEN, bukan seluruh viewport. Sebelumnya
+    // overlay + panel menutupi sidebar 227px (panel max-w-3xl = 768px pada
+    // lebar CSS 826px), dan karena overlay z-[60] ada di atas aside z-50,
+    // menu sidebar tidak bisa diklik selama modal terbuka. Offset kiri
+    // mengikuti lebar sidebar (pl-52 sm:pl-56 md:pl-64 xl:pl-72).
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto custom-scrollbar"
+      className="fixed inset-0 z-[60] left-52 sm:left-56 md:left-64 xl:left-72 flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto custom-scrollbar"
       onClick={onClose}
     >
       <div
-        className={`glass-panel rounded-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} my-auto p-5 shadow-2xl`}
+        className={`glass-panel rounded-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} my-auto p-5 shadow-glass-elevated`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 pb-3 mb-4 border-b border-outline-variant/40">

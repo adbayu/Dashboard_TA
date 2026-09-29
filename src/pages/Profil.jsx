@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
-import { Badge, Button, Card, Field, Input, SectionTitle, StatCard, TextArea } from '../components/ui';
+import { Avatar, AvatarPilih, Badge, Button, Card, Field, Input, SectionTitle, StatCard, TextArea } from '../components/ui';
 import { AVATAR_PILIHAN } from '../data/seed';
 
 // Halaman profil: pemilik akun dapat mengubah data dirinya sendiri + ganti password.
@@ -69,11 +69,7 @@ export default function Profil() {
       {/* Ringkasan akun */}
       <Card>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          <img
-            src={form.avatar}
-            alt=""
-            className="w-20 h-20 rounded-2xl object-cover ring-4 ring-primary/20"
-          />
+          <Avatar avatar={form.avatar} nama={form.name || currentUser?.name} size={80} className="rounded-2xl ring-4 ring-primary/20" />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">Profil Saya</p>
             <h2 className="text-2xl font-extrabold text-on-surface leading-tight">{form.name || currentUser.name}</h2>
@@ -138,18 +134,15 @@ export default function Profil() {
           <div>
             <p className="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">Foto profil</p>
             <div className="flex flex-wrap gap-2">
-              {AVATAR_PILIHAN.map((url) => (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => setForm({ ...form, avatar: url })}
-                  className={`rounded-xl overflow-hidden border-2 transition-all ${
-                    form.avatar === url ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-primary/40'
-                  }`}
-                  aria-label="Pilih foto profil"
-                >
-                  <img src={url} alt="" className="w-14 h-14 object-cover" />
-                </button>
+              {AVATAR_PILIHAN.map((pilihan) => (
+                <AvatarPilih
+                  key={pilihan.id}
+                  avatar={pilihan}
+                  nama={form.name}
+                  size={56}
+                  terpilih={form.avatar?.id === pilihan.id}
+                  onClick={() => setForm({ ...form, avatar: pilihan })}
+                />
               ))}
             </div>
           </div>

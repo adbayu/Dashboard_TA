@@ -35,7 +35,7 @@ export default function AdminDashboard() {
           <StatCard label="Ikan Mati Hari Ini" value={totalKematianHariIni()} unit="ekor" icon="heart_broken" tone={totalKematianHariIni() > 0 ? 'warn' : 'ok'} hint="Dilaporkan pengguna" />
         </div>
         <p className="mt-3 text-xs text-on-surface-variant">
-          Nilai HPP sistem: <strong className="text-on-surface">{formatRupiah(totalHpp)}</strong> — akumulasi biaya yang dicatat pengguna.
+          Nilai HPP sistem: <strong className="text-on-surface">{formatRupiah(totalHpp)}</strong>, akumulasi biaya yang dicatat pengguna.
         </p>
       </Card>
 
@@ -114,7 +114,7 @@ export default function AdminDashboard() {
                     {areas.find((a) => a.id === row.areaId)?.name || row.areaId}
                   </td>
                   <td className="px-3 py-2 font-bold text-on-surface">{row.jumlah} ekor</td>
-                  <td className="px-3 py-2 text-on-surface-variant">{row.catatan || '—'}</td>
+                  <td className="px-3 py-2 text-on-surface-variant">{row.catatan || '·'}</td>
                 </tr>
               ))}
             </Table>

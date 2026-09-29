@@ -9,7 +9,9 @@ export default function SmartTopBar({ title, subtitle }) {
   const alertTone = activeAlerts.length === 0 ? 'ok' : activeAlerts.some((d) => d.status === 'offline') ? 'bad' : 'warn';
 
   return (
-    <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 dark:bg-[#191e1b]/80 border-b border-white/40 dark:border-white/10 px-4 sm:px-6 py-3">
+    // Kaca tidak dipakai lagi di sini (R-10): latar semi-pekat sudah cukup
+    // memisahkan top bar dari isi yang bergulir di bawahnya.
+    <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#191e1b]/85 border-b border-white/40 dark:border-white/10 px-4 sm:px-6 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">

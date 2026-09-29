@@ -6,10 +6,10 @@ export default function VPet() {
   const areas = areasSaya;
 
   const status = [
-    { key: 'hunger', label: 'Kenyang', value: pet.hunger, icon: 'restaurant', low: 'Lapar — beri pakan' },
-    { key: 'happiness', label: 'Kebahagiaan', value: pet.happiness, icon: 'mood', low: 'Murung — ajak bermain' },
-    { key: 'hygiene', label: 'Kebersihan', value: pet.hygiene, icon: 'shower', low: 'Kotor — bersihkan kolam' },
-    { key: 'health', label: 'Kesehatan', value: pet.health, icon: 'favorite', low: 'Lemah — butuh perawatan' },
+    { key: 'hunger', label: 'Kenyang', value: pet.hunger, icon: 'restaurant', low: 'Lapar, beri pakan' },
+    { key: 'happiness', label: 'Kebahagiaan', value: pet.happiness, icon: 'mood', low: 'Murung, ajak bermain' },
+    { key: 'hygiene', label: 'Kebersihan', value: pet.hygiene, icon: 'shower', low: 'Kotor, bersihkan kolam' },
+    { key: 'health', label: 'Kesehatan', value: pet.health, icon: 'favorite', low: 'Lemah, butuh perawatan' },
   ];
 
   const area = areas.find((a) => a.id === pet.appliedToAreaId);

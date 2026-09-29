@@ -97,7 +97,7 @@ export default function AdminIot() {
                   <p className="font-semibold text-on-surface">{device.name}</p>
                   <p className="text-[11px] text-on-surface-variant">{device.model} · fw {device.firmware}</p>
                 </td>
-                <td className="px-3 py-2 text-on-surface-variant">{categoryOf(device.categoryId)?.name || '—'}</td>
+                <td className="px-3 py-2 text-on-surface-variant">{categoryOf(device.categoryId)?.name || '·'}</td>
                 <td className="px-3 py-2">
                   <Select
                     className="min-w-[150px]"
@@ -133,7 +133,7 @@ export default function AdminIot() {
         </p>
       </Card>
 
-      <Modal open={open} onClose={closeModal} title={editing ? `Ubah perangkat — ${editing.name}` : 'Tambah perangkat IoT'} wide>
+      <Modal open={open} onClose={closeModal} title={editing ? `Ubah perangkat: ${editing.name}` : 'Tambah perangkat IoT'} wide>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Kode alat" hint="Dipakai sebagai isi QR, mis. AQ-PH-011">
@@ -187,7 +187,7 @@ export default function AdminIot() {
         </form>
       </Modal>
 
-      <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title={qrDevice ? `QR alat — ${qrDevice.code}` : ''} wide>
+      <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title={qrDevice ? `QR alat: ${qrDevice.code}` : ''} wide>
         {qrDevice && (
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -196,7 +196,7 @@ export default function AdminIot() {
             <div className="rounded-xl panel-inset p-3 text-sm text-on-surface-variant">
               <p className="font-bold text-on-surface">Yang tampil saat QR dipindai</p>
               <p className="mt-1">
-                Isi QR ini dibaca oleh halaman <strong className="text-on-surface">Detail Information</strong> — teks
+                Isi QR ini dibaca oleh halaman <strong className="text-on-surface">Detail Information</strong>. Teks
                 penjelasan lengkapnya bisa Anda periksa langsung, persis seperti yang dilihat pengguna.
               </p>
             </div>

@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
+import { Avatar } from './ui';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
 export const MENUS = {
@@ -58,7 +59,7 @@ export default function SmartSidebar({ role: roleProp }) {
   return (
     <>
       <aside
-        className="fixed left-0 top-0 bottom-0 z-50 w-52 sm:w-56 md:w-64 xl:w-72 flex flex-col shadow-2xl"
+        className="fixed left-0 top-0 bottom-0 z-50 w-52 sm:w-56 md:w-64 xl:w-72 flex flex-col"
         style={{ background: 'linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
       >
         {/* Kepala: brand */}
@@ -79,7 +80,7 @@ export default function SmartSidebar({ role: roleProp }) {
             title="Buka profil saya"
             className="flex items-center gap-3 rounded-2xl bg-white/10 border border-white/10 p-3 hover:bg-white/20 transition-colors group"
           >
-            <img src={currentUser.avatar} alt="" className="w-10 h-10 rounded-xl object-cover ring-2 ring-emerald-accent/40" />
+            <Avatar avatar={currentUser.avatar} nama={currentUser.name} size={40} className="ring-2 ring-emerald-accent/40" />
             <div className="min-w-0 flex-1">
               <p className="text-white text-sm font-bold truncate">{currentUser.name}</p>
               <p className="text-[11px] text-white/60 truncate">
@@ -112,7 +113,7 @@ export default function SmartSidebar({ role: roleProp }) {
                     className={({ isActive }) =>
                       `flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all group ${
                         isActive
-                          ? 'bg-white text-primary shadow-lg dark:bg-inverse-primary/15 dark:text-inverse-primary dark:shadow-none'
+                          ? 'bg-white text-primary dark:bg-inverse-primary/15 dark:text-inverse-primary'
                           : 'text-white/80 hover:bg-white/10 hover:text-white'
                       }`
                     }
@@ -148,7 +149,7 @@ export default function SmartSidebar({ role: roleProp }) {
               {pending} device butuh perhatian
             </p>
           )}
-          <p className="text-[10px] text-white/60 leading-snug">Data demo lokal — belum terhubung hardware IoT fisik.</p>
+          <p className="text-[10px] text-white/60 leading-snug">Data demo lokal, belum terhubung hardware IoT fisik.</p>
         </div>
       </aside>
     </>

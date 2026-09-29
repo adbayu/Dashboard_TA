@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLocation } from 'react-router-dom';
 import {
   AVATAR_PILIHAN,
+  AVATAR_LAMA,
   DEMO_PASSWORD,
   PET_STAGES,
   SEED_AREAS,
@@ -252,14 +253,23 @@ const DEFAULT_STATE = {
   sessionUserId: null,
 };
 
+// Penanda kondisi dunia nyata, bukan status "sedang memuat". Aplikasi ini
+// menyimpan seluruh datanya di localStorage, jadi tidak ada permintaan jaringan
+// yang bisa berjalan lama; yang bisa terjadi adalah: belum ada data sama sekali,
+// atau data tersimpan rusak/tidak bisa dibaca (R-27).
+export const KONDISI = { siap: 'siap', kosong: 'kosong', rusak: 'rusak' };
+
 function loadState() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULT_STATE;
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_STATE, ...migrateState(parsed) };
+    return { ...DEFAULT_STATE, ...migrateState(parsed), kondisi: KONDISI.siap };
   } catch {
-    return DEFAULT_STATE;
+    // Data tersimpan tidak bisa dibaca (JSON rusak atau disunting manual).
+    // Jangan diam-diam memakai seed lalu berpura-pura semua normal: beri tahu
+    // pengguna bahwa data lama tidak terbaca dan apa langkah berikutnya.
+    return { ...DEFAULT_STATE, kondisi: KONDISI.rusak };
   }
 }
 
@@ -310,6 +320,11 @@ function migrateState(parsed) {
       }
       const gabung = { ...seed, ...u };
       if (!gabung.password) gabung.password = seed.password; // data lama tanpa password
+      // Avatar lama memakai foto orang dari Unsplash (isi seed versi sebelumnya).
+      // Untuk aplikasi demo, identitas akun sekarang divalidasi (inisial + warna),
+      // jadi nilai lama dikenali lewat daftar AVATAR_LAMA lalu diisi ulang dari
+      // seed. Avatar pilihan pengguna yang divalidasi TIDAK disentuh.
+      if (AVATAR_LAMA.includes(gabung.avatar)) gabung.avatar = seed.avatar;
       return gabung;
     }),
   };
@@ -385,7 +400,7 @@ export function SmartProvider({ children }) {
   const award = useCallback(
     (activity, points, silent) => {
       patch((prev) => {
-        if (!silent) notify(`+${points} point — ${activity}`);
+        if (!silent) notify(`+${points} point: ${activity}`);
         return logPoints(prev, activity, points);
       });
     },
@@ -480,6 +495,7 @@ export function SmartProvider({ children }) {
           phone: (data.phone || '').trim(),
           jabatan: (data.jabatan || '').trim(),
           bio: '',
+          // avatar = objek {id, warna, warnaTeks}; lihat komponen <Avatar> di ui.jsx.
           avatar: data.avatar || AVATAR_PILIHAN[0],
         };
         // Akun baru DAN sesinya diset sekaligus. Kalau halaman pendaftaran
@@ -554,7 +570,7 @@ export function SmartProvider({ children }) {
             d.id === id ? { ...d, status: 'online', lastCalibration: new Date().toISOString().slice(0, 10) } : d,
           ),
         }));
-        notify(`Kalibrasi ${id} selesai — status kembali online.`);
+        notify(`Kalibrasi ${id} selesai, status kembali online.`);
       },
       setDeviceStatus: (id, status) => {
         patch((prev) => ({ devices: prev.devices.map((d) => (d.id === id ? { ...d, status } : d)) }));
@@ -673,7 +689,7 @@ export function SmartProvider({ children }) {
             ),
           };
         });
-        if (areaId) notify(`Catatan kematian dihapus — populasi dikembalikan ${kembali} ekor.`);
+        if (areaId) notify(`Catatan kematian dihapus. Populasi dikembalikan ${kembali} ekor.`);
       },
       addHarvest: (entry) => {
         patch((prev) => ({ harvests: [{ ...entry, id: uid('HV') }, ...prev.harvests] }));
@@ -783,7 +799,7 @@ export function SmartProvider({ children }) {
               stage,
               xp,
               xpNext,
-              log: [{ id: uid('P'), at: now(), text: 'Kolam dibersihkan — kebersihan pet naik.', delta: '+10 xp' }, ...pet.log].slice(0, 20),
+              log: [{ id: uid('P'), at: now(), text: 'Kolam dibersihkan, kebersihan pet naik.', delta: '+10 xp' }, ...pet.log].slice(0, 20),
             },
             ...logPoints(prev, 'Pelihara virtual pet (bersih)', 10),
           };
@@ -791,7 +807,7 @@ export function SmartProvider({ children }) {
         notify('Kebersihan virtual pet dirawat (+10 point).');
       },
       healPet: () => {
-        patch((prev) => ({ pet: { ...prev.pet, health: 100, log: [{ id: uid('P'), at: now(), text: 'Pet dirawat — kondisi kembali prima.', delta: 'heal' }, ...prev.pet.log].slice(0, 20) } }));
+        patch((prev) => ({ pet: { ...prev.pet, health: 100, log: [{ id: uid('P'), at: now(), text: 'Pet dirawat, kondisi kembali prima.', delta: 'heal' }, ...prev.pet.log].slice(0, 20) } }));
         notify('Kesehatan virtual pet dipulihkan.');
       },
       resetPet: () => {
@@ -812,7 +828,7 @@ export function SmartProvider({ children }) {
             health: clamp(prev.pet.health - (prev.pet.hunger < 30 ? 6 : 2), 0, 100),
           },
         }));
-        notify('Waktu berjalan — kondisi pet menurun, rawat kembali.', 'warn');
+        notify('Waktu berjalan: kondisi pet menurun, rawat kembali.', 'warn');
       },
 
       // ── Gamifikasi ──────────────────────────────────────────────────────────
@@ -1020,6 +1036,10 @@ export function SmartProvider({ children }) {
       isLoggedIn: !!currentUser,
       // Saldo poin = poin akun yang login (satu-satunya sumber).
       points: currentUser ? currentUser.points || 0 : 0,
+      // Kondisi penyimpanan browser. 'kosong' = jumlah data nol (mis. localStorage
+      // dibersihkan manual), 'rusak' = data lama tidak bisa dibaca (lihat loadState).
+      kondisi: state.kondisi || KONDISI.siap,
+      jumlahData: (state.areas?.length || 0) + (state.devices?.length || 0) + (state.users?.length || 0),
       toast,
     }),
     [state, actions, derived, role, currentUser, toast],

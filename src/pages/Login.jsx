@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
-import { Button, Field, Input } from '../components/ui';
+import { Avatar, Button, Field, Input } from '../components/ui';
 import { DEMO_PASSWORD } from '../data/seed';
 
 // Halaman masuk. Role TIDAK dipilih di sini — ditentukan oleh akun yang dipakai:
@@ -45,7 +45,7 @@ export default function Login() {
       <div className="w-full max-w-5xl grid md:grid-cols-[1.1fr,1fr] gap-6 items-stretch">
         {/* Sisi kiri: identitas aplikasi */}
         <div
-          className="rounded-3xl px-8 py-10 text-white shadow-2xl flex flex-col justify-between"
+          className="rounded-3xl px-8 py-10 text-white shadow-glass-elevated flex flex-col justify-between"
           style={{ background: 'linear-gradient(165deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
         >
           <div>
@@ -67,7 +67,7 @@ export default function Login() {
           <div className="mt-8 space-y-2 text-[12px] text-white/60">
             <p className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px] text-emerald-accent">info</span>
-              Data demo — belum terhubung perangkat IoT fisik.
+              Data demo: belum terhubung perangkat IoT fisik.
             </p>
             <p className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px] text-emerald-accent">lock</span>
@@ -77,7 +77,7 @@ export default function Login() {
         </div>
 
         {/* Sisi kanan: formulir */}
-        <div className="glass-panel rounded-3xl px-7 py-8 shadow-2xl flex flex-col">
+        <div className="glass-panel rounded-3xl px-7 py-8 shadow-glass-elevated flex flex-col">
           <h2 className="text-xl font-extrabold text-on-surface">Masuk</h2>
           <p className="text-sm text-on-surface-variant mt-1">
             Belum punya akun?{' '}
@@ -134,7 +134,7 @@ export default function Login() {
           {/* Akun demo, supaya mudah dicoba */}
           <div className="mt-7 pt-5 border-t border-outline-variant/40">
             <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
-              Akun demo — klik untuk mengisi
+              Akun demo: klik untuk mengisi
             </p>
             <div className="space-y-2">
               {akunDemo.map((u) => (
@@ -144,7 +144,7 @@ export default function Login() {
                   onClick={() => pakaiAkun(u)}
                   className="w-full flex items-center gap-3 rounded-xl panel-inset px-3 py-2 text-left hover:border-primary/50 hover:bg-primary/10 transition-all"
                 >
-                  <img src={u.avatar} alt="" className="w-9 h-9 rounded-lg object-cover" />
+                  <Avatar avatar={u.avatar} nama={u.name} size={36} className="rounded-lg" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold text-on-surface truncate">{u.name}</span>
                     <span className="block text-[11px] text-on-surface-variant truncate">{u.email}</span>
@@ -161,7 +161,7 @@ export default function Login() {
             {adaMenunggu.length > 0 && (
               <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-amber-900/20 px-3 py-2 text-[11px] text-on-surface-variant">
                 <span className="material-symbols-outlined text-[14px] text-amber-600">hourglass_top</span>
-                {adaMenunggu.length} pendaftar pengelola menunggu persetujuan — belum bisa masuk sampai
+                {adaMenunggu.length} pendaftar pengelola menunggu persetujuan, belum bisa masuk sampai
                 disetujui di menu Kelola User.
               </p>
             )}

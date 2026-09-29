@@ -148,7 +148,7 @@ export default function AksiQr({ value, kode, nama, size = 'sm', className = '' 
     const ok = await salinTeks(value);
     setSibuk(false);
     kabari(
-      ok ? 'Isi QR disalin — tempel di kolom pencarian untuk mengujinya.' : 'Browser menolak menyalin. Pilih teksnya manual dari kotak isi QR.',
+      ok ? 'Isi QR disalin. Tempel di kolom pencarian untuk mengujinya.' : 'Browser menolak menyalin. Pilih teksnya manual dari kotak isi QR.',
       ok ? 'info' : 'gagal',
     );
   }
@@ -180,7 +180,7 @@ export default function AksiQr({ value, kode, nama, size = 'sm', className = '' 
     jendela.focus();
     // Beri waktu gambar dimuat; tanpa jeda, halaman bisa tercetak kosong.
     setTimeout(() => jendela.print(), 350);
-    kabari('Jendela cetak dibuka — pilih printer atau "Simpan sebagai PDF".');
+    kabari('Jendela cetak dibuka. Pilih printer atau "Simpan sebagai PDF".');
   }
 
   return (

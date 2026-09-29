@@ -112,7 +112,7 @@ export default function ListIot() {
                   <div className="mt-3 flex items-start justify-between gap-2">
                     <div>
                       <p className="text-2xl font-extrabold text-on-surface">
-                        {device.metric?.value ?? '—'}
+                        {device.metric?.value ?? '·'}
                         <small className="text-[11px] font-semibold text-on-surface-variant ml-1">{device.metric?.key}</small>
                       </p>
                       <p className="text-[11px] text-on-surface-variant">{areaOf(device.areaId)?.name || 'Belum ditempatkan'}</p>
@@ -238,7 +238,7 @@ export function DeviceDetail() {
                   {METRIC_META[device.metric?.key]?.label || device.metric?.key}
                 </p>
                 <p className="text-3xl font-extrabold text-on-surface mt-1">
-                  {device.metric?.value ?? '—'} <small className="text-xs text-on-surface-variant">{METRIC_META[device.metric?.key]?.unit}</small>
+                  {device.metric?.value ?? '·'} <small className="text-xs text-on-surface-variant">{METRIC_META[device.metric?.key]?.unit}</small>
                 </p>
                 <Badge
                   tone={posisi === null ? 'muted' : posisi === 'dalam' ? 'ok' : 'bad'}
@@ -256,7 +256,7 @@ export function DeviceDetail() {
               <div className="rounded-2xl border border-outline-variant/40 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Rentang ideal</p>
                 <p className="text-lg font-extrabold text-on-surface mt-1">
-                  {ambang ? `${ambang[0]} – ${ambang[1]} ${METRIC_META[device.metric?.key]?.unit || ''}` : '—'}
+                  {ambang ? `${ambang[0]} – ${ambang[1]} ${METRIC_META[device.metric?.key]?.unit || ''}` : '·'}
                 </p>
                 <p className="text-[11px] text-on-surface-variant mt-2">
                   {area?.targets?.[device.metric?.key]
@@ -328,7 +328,7 @@ export function DeviceDetail() {
             </dl>
             {device.battery < 40 && (
               <p className="mt-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 p-2 text-[11px] font-semibold text-amber-900 dark:text-amber-100">
-                Baterai rendah — ganti atau isi ulang sebelum unit berhenti mengirim data.
+                Baterai rendah. Ganti atau isi ulang sebelum unit berhenti mengirim data.
               </p>
             )}
           </Card>
@@ -349,7 +349,7 @@ export function DeviceDetail() {
         </div>
       </div>
 
-      <Modal open={showQr} onClose={() => setShowQr(false)} title={`QR alat — ${device.code}`} wide>
+      <Modal open={showQr} onClose={() => setShowQr(false)} title={`QR alat: ${device.code}`} wide>
         {/* Panel penjelasan BERSAMA: isi yang sama dengan yang dibaca pengguna di
             menu Detail Information dan dengan yang dipakai pengelola di Kelola IoT.
             Sebelumnya halaman ini punya QrPanel sendiri, sehingga penjelasan alat

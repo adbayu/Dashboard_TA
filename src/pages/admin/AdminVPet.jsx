@@ -83,7 +83,7 @@ export default function AdminVPet() {
                     value={form.appliedToAreaId}
                     onChange={(v) => setForm({ ...form, appliedToAreaId: v })}
                     placeholder="Pilih area kolam…"
-                    options={areas.map((a) => ({ value: a.id, label: `${a.name} — ${a.commodity}` }))}
+                    options={areas.map((a) => ({ value: a.id, label: `${a.name} (${a.commodity})` }))}
                   />
                 </Field>
               </div>

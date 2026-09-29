@@ -5,7 +5,7 @@ import { Badge, Bar, Card, Empty, SectionTitle, StatCard, STATUS_LABEL, STATUS_T
 
 const WARNA_STATUS = { aman: 'ok', waspada: 'warn', bahaya: 'bad', 'tanpa-ambang': 'muted' };
 const TEKS_STATUS = { aman: 'Aman', waspada: 'Waspada', bahaya: 'Keluar ambang', 'tanpa-ambang': 'Tanpa ambang' };
-const angka = (value, digit) => (value == null ? '—' : Number(value).toFixed(digit));
+const angka = (value, digit) => (value == null ? '·' : Number(value).toFixed(digit));
 
 export default function Dashboard() {
   const {
@@ -131,7 +131,7 @@ export default function Dashboard() {
                   <Badge tone={health.tone}>{health.text}</Badge>
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-on-surface">
-                  {device?.metric?.value ?? '—'} <small className="text-xs font-semibold text-on-surface-variant">{meta.unit}</small>
+                  {device?.metric?.value ?? '·'} <small className="text-xs font-semibold text-on-surface-variant">{meta.unit}</small>
                 </p>
                 <p className="text-xs font-semibold text-on-surface-variant">{meta.label}</p>
                 <p className="text-[11px] text-outline mt-1">{device ? device.code : 'Belum terpasang'}</p>
@@ -250,7 +250,7 @@ export default function Dashboard() {
         <SectionTitle
           eyebrow="Histori Harian"
           title="Riwayat kondisi kolam per tanggal"
-          subtitle="Ringkasan tiap hari: rata-rata, terendah, dan tertinggi dari sensor pH, suhu air, dan TDS — lengkap dengan tanggal, bulan, dan tahunnya."
+          subtitle="Ringkasan tiap hari: rata-rata, terendah, dan tertinggi dari sensor pH, suhu air, dan TDS, lengkap dengan tanggal, bulan, dan tahunnya."
         />
         {areaBerSensor.length === 0 ? (
           <Empty
@@ -301,7 +301,7 @@ export default function Dashboard() {
                                   </span>
                                 </>
                               ) : (
-                                <span className="text-[11px] text-on-surface-variant">—</span>
+                                <span className="text-[11px] text-on-surface-variant">·</span>
                               )}
                             </td>
                           );
@@ -320,7 +320,7 @@ export default function Dashboard() {
                           {h.matiEkor > 0 ? (
                             <span className="font-bold text-amber-600">{h.matiEkor} ekor</span>
                           ) : (
-                            <span className="text-[11px] text-on-surface-variant">—</span>
+                            <span className="text-[11px] text-on-surface-variant">·</span>
                           )}
                         </td>
                       </tr>
@@ -374,7 +374,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-3 py-2 font-semibold">{formatRupiah(total)}</td>
                     <td className="px-3 py-2 text-on-surface-variant">
-                      {perUnit ? `${formatRupiah(perUnit)} / ${area.populationUnit}` : '—'}
+                      {perUnit ? `${formatRupiah(perUnit)} / ${area.populationUnit}` : '·'}
                     </td>
                   </tr>
                 );

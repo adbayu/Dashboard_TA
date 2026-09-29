@@ -38,9 +38,9 @@ const ARTI_STATUS = {
 // disuruh mengkalibrasi larutan TDS.
 export function catatanPerawatan(metricKey) {
   const umum = [
-    'Bersihkan ujung probe dari biofilm seminggu sekali — lapisan ini penyebab utama angka melenceng.',
+    'Bersihkan ujung probe dari biofilm seminggu sekali, karena lapisan ini penyebab utama angka melenceng.',
     'Periksa tanggal kalibrasi terakhir di kartu atas; lakukan bila sudah lebih dari 1 bulan.',
-    'Amati tren harian di Dashboard — lonjakan mendadak lebih penting daripada satu angka.',
+    'Amati tren harian di Dashboard: lonjakan mendadak lebih penting daripada satu angka.',
     'Laporkan ke pengelola bila status berubah ke "Perlu perhatian" atau "Tidak terhubung".',
   ];
   if (metricKey === 'ph') {
@@ -161,7 +161,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
                   </td>
                   <td className="px-3 py-2 text-on-surface-variant">{m.unit}</td>
                   <td className="px-3 py-2 text-on-surface-variant">
-                    {batas ? `${batas[0]} – ${batas[1]} ${m.unit}` : '—'}
+                    {batas ? `${batas[0]} – ${batas[1]} ${m.unit}` : '·'}
                   </td>
                 </tr>
               );
@@ -169,7 +169,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
           </Table>
           {area?.targets?.[device.metric?.key] && (
             <p className="mt-2 text-[11px] text-on-surface-variant">
-              Untuk {area.name}, ambangnya diatur khusus oleh pengelola — bukan ambang bawaan kategori.
+              Untuk {area.name}, ambangnya diatur khusus oleh pengelola, bukan ambang bawaan kategori.
             </p>
           )}
           {ARTI_PARAMETER[device.metric?.key] && (
@@ -193,7 +193,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
               {meta?.label || device.metric?.key}
             </p>
             <p className="text-3xl font-extrabold text-on-surface mt-1">
-              {device.metric?.value ?? '—'}{' '}
+              {device.metric?.value ?? '·'}{' '}
               <small className="text-xs font-semibold text-on-surface-variant">{meta?.unit}</small>
             </p>
             <Badge tone={posisi === null ? 'muted' : posisi === 'dalam' ? 'ok' : 'bad'} className="mt-2">
@@ -209,7 +209,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
           <div className="rounded-2xl panel-inset p-4">
             <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Rentang ideal</p>
             <p className="text-lg font-extrabold text-on-surface mt-1">
-              {ambang ? `${ambang[0]} – ${ambang[1]} ${meta?.unit || ''}` : '—'}
+              {ambang ? `${ambang[0]} – ${ambang[1]} ${meta?.unit || ''}` : '·'}
             </p>
             <p className="text-[11px] text-on-surface-variant mt-2">
               Ditetapkan pengelola di Kategori Device / Kelola Area.
@@ -238,7 +238,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
                 <td className="px-3 py-2">
                   <Badge tone={STATUS_TONE[nilai]}>{teks}</Badge>
                 </td>
-                <td className="px-3 py-2 text-on-surface-variant">{ARTI_STATUS[nilai] || '—'}</td>
+                <td className="px-3 py-2 text-on-surface-variant">{ARTI_STATUS[nilai] || '·'}</td>
               </tr>
             ))}
           </Table>
@@ -275,7 +275,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
             <p className="font-bold text-on-surface">Isi QR: {ambilKodeAlat(device)}</p>
             <p className="mt-1">
               Dipakai menu <strong className="text-on-surface">Detail Information</strong> (role pengguna) dan tombol QR di{' '}
-              <strong className="text-on-surface">Kelola IoT</strong> (role pengelola) — satu format untuk kedua role.
+              <strong className="text-on-surface">Kelola IoT</strong> (role pengelola): satu format untuk kedua role.
             </p>
             {/* Tombol unduh/salin/cetak ada di SATU komponen bersama, dipakai
                 keempat pintu masuk QR, supaya tidak ada role yang tombolnya

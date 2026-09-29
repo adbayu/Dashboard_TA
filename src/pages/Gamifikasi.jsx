@@ -20,7 +20,7 @@ export default function Gamifikasi() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Poin Anda" value={points.toLocaleString('id-ID')} icon="stars" hint="Dari seluruh aktivitas farm" />
-        <StatCard label="Peringkat" value={myRank || '—'} unit={`/ ${leaderboard.length}`} icon="leaderboard" hint="Papan peringkat pengguna" />
+        <StatCard label="Peringkat" value={myRank || '·'} unit={`/ ${leaderboard.length}`} icon="leaderboard" hint="Papan peringkat pengguna" />
         <StatCard label="Misi Selesai" value={`${doneMissions}/${missions.length}`} icon="task_alt" hint={`${missionPoints} point dari misi`} />
         <StatCard label="Badge Terkumpul" value={badges.filter((b) => b.claimed).length} unit={`/ ${badges.length}`} icon="military_tech" hint="Klaim di bawah" />
       </div>

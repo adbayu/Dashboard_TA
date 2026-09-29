@@ -162,7 +162,7 @@ export default function QrScanner({ onHasil, onBatal }) {
         }}
         className="space-y-2 rounded-2xl panel-inset p-3"
       >
-        <Field label="Atau ketik / tempel kode alat" hint="cth. AQ-PH-001 — berguna bila kamera tidak tersedia.">
+        <Field label="Atau ketik / tempel kode alat" hint="cth. AQ-PH-001, berguna bila kamera tidak tersedia.">
           <Input value={manual} onChange={setManual} placeholder="AQ-PH-001" />
         </Field>
         <div className="flex flex-wrap gap-2">

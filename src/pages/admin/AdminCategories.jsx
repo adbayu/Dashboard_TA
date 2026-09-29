@@ -97,7 +97,7 @@ export default function AdminCategories() {
         )}
       </Card>
 
-      <Modal open={open} onClose={closeModal} title={editing ? `Ubah kategori — ${editing.name}` : 'Tambah kategori device'} wide>
+      <Modal open={open} onClose={closeModal} title={editing ? `Ubah kategori: ${editing.name}` : 'Tambah kategori device'} wide>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nama kategori">

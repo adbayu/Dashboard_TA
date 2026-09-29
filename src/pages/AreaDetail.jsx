@@ -13,7 +13,7 @@ const emptyMati = { jumlah: '', catatan: '' };
 
 const WARNA_STATUS = { aman: 'ok', waspada: 'warn', bahaya: 'bad', 'tanpa-ambang': 'muted' };
 const TEKS_STATUS = { aman: 'Aman', waspada: 'Waspada', bahaya: 'Keluar ambang', 'tanpa-ambang': 'Tanpa ambang' };
-const angka = (value, digit) => (value == null ? '—' : Number(value).toFixed(digit));
+const angka = (value, digit) => (value == null ? '·' : Number(value).toFixed(digit));
 
 export default function AreaDetail() {
   const { id } = useParams();
@@ -128,7 +128,7 @@ export default function AreaDetail() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Total HPP" value={formatRupiah(total)} icon="payments" hint={`${area.hpp.length} item biaya`} />
-        <StatCard label="HPP / Unit" value={perUnit ? formatRupiah(perUnit) : '—'} icon="calculate" hint={`per ${area.populationUnit}`} />
+        <StatCard label="HPP / Unit" value={perUnit ? formatRupiah(perUnit) : '·'} icon="calculate" hint={`per ${area.populationUnit}`} />
         <StatCard label="Pendapatan" value={formatRupiah(revenue)} icon="savings" hint={`${crops.length} catatan panen`} />
         <StatCard
           label="Margin"
@@ -209,7 +209,7 @@ export default function AreaDetail() {
           <SectionTitle
             eyebrow="Kematian Ikan"
             title="Catat jumlah ikan mati hari ini"
-            subtitle="Diisi manual sesuai hitungan di kolam. Satu kolam satu catatan per hari — mengisi ulang di hari yang sama memperbarui angkanya, dan populasi kolam ikut disesuaikan."
+            subtitle="Diisi manual sesuai hitungan di kolam. Satu kolam satu catatan per hari: mengisi ulang di hari yang sama memperbarui angkanya, dan populasi kolam ikut disesuaikan."
           />
           <div className="grid gap-4 lg:grid-cols-[2fr,3fr]">
             <form onSubmit={submitMati} className="space-y-3">
@@ -236,7 +236,7 @@ export default function AreaDetail() {
                     <tr key={row.id} className="hover:bg-primary/5">
                       <td className="px-3 py-2 whitespace-nowrap text-on-surface-variant">{row.tanggal}</td>
                       <td className="px-3 py-2 font-bold text-on-surface">{row.jumlah} ekor</td>
-                      <td className="px-3 py-2 text-on-surface-variant">{row.catatan || '—'}</td>
+                      <td className="px-3 py-2 text-on-surface-variant">{row.catatan || '·'}</td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end">
                           <IconButton icon="delete" tone="bad" size="sm" onClick={() => removeKematian(row.id)} title="Hapus catatan (populasi dikembalikan)" />
@@ -274,7 +274,7 @@ export default function AreaDetail() {
             <Field label="Satuan">
               <Input placeholder="kg / ekor" value={hppForm.unit} onChange={(v) => setHppForm({ ...hppForm, unit: v })} />
             </Field>
-            <Field label="Harga satuan">
+            <Field label="Harga">
               <NumberInput min="0" step="any" placeholder="Rp" value={hppForm.unitPrice} onChange={(v) => setHppForm({ ...hppForm, unitPrice: v })} required />
             </Field>
             <Button type="submit" icon="add">{editingHpp ? 'Simpan' : 'Tambah'}</Button>
@@ -306,7 +306,7 @@ export default function AreaDetail() {
                 </td>
                 <td className="px-3 py-2 font-extrabold text-primary" colSpan={2}>
                   {formatRupiah(total)}
-                  {perUnit ? ` — ${formatRupiah(perUnit)} / ${area.populationUnit}` : ''}
+                  {perUnit ? ` (${formatRupiah(perUnit)} / ${area.populationUnit})` : ''}
                 </td>
               </tr>
             </Table>

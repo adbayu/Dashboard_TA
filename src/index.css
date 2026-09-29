@@ -80,6 +80,45 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Manrope', sans-serif;
   }
+
+  /* ── Indikator fokus (R-32) ──────────────────────────────────────────────
+     Bawaan browser hanya memberi `outline: auto 1px` yang gelap. Di atas
+     sidebar (gradien hijau gelap) rasio outline itu vs latar hanya 1.01:1,
+     jadi pengguna keyboard tidak melihat posisinya sama sekali. Di area
+     konten cincin Tailwind sudah terukur 9.19:1, jadi cukup sidebar yang
+     diberi gaya sendiri, terang dan kontras terhadap gradien tergelap. */
+  aside :is(a, button, [tabindex]):focus-visible {
+    outline: 2px solid #b1f0ce;
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
+  /* ── Dosis kaca (R-10) ───────────────────────────────────────────────────
+     Blur dulu dipakai serentak di empat jenis permukaan (kartu, panel, kolom
+     isian, top bar). Dua yang terakhir tidak punya lapisan apa pun di
+     belakangnya, jadi blur-nya tidak terlihat gunanya, hanya menambah biaya
+     render tiap bingkai. Kaca sekarang tinggal aksen pada kartu dan panel. */
+  .glass-input {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* Top bar ikut dilepas dari kaca (R-10). Latarnya sudah hampir pekat
+     (bg-white/70) dan isinya bergerak: blur 24px di sana memaksa compositor
+     bekerja setiap kali halaman digulir tanpa menghasilkan efek yang terlihat. */
+  header:not(.glass-panel) {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* ── Skala radius resmi (R-11) ───────────────────────────────────────────
+     Sebelumnya variasi radius muncul tanpa aturan (xl 50x, 2xl 46x, full 15x,
+     3xl 5x, lg 4x), sehingga radius berhenti menandai hierarki. Aturannya
+     sekarang, satu makna per tingkat:
+       lg / xl  → kontrol kecil (tombol, input, chip berisi teks)
+       2xl      → kartu dan permukaan
+       full     → keping status (badge, titik, avatar bundar)
+       3xl      → hanya panel masuk/daftar (satu permukaan besar per layar) */
 }
 
 @layer utilities {

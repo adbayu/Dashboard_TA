@@ -28,7 +28,7 @@ export default function AdminDetailInformation() {
   function proses(nilai) {
     const mentah = (nilai || '').trim();
     if (!mentah) {
-      setGalat('Isi QR kosong — tempel kodenya atau pilih alat dari daftar di bawah.');
+      setGalat('Isi QR kosong. Tempel kodenya atau pilih alat dari daftar di bawah.');
       setHasil(null);
       return;
     }
@@ -94,7 +94,7 @@ export default function AdminDetailInformation() {
           </Button>
         </div>
         <p className="mt-3 text-[11px] text-on-surface-variant">
-          Memindai label yang sudah ditempel di lapangan memastikan label itu benar-benar terbaca pengguna — bukan
+          Memindai label yang sudah ditempel di lapangan memastikan label itu benar-benar terbaca pengguna, bukan
           hanya isi QR yang Anda lihat di layar.
         </p>
       </Card>
@@ -170,7 +170,7 @@ export default function AdminDetailInformation() {
                 <tr key={d.id} className={d.id === device?.id ? 'bg-primary/5' : ''}>
                   <td className="px-3 py-2 font-semibold text-on-surface">{d.name}</td>
                   <td className="px-3 py-2 font-mono text-[12px] text-on-surface-variant">{d.code}</td>
-                  <td className="px-3 py-2 text-on-surface-variant">{categoryOf(d.categoryId)?.name || '—'}</td>
+                  <td className="px-3 py-2 text-on-surface-variant">{categoryOf(d.categoryId)?.name || '·'}</td>
                   <td className="px-3 py-2 text-on-surface-variant">{areaOf(d.areaId)?.name || 'belum ditempatkan'}</td>
                   <td className="px-3 py-2">
                     <Badge tone={STATUS_TONE[d.status]}>{STATUS_LABEL[d.status]}</Badge>

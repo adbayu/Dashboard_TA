@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSmart } from '../../store/SmartStore';
-import { IconButton, Badge, Button, Card, Empty, Field, Input, Modal, SectionTitle, Select, StatCard, Table } from '../../components/ui';
+import { Avatar, IconButton, Badge, Button, Card, Empty, Field, Input, Modal, SectionTitle, Select, StatCard, Table } from '../../components/ui';
 import { DEMO_PASSWORD, STATUS_AKUN } from '../../data/seed';
 
 const empty = { name: '', email: '', role: 'pengguna', status: 'aktif', areaIds: [], password: '' };
@@ -44,7 +44,7 @@ export default function AdminUsers() {
     const emailBaru = (form.email || '').trim().toLowerCase();
     const dipakai = users.some((u) => (u.email || '').toLowerCase() === emailBaru && u.id !== form.id);
     if (dipakai) {
-      setMessage(`Email ${form.email} sudah dipakai akun lain — pakai email berbeda.`);
+      setMessage(`Email ${form.email} sudah dipakai akun lain. Pakai email berbeda.`);
       return;
     }
     saveUser({ ...form, email: emailBaru, password: (form.password || '').trim() || undefined });
@@ -90,7 +90,7 @@ export default function AdminUsers() {
           <div className="space-y-3">
             {menunggu.map((u) => (
               <div key={u.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300/60 bg-amber-50/60 dark:bg-amber-900/20 p-3">
-                <img src={u.avatar} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                <Avatar avatar={u.avatar} nama={u.name} size={40} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-on-surface">{u.name}</p>
                   <p className="text-[11px] text-on-surface-variant">
@@ -152,7 +152,7 @@ export default function AdminUsers() {
                   <Badge tone={user.role === 'pengelola' ? 'brand' : 'info'}>{user.role === 'pengelola' ? 'Pengelola' : 'Pengguna'}</Badge>
                 </td>
                 <td className="px-3 py-2 text-on-surface-variant max-w-[200px]">
-                  {user.areaIds?.length ? user.areaIds.map((id) => areas.find((a) => a.id === id)?.name || id).join(', ') : '—'}
+                  {user.areaIds?.length ? user.areaIds.map((id) => areas.find((a) => a.id === id)?.name || id).join(', ') : '·'}
                 </td>
                 <td className="px-3 py-2 font-bold text-primary">{Number(user.points || 0).toLocaleString('id-ID')}</td>
                 <td className="px-3 py-2">
@@ -211,7 +211,7 @@ export default function AdminUsers() {
         )}
       </Card>
 
-      <Modal open={open} onClose={closeModal} title={editing ? `Ubah akun — ${editing.name}` : 'Tambah pengguna baru'} wide>
+      <Modal open={open} onClose={closeModal} title={editing ? `Ubah akun: ${editing.name}` : 'Tambah pengguna baru'} wide>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nama lengkap">

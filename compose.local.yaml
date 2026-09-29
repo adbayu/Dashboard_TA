@@ -1,0 +1,7 @@
+# Override lokal: mesin ini sudah punya PostgreSQL sendiri di 5432 (service Windows),
+# jadi database pilot dipindah ke 5433 supaya tidak bentrok. Mailpit tetap memakai
+# port bawaannya. Tidak mengubah apa pun pada PostgreSQL yang sudah ada.
+services:
+  database:
+    ports: !override
+      - "127.0.0.1:5433:5432"

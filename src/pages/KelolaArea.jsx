@@ -53,7 +53,10 @@ export default function KelolaArea() {
         {areas.length === 0 ? (
           <Empty title="Belum ada area" hint="Hubungi pengelola untuk mendaftarkan kolam atau growbed." icon="water" />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-stretch">
+            {/* Tiga kolom (dulu empat) supaya kolom lebih lebar dan nama area serta
+                lokasinya tidak terpotong elipsis padahal kartu masih punya ruang.
+                items-stretch: kartu dalam satu baris sama tinggi. */}
             {areas.map((area) => {
               const { total, perUnit } = hppTotal(area.id);
               const areaDevices = devicesByArea(area.id);
@@ -71,7 +74,10 @@ export default function KelolaArea() {
                   </div>
 
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
+                    {/* Komoditas memakai baris penuh: di lebar 841px kolom kartu
+                        hanya 93px, sedangkan "Kangkung & Pakcoy" butuh 125px,
+                        sehingga dulu terpotong elipsis padahal ruangnya ada. */}
+                    <div className="col-span-2">
                       <dt className="text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">Komoditas</dt>
                       <dd className="font-semibold text-on-surface truncate">{area.commodity}</dd>
                     </div>
@@ -134,10 +140,10 @@ export default function KelolaArea() {
               <tr key={note.id} className="hover:bg-primary/5">
                 <td className="px-3 py-2 whitespace-nowrap text-on-surface-variant">{note.at}</td>
                 <td className="px-3 py-2 font-semibold text-on-surface">{note.areaName}</td>
-                <td className="px-3 py-2">{note.ph ?? '—'}</td>
-                <td className="px-3 py-2">{note.temp ?? '—'}</td>
-                <td className="px-3 py-2">{note.tds ?? '—'}</td>
-                <td className="px-3 py-2 text-on-surface-variant">{note.note || '—'}</td>
+                <td className="px-3 py-2">{note.ph ?? '·'}</td>
+                <td className="px-3 py-2">{note.temp ?? '·'}</td>
+                <td className="px-3 py-2">{note.tds ?? '·'}</td>
+                <td className="px-3 py-2 text-on-surface-variant">{note.note || '·'}</td>
               </tr>
             ))}
           </Table>
@@ -156,8 +162,8 @@ export default function KelolaArea() {
                 <td className="px-3 py-2 font-semibold text-on-surface">{k.areaName}</td>
                 <td className="px-3 py-2 text-on-surface-variant whitespace-nowrap">{k.tanggal}</td>
                 <td className="px-3 py-2 font-bold text-amber-600">{k.jumlah} ekor</td>
-                <td className="px-3 py-2 text-on-surface-variant">{k.by || '—'}</td>
-                <td className="px-3 py-2 text-on-surface-variant">{k.catatan || '—'}</td>
+                <td className="px-3 py-2 text-on-surface-variant">{k.by || '·'}</td>
+                <td className="px-3 py-2 text-on-surface-variant">{k.catatan || '·'}</td>
               </tr>
             ))}
           </Table>

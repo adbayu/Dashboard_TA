@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
-import { Button, Field, Input } from '../components/ui';
+import { AvatarPilih, Button, Field, Input } from '../components/ui';
 import { AVATAR_PILIHAN } from '../data/seed';
 
 // Halaman daftar akun sendiri (/daftar).
@@ -70,7 +70,7 @@ export default function Daftar() {
   if (berhasil) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-10">
-        <div className="glass-panel rounded-3xl px-7 py-8 shadow-2xl w-full max-w-lg">
+        <div className="glass-panel rounded-3xl px-7 py-8 shadow-glass-elevated w-full max-w-lg">
           <span className="material-symbols-outlined text-[40px] text-amber-600">hourglass_top</span>
           <h2 className="mt-2 text-xl font-extrabold text-on-surface">Pengajuan akun pengelola terkirim</h2>
           <p className="text-sm text-on-surface-variant mt-2">
@@ -110,7 +110,7 @@ export default function Daftar() {
       <div className="w-full max-w-5xl grid md:grid-cols-[1fr,1.25fr] gap-6 items-stretch">
         {/* Sisi kiri: penjelasan alur peran */}
         <div
-          className="rounded-3xl px-8 py-10 text-white shadow-2xl flex flex-col justify-between"
+          className="rounded-3xl px-8 py-10 text-white shadow-glass-elevated flex flex-col justify-between"
           style={{ background: 'linear-gradient(165deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
         >
           <div>
@@ -140,13 +140,13 @@ export default function Daftar() {
               </div>
             ))}
             <p className="text-[12px] text-white/50 leading-snug pt-2 border-t border-white/10">
-              Data demo — akun disimpan di browser ini saja (belum ada server autentikasi).
+              Data demo: akun disimpan di browser ini saja (belum ada server autentikasi).
             </p>
           </div>
         </div>
 
         {/* Sisi kanan: formulir */}
-        <div className="glass-panel rounded-3xl px-7 py-8 shadow-2xl">
+        <div className="glass-panel rounded-3xl px-7 py-8 shadow-glass-elevated">
           <h2 className="text-xl font-extrabold text-on-surface">Daftar akun</h2>
           <p className="text-sm text-on-surface-variant mt-1">
             Sudah punya akun?{' '}
@@ -239,18 +239,15 @@ export default function Daftar() {
             <div>
               <p className="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">Foto profil</p>
               <div className="flex flex-wrap gap-2">
-                {AVATAR_PILIHAN.map((url) => (
-                  <button
-                    key={url}
-                    type="button"
-                    onClick={() => setForm({ ...form, avatar: url })}
-                    className={`rounded-xl overflow-hidden border-2 transition-all ${
-                      form.avatar === url ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-primary/40'
-                    }`}
-                    aria-label="Pilih foto profil"
-                  >
-                    <img src={url} alt="" className="w-12 h-12 object-cover" />
-                  </button>
+                {AVATAR_PILIHAN.map((pilihan) => (
+                  <AvatarPilih
+                    key={pilihan.id}
+                    avatar={pilihan}
+                    nama={form.name}
+                    size={48}
+                    terpilih={form.avatar?.id === pilihan.id}
+                    onClick={() => setForm({ ...form, avatar: pilihan })}
+                  />
                 ))}
               </div>
             </div>

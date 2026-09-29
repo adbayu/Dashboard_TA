@@ -26,7 +26,7 @@ export const SEED_AREAS = [
     id: 'AR-01',
     name: 'Kolam Nila A',
     type: 'kolam',
-    location: 'Blok Barat — Unit 1',
+    location: 'Blok Barat, Unit 1',
     volume: 12000,
     unit: 'liter',
     commodity: 'Ikan Nila',
@@ -47,7 +47,7 @@ export const SEED_AREAS = [
     id: 'AR-02',
     name: 'Kolam Lele B',
     type: 'kolam',
-    location: 'Blok Timur — Unit 2',
+    location: 'Blok Timur, Unit 2',
     volume: 9000,
     unit: 'liter',
     commodity: 'Ikan Lele',
@@ -56,7 +56,7 @@ export const SEED_AREAS = [
     status: 'aktif',
     deviceIds: [],
     targets: { ph: [6.5, 8.0], temp: [26, 30], tds: [500, 900] },
-    note: 'Padat tebar tinggi, belum dipasang sensor — jaga sirkulasi air dan cek pH manual.',
+    note: 'Padat tebar tinggi, belum dipasang sensor, jadi jaga sirkulasi air dan cek pH manual.',
     hpp: [
       { id: 'H-5', name: 'Benih lele sangkuriang', qty: 800, unit: 'ekor', unitPrice: 450 },
       { id: 'H-6', name: 'Pakan apung 781-1', qty: 60, unit: 'kg', unitPrice: 12800 },
@@ -67,7 +67,7 @@ export const SEED_AREAS = [
     id: 'AR-03',
     name: 'Growbed Sayur 1',
     type: 'growbed',
-    location: 'Blok Selatan — Bedengan A',
+    location: 'Blok Selatan, Bedengan A',
     volume: 2400,
     unit: 'liter',
     commodity: 'Kangkung & Pakcoy',
@@ -88,7 +88,7 @@ export const SEED_AREAS = [
     id: 'AR-04',
     name: 'Tandon Nutrisi Utama',
     type: 'tandon',
-    location: 'Blok Tengah — Rumah Pompa',
+    location: 'Blok Tengah, Rumah Pompa',
     volume: 4000,
     unit: 'liter',
     commodity: 'Nutrisi & Buffer',
@@ -160,6 +160,19 @@ export const DEMO_PASSWORD = 'jagofarm123';
 // halaman Profil. Ditaruh di seed supaya daftarnya tidak ditulis dua kali dan
 // tidak bisa berbeda antar halaman.
 export const AVATAR_PILIHAN = [
+  { id: 'hijau', warna: '#0f5238', warnaTeks: '#eafff4' },
+  { id: 'teal', warna: '#0f766e', warnaTeks: '#eafff4' },
+  { id: 'biru', warna: '#1e40af', warnaTeks: '#eafff4' },
+  { id: 'ungu', warna: '#6d28d9', warnaTeks: '#f6f0ff' },
+  { id: 'oranye', warna: '#b45309', warnaTeks: '#fff8ec' },
+  { id: 'merah', warna: '#9f1239', warnaTeks: '#fff1f4' },
+];
+
+// Isi seed versi lama: foto orang dari Unsplash. Dipakai hanya untuk mengenali
+// data localStorage yang sudah telanjur menyimpan nilai itu, lalu diganti avatar
+// divalidasi oleh migrateState (R-23/R-38: jangan pakai foto orang sebagai
+// identitas akun demo).
+export const AVATAR_LAMA = [
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
@@ -167,6 +180,16 @@ export const AVATAR_PILIHAN = [
   'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250',
   'https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&q=80&w=250',
 ];
+
+// Identitas akun demo = avatar divalidasi (inisial nama + warna), bukan foto orang.
+// Bentuknya objek {id, warna, warnaTeks}; komponen memakai <Avatar> dari ui.jsx.
+export const avatarKe = (seed, nama, email, warna) => ({
+  id: `${seed}-${(email || nama || 'akun').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8)}`,
+  warna,
+  warnaTeks: '#eafff4',
+});
+
+export const AVATAR_AKUN = AVATAR_PILIHAN; // nama lama dipakai di beberapa halaman
 
 // Status akun. 'menunggu' dipakai untuk pendaftar PENGELOLA: hak akses
 // pengelola tidak diberikan otomatis dari formulir publik — harus disetujui
@@ -183,25 +206,25 @@ export const SEED_USERS = [
     id: 'U-001', name: 'Budi Santoso', email: 'budi@jagofarm.id', password: DEMO_PASSWORD,
     role: 'pengguna', areaIds: ['AR-01', 'AR-03'], status: 'aktif', joinedAt: '2026-01-12', points: 1240,
     phone: '0812-3456-7890', jabatan: 'Operator Kolam', bio: 'Mengurus kolam nila dan pakcoy sejak 2026.',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+    avatar: { id: 'U-001', warna: '#0f5238', warnaTeks: '#eafff4' },
   },
   {
     id: 'U-002', name: 'Siti Rahmawati', email: 'siti@jagofarm.id', password: DEMO_PASSWORD,
     role: 'pengguna', areaIds: ['AR-02'], status: 'aktif', joinedAt: '2026-01-20', points: 980,
     phone: '0813-2233-4455', jabatan: 'Operator Growbed', bio: 'Fokus pada sayuran daun dan kualitas air.',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=250',
+    avatar: { id: 'U-002', warna: '#0f766e', warnaTeks: '#eafff4' },
   },
   {
     id: 'U-003', name: 'Agus Priyanto', email: 'agus@jagofarm.id', password: DEMO_PASSWORD,
     role: 'pengguna', areaIds: ['AR-03'], status: 'nonaktif', joinedAt: '2026-02-02', points: 410,
     phone: '0857-9988-7766', jabatan: 'Operator Tandon', bio: 'Menangani tandon dan pompa.',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+    avatar: { id: 'U-003', warna: '#b45309', warnaTeks: '#fff8ec' },
   },
   {
     id: 'U-004', name: 'Hendra Wicaksono', email: 'hendra@jagofarm.id', password: DEMO_PASSWORD,
     role: 'pengelola', areaIds: [], status: 'aktif', joinedAt: '2026-01-01', points: 0,
     phone: '0811-1122-3344', jabatan: 'Pengelola Farm', bio: 'Mengelola perangkat IoT dan data seluruh area.',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    avatar: { id: 'U-004', warna: '#1e40af', warnaTeks: '#eafff4' },
   },
 ];
 
@@ -221,8 +244,8 @@ export const SEED_PET = {
   lastPlayed: null,
   appliedToAreaId: 'AR-01',
   log: [
-    { id: 'P-1', at: '2026-03-07 08:10', text: 'Pet diberi pakan pelet — nafsu makan baik.', delta: '+8 xp' },
-    { id: 'P-2', at: '2026-03-07 15:40', text: 'Air kolam Prima — kebersihan pet naik.', delta: '+5 xp' },
+    { id: 'P-1', at: '2026-03-07 08:10', text: 'Pet diberi pakan pelet, nafsu makan baik.', delta: '+8 xp' },
+    { id: 'P-2', at: '2026-03-07 15:40', text: 'Air kolam Prima, kebersihan pet naik.', delta: '+5 xp' },
   ],
 };
 
@@ -265,15 +288,15 @@ export const KNOWLEDGE = [
   },
   {
     tags: ['amonia', 'nh3', 'nitrit', 'nitrat', 'siklus nitrogen', 'nitrifikasi'],
-    answer: 'Amonia (NH3) hasil sisa pakan dan kotoran ikan sangat toksik — jaga di bawah 0,25 mg/L. Bakteri Nitrosomonas mengubahnya jadi nitrit (NO2, toksik, target < 0,5 mg/L), lalu Nitrobacter mengubah nitrit jadi nitrat (NO3) yang justru nutrisi favorit sayur (target 20–80 mg/L). Siklus lengkap biasanya butuh 4–6 minggu. Aerasi kuat, jangan cuci biofilter dengan air klorin, dan tambah inokulan bakteri bila siklus crash.',
+    answer: 'Amonia (NH3) hasil sisa pakan dan kotoran ikan sangat toksik, jadi jaga di bawah 0,25 mg/L. Bakteri Nitrosomonas mengubahnya jadi nitrit (NO2, toksik, target < 0,5 mg/L), lalu Nitrobacter mengubah nitrit jadi nitrat (NO3) yang justru nutrisi favorit sayur (target 20–80 mg/L). Siklus lengkap biasanya butuh 4–6 minggu. Aerasi kuat, jangan cuci biofilter dengan air klorin, dan tambah inokulan bakteri bila siklus crash.',
   },
   {
     tags: ['oksigen', 'do', 'aerasi', 'aerator', 'nafas'],
-    answer: 'Oksigen terlarut (DO) untuk ikan nila aman di 5–8 mg/L; lele tahan sampai 4 mg/L tapi pertumbuhannya menurun. DO paling rendah menjelang subuh (04.00–06.00) karena tidak ada fotosintesis. Solusi: nyalakan aerator venturi/air stone 24 jam, tambah aliran cascade dari growbed, dan hindari overfeeding yang memicu dekomposisi. Catatan alat: sensor DO belum terpasang di farm ini — pantau DO secara manual dengan test kit, atau nilai dari gejala ikan (mengapung ke permukaan pagi hari = DO rendah).',
+    answer: 'Oksigen terlarut (DO) untuk ikan nila aman di 5–8 mg/L; lele tahan sampai 4 mg/L tapi pertumbuhannya menurun. DO paling rendah menjelang subuh (04.00–06.00) karena tidak ada fotosintesis. Solusi: nyalakan aerator venturi/air stone 24 jam, tambah aliran cascade dari growbed, dan hindari overfeeding yang memicu dekomposisi. Catatan alat: sensor DO belum terpasang di farm ini, jadi pantau DO secara manual dengan test kit, atau nilai dari gejala ikan (mengapung ke permukaan pagi hari = DO rendah).',
   },
   {
     tags: ['suhu', 'temperatur', 'panas', 'dingin', 'hujan'],
-    answer: 'Suhu air ideal nila 25–29 °C, lele 26–30 °C, sayur kangkung/pakcoy nyaman 20–28 °C. Suhu naik mempercepat metabolisme ikan tapi menekan DO — naikkan aerasi saat siang terik. Suhu turun drastis setelah hujan bisa menekan nafsu makan; tutup kolam sebagian atau tambah kedalaman air minimal 80 cm.',
+    answer: 'Suhu air ideal nila 25–29 °C, lele 26–30 °C, sayur kangkung/pakcoy nyaman 20–28 °C. Suhu naik mempercepat metabolisme ikan tapi menekan DO, jadi naikkan aerasi saat siang terik. Suhu turun drastis setelah hujan bisa menekan nafsu makan; tutup kolam sebagian atau tambah kedalaman air minimal 80 cm.',
   },
   {
     tags: ['pakan', 'feed', 'overfeeding', 'pelet', 'kuantitas pakan'],
@@ -289,11 +312,11 @@ export const KNOWLEDGE = [
   },
   {
     tags: ['hpp', 'harga pokok', 'biaya', 'untung', 'laba', 'ekonomi'],
-    answer: 'HPP (Harga Pokok Produksi) = total biaya langsung ÷ jumlah produksi. Di menu Kelola Area, masukkan setiap item (benih, pakan, listrik, tenaga kerja) dengan kuantitas dan harga satuan — sistem menjumlahkannya otomatis. Contoh Kolam Nila A: benih 500 × Rp1.200 = Rp600.000, pakan 50 kg × Rp13.500 = Rp675.000, jadi HPP per ekor = total ÷ 500. Bandingkan dengan harga jual untuk melihat margin sebelum panen, bukan setelah.',
+    answer: 'HPP (Harga Pokok Produksi) = total biaya langsung ÷ jumlah produksi. Di menu Kelola Area, masukkan setiap item (benih, pakan, listrik, tenaga kerja) dengan kuantitas dan harga satuan, lalu sistem menjumlahkannya otomatis. Contoh Kolam Nila A: benih 500 × Rp1.200 = Rp600.000, pakan 50 kg × Rp13.500 = Rp675.000, jadi HPP per ekor = total ÷ 500. Bandingkan dengan harga jual untuk melihat margin sebelum panen, bukan setelah.',
   },
   {
     tags: ['iot', 'sensor', 'perangkat', 'kalibrasi', 'alat'],
-    answer: 'Farm ini punya tiga sensor kualitas air: pH probe (mengukur keasaman, ambang 6,2–7,6), probe suhu air DS18B20 (24–30 °C), dan sensor TDS/EC (400–900 ppm nutrisi). Kalibrasi pH tiap 2–4 minggu dengan buffer 4,0 dan 7,0; probe TDS dikalibrasi dengan larutan standar 707 ppm atau 1.413 ppm; probe suhu umumnya tidak perlu dikalibrasi berkala. Bersihkan ujung probe dari biofilm seminggu sekali — biofilm adalah penyebab drift tersembunyi. Setiap perangkat di dashboard punya halaman detail berisi fungsi, baterai, sinyal, dan tanggal kalibrasi terakhir.',
+    answer: 'Farm ini punya tiga sensor kualitas air: pH probe (mengukur keasaman, ambang 6,2–7,6), probe suhu air DS18B20 (24–30 °C), dan sensor TDS/EC (400–900 ppm nutrisi). Kalibrasi pH tiap 2–4 minggu dengan buffer 4,0 dan 7,0; probe TDS dikalibrasi dengan larutan standar 707 ppm atau 1.413 ppm; probe suhu umumnya tidak perlu dikalibrasi berkala. Bersihkan ujung probe dari biofilm seminggu sekali, karena biofilm adalah penyebab drift tersembunyi. Setiap perangkat di dashboard punya halaman detail berisi fungsi, baterai, sinyal, dan tanggal kalibrasi terakhir.',
   },
   {
     tags: ['aquaponik', 'apa itu', 'definisi', 'cara kerja'],
@@ -301,7 +324,7 @@ export const KNOWLEDGE = [
   },
   {
     tags: ['hama', 'penyakit', 'jamur', 'daun kuning', 'kutu'],
-    answer: 'Hindari pestisida kimia — sedikit saja bisa mematikan ikan. Untuk kutu daun: semprot air sabun kalium atau minyak neem di sore hari. Jamur daun muncul saat RH > 85% dan sirkulasi lemah: perbaiki ventilasi, kurangi jarak tanam, siram hanya di pangkal. Daun menguning bisa karena kekurangan nitrat (EC rendah), besi (pH > 7,5), atau akar busuk akibat aerasi kurang.',
+    answer: 'Hindari pestisida kimia, sedikit saja bisa mematikan ikan. Untuk kutu daun: semprot air sabun kalium atau minyak neem di sore hari. Jamur daun muncul saat RH > 85% dan sirkulasi lemah: perbaiki ventilasi, kurangi jarak tanam, siram hanya di pangkal. Daun menguning bisa karena kekurangan nitrat (EC rendah), besi (pH > 7,5), atau akar busuk akibat aerasi kurang.',
   },
   {
     tags: ['v-pet', 'virtual pet', 'gamifikasi', 'point', 'level'],

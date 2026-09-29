@@ -109,8 +109,8 @@ function Devices() {
     <div className="pilot-heading"><div><p className="pilot-eyebrow">DASHBOARD / PERANGKAT SAYA</p><h1>Ringkasan perangkat</h1><p>Pantau tiap unit, tanpa mencampur data antarperangkat.</p></div>
       <button className="pilot-button" aria-expanded={pairing} aria-controls="pilot-pairing" onClick={() => setPairing(!pairing)}><span aria-hidden="true">+</span> Tambah Perangkat</button></div>
     <dl className="pilot-metrics" aria-label="Ringkasan koneksi perangkat">
-      <div><dt>Total perangkat</dt><dd><span>{state.data && !state.error ? state.data.devices.length : '—'}</span><small>Unit pada akun Anda</small></dd></div>
-      {['online', 'stale', 'offline'].map(status => <div key={status} className={'pilot-metric ' + status}><dt>{statusNames[status]}</dt><dd><span>{state.data && !state.error ? state.data.devices.filter(device => device.status === status).length : '—'}</span><small>{status === 'online' ? 'Koneksi tersedia' : status === 'stale' ? 'Pengukuran ≥90 detik' : 'Tanpa kiriman ≥3 menit'}</small></dd></div>)}
+      <div><dt>Total perangkat</dt><dd><span>{state.data && !state.error ? state.data.devices.length : '·'}</span><small>Unit pada akun Anda</small></dd></div>
+      {['online', 'stale', 'offline'].map(status => <div key={status} className={'pilot-metric ' + status}><dt>{statusNames[status]}</dt><dd><span>{state.data && !state.error ? state.data.devices.filter(device => device.status === status).length : '·'}</span><small>{status === 'online' ? 'Koneksi tersedia' : status === 'stale' ? 'Pengukuran ≥90 detik' : 'Tanpa kiriman ≥3 menit'}</small></dd></div>)}
     </dl>
     {pairing && <section id="pilot-pairing" className="pilot-panel pilot-pairing"><p className="pilot-eyebrow">PEMASANGAN UNIT</p><h2>Pasangkan perangkat simulator</h2><p>Gunakan kode sekali pakai yang dialokasikan admin untuk akun Anda. Bukan kredensial pengiriman perangkat.</p>
       <ActionForm button="Pasangkan" action={values => pilotApi('/devices/pair', { method: 'POST', body: values })} onSuccess={result => navigate('/perangkat/' + result.deviceId)}>
@@ -123,10 +123,10 @@ function Devices() {
     <div className="pilot-device-list">{state.data?.devices.map(device => <Link className="pilot-panel pilot-device" key={device.id} to={'/perangkat/' + device.id}>
       <div className="pilot-device-top"><span className="pilot-eyebrow">{device.model === 'water-v1' ? 'PEMANTAU AIR' : 'PEMANTAU LINGKUNGAN'}</span><span className={'pilot-status ' + (state.error ? 'stale' : device.status)}>{state.error ? 'Status belum terverifikasi' : statusNames[device.status]}</span></div>
       <div><h2>{device.name}</h2><p className="pilot-device-model">{device.model} · Simulator melalui backend</p></div>
-      {device.sensors?.length > 0 && <dl className="pilot-device-values">{device.sensors.map(sensor => <div key={sensor.code}><dt>{sensor.name}</dt><dd>{device.readings?.[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 2 }) ?? '—'} <small>{sensor.unit}</small></dd></div>)}</dl>}
+      {device.sensors?.length > 0 && <dl className="pilot-device-values">{device.sensors.map(sensor => <div key={sensor.code}><dt>{sensor.name}</dt><dd>{device.readings?.[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 2 }) ?? '·'} <small>{sensor.unit}</small></dd></div>)}</dl>}
       <div className="pilot-device-bottom"><p><span>Pengukuran terakhir</span>{date(device.measured_at)}</p><span className="pilot-device-arrow" aria-hidden="true">↗</span><span className="sr-only">Lihat detail</span></div>
     </Link>)}</div>
-    <p className="pilot-note">Alert sensor dan email peringatan belum aktif — Sprint 2. Terhubung bukan berarti kondisi sensor normal.</p>
+    <p className="pilot-note">Alert sensor dan email peringatan belum aktif (Sprint 2). Terhubung bukan berarti kondisi sensor normal.</p>
   </>;
 }
 
@@ -154,7 +154,7 @@ function DeviceDetail() {
         <dl><div><dt>Pengukuran terakhir</dt><dd>{date(device.measured_at)}</dd></div><div><dt>Kiriman diterima server</dt><dd>{date(device.last_received_at)}</dd></div></dl>
         <p>Data terlambat ≥90 detik; offline ≥3 menit tanpa kiriman. Nilai lama bukan kondisi normal.</p></section>
       <div className="pilot-sensors">{device.sensors.map(sensor => <section className="pilot-panel pilot-sensor-value" key={sensor.code}><h2>{sensor.name}</h2>
-        <p className="pilot-value">{device.readings?.[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 2 }) ?? '—'} <small>{sensor.unit}</small></p>
+        <p className="pilot-value">{device.readings?.[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 2 }) ?? '·'} <small>{sensor.unit}</small></p>
         <p>{date(device.measured_at)}</p></section>)}</div>
       <h2 className="pilot-section-title">Riwayat pengukuran</h2>
       {!rows.length && !history.loading && !history.error && <p>Belum ada kiriman. Jalankan simulator setelah pemasangan.</p>}
@@ -164,7 +164,7 @@ function DeviceDetail() {
           <div className="pilot-chart"><Line aria-label={'Grafik ' + sensor.name} role="img" data={{ labels: plot.map(row => date(row.measured_at)), datasets: [{ label: sensor.unit, data: plot.map(row => row.readings[sensor.code]), borderColor: '#165b3f', backgroundColor: '#165b3f', pointRadius: 1, borderWidth: 2 }] }} options={{ responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 4 } } } }} /></div>
         </section>)}</div>
         <div className="pilot-table" tabIndex={0} role="region" aria-label="Tabel riwayat, dapat digulir"><table><caption>Riwayat unit ini, periode kepemilikan akun Anda</caption><thead><tr><th scope="col">Waktu pengukuran</th>{device.sensors.map(sensor => <th scope="col" key={sensor.code}>{sensor.name} ({sensor.unit})</th>)}<th scope="col">Diterima server</th></tr></thead>
-          <tbody>{rows.map(row => <tr key={row.message_id}><td>{date(row.measured_at)}</td>{device.sensors.map(sensor => <td key={sensor.code}>{row.readings[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 3 }) ?? '—'}</td>)}<td>{date(row.received_at)}</td></tr>)}</tbody></table></div>
+          <tbody>{rows.map(row => <tr key={row.message_id}><td>{date(row.measured_at)}</td>{device.sensors.map(sensor => <td key={sensor.code}>{row.readings[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 3 }) ?? '·'}</td>)}<td>{date(row.received_at)}</td></tr>)}</tbody></table></div>
         {cursor && <button className="pilot-button secondary" disabled={moreLoading || history.loading} onClick={async () => {
           setMoreLoading(true); setHistoryError('');
           try { const result = await pilotApi('/devices/' + id + '/history?cursor=' + encodeURIComponent(cursor)); setPagination({ head: history.data, rows: [...older, ...result.readings], cursor: result.nextCursor }); }
@@ -200,7 +200,7 @@ function Admin() {
         <div className="pilot-field"><label htmlFor="pilot-model">Model</label><select id="pilot-model" name="model" required defaultValue=""><option value="" disabled>Pilih model</option>{Object.entries(modelState.data?.models ?? {}).map(([key, model]) => <option key={key} value={key}>{model.name}</option>)}</select></div>
         <Field label="ID unit lama (opsional, hanya unit yang sudah dilepas; kredensial lama akan diganti)" name="deviceId" />
       </ActionForm>
-      {provision && <div role="status" className="pilot-secret"><h3>Simpan sekarang — rahasia hanya ditampilkan sekali</h3><p>Kirim kode aktivasi hanya ke pengguna tujuan. Kredensial hanya untuk operator simulator, jangan dimasukkan ke frontend atau Git.</p>
+      {provision && <div role="status" className="pilot-secret"><h3>Simpan sekarang: rahasia hanya ditampilkan sekali</h3><p>Kirim kode aktivasi hanya ke pengguna tujuan. Kredensial hanya untuk operator simulator, jangan dimasukkan ke frontend atau Git.</p>
         <dl>{Object.entries(provision).map(([key, value]) => <div key={key}><dt>{key}</dt><dd><code>{value}</code></dd></div>)}</dl><button className="pilot-button secondary" onClick={() => setProvision(null)}>Sembunyikan rahasia</button></div>}
     </section></div>
     <section className="pilot-panel"><h2>Akun pilot</h2><RefreshBar state={state} /><ul className="pilot-user-list">{state.data?.users.map(user => <li key={user.id}><div><strong>{user.email}</strong><span>{user.role === 'admin' ? 'Admin Pilot' : 'Pengguna'}</span></div><span className={'pilot-status ' + (user.verified ? 'online' : 'stale')}>{user.verified ? 'Terverifikasi' : 'Menunggu undangan'}</span></li>)}</ul></section>
