@@ -12,7 +12,12 @@ export async function pilotApi(path, { method = 'GET', body, signal } = {}) {
   }
   let data;
   try { data = await response.json(); }
-  catch { throw new Error('Respons API tidak valid. Periksa routing /api.'); }
+  catch {
+    // B-9 (audit-002): dulu semua badan non-JSON disebut "periksa routing /api",
+    // padahal sebabnya bisa lain (endpoint salah, halaman HTML dari proxy, atau
+    // backend bukan API). Sebut kenyataannya, jangan menebak penyebabnya.
+    throw new Error('Balasan /api tidak berupa JSON. Server tidak menjawab sebagai API.');
+  }
   if (!response.ok) throw Object.assign(new Error(data.error?.message ?? 'Permintaan gagal.'), { status: response.status });
   return data;
 }

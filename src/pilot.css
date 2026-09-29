@@ -8,7 +8,13 @@
   --pilot-soft: #edf3e9;
   --pilot-warning: #805011;
   --pilot-danger: #8b382a;
+  /* Skala radius (B-8 audit-002). Sebelumnya 8 nilai berbeda tanpa aturan
+     (6/10/12/16/20/22/24/999 px) sehingga radius berhenti menandai hierarki.
+     Aturannya: 10px kontrol kecil, 12px pesan/kotak isian, 20px kartu & panel,
+     999px keping (pil) saja. Nilai 6/16/22/24 diselaraskan ke skala ini. */
   --pilot-radius: 20px;
+  --pilot-radius-kontrol: 10px;
+  --pilot-radius-pesan: 12px;
   --pilot-space: 1.5rem;
   display: flow-root;
   min-height: 100vh;
@@ -32,18 +38,16 @@
   padding: .75rem 1.25rem;
   background: #f5f7f2;
   border: 1px solid rgba(255, 255, 255, .9);
-  border-radius: 22px;
-  box-shadow: 0 8px 30px rgba(25, 60, 44, .07), 0 1px 3px rgba(25, 60, 44, .05), inset 0 1px 0 #fff;
-}
-@supports ((backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px))) {
-  .pilot-header {
-    background: linear-gradient(120deg, rgba(255, 255, 255, .84), rgba(242, 248, 239, .7));
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    backdrop-filter: blur(20px) saturate(140%);
-  }
+  border-radius: var(--pilot-radius);
+  /* B-7 (audit-002): dulu kaca (blur 20px) + tiga lapis bayangan sekaligus pada
+     elemen yang sama. Kini satu bayangan tipis; kaca dilepas karena tidak ada
+     lapisan bergerak di belakang header (isinya bergulir di bawah, bukan di
+     baliknya). Latar dibuat hampir pekat supaya pemisahannya tetap terbaca. */
+  background: rgba(250, 252, 249, .96);
+  box-shadow: 0 1px 3px rgba(25, 60, 44, .08);
 }
 .pilot-brand { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; font-size: 1.4rem; font-weight: 800; letter-spacing: -.05em; }
-.pilot-brand-symbol { width: 34px; height: 34px; padding: 4px; border-radius: 10px; background: var(--pilot-soft); flex-shrink: 0; }
+.pilot-brand-symbol { width: 34px; height: 34px; padding: 4px; border-radius: var(--pilot-radius-kontrol); background: var(--pilot-soft); flex-shrink: 0; }
 .pilot-brand span { font-size: .7rem; font-weight: 600; letter-spacing: .04em; margin-left: .3rem; padding: .2rem .5rem; border: 1px solid #b6cbb8; border-radius: 999px; }
 .pilot-header nav { display: flex; gap: .4rem; align-items: center; }
 .pilot-header nav a, .pilot-header nav button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .55rem .9rem; border: 1px solid transparent; border-radius: 999px; font-size: .875rem; font-weight: 600; }
@@ -79,24 +83,27 @@
 .pilot-refresh { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin: 1rem 0; font-size: .75rem; color: var(--pilot-muted); }
 .pilot-refresh > span { min-width: 0; }
 .pilot-refresh .pilot-button { flex-shrink: 0; font-size: .8125rem; }
-.pilot-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; background: var(--pilot-brand); color: white; border: 1px solid var(--pilot-brand); border-radius: 10px; padding: .65rem 1rem; min-height: 44px; font-size: .875rem; font-weight: 600; text-align: center; transition: background-color 150ms, box-shadow 150ms; }
+.pilot-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; background: var(--pilot-brand); color: white; border: 1px solid var(--pilot-brand); border-radius: var(--pilot-radius-kontrol); padding: .65rem 1rem; min-height: 44px; font-size: .875rem; font-weight: 600; text-align: center; transition: background-color 150ms, box-shadow 150ms; }
 .pilot-button > span[aria-hidden] { font-size: 1.2rem; line-height: 1; }
 .pilot-button:hover:not(:disabled) { background: #134b35; box-shadow: 0 3px 10px #1b604522; }
 .pilot-button.secondary { background: white; color: var(--pilot-brand); border-color: #8aab94; }
 .pilot-button.secondary:hover:not(:disabled) { background: var(--pilot-soft); }
 .pilot-shell button:disabled { opacity: .55; cursor: wait; }
-.pilot-shell :focus-visible { outline: 3px solid #9b6417; outline-offset: 4px; scroll-margin-top: 10rem; }
+/* B-3 (audit-002): #9b6417 hanya 2.49:1 di atas panel putih dan latar #f6f7f2,
+   gagal ambang 3:1 untuk indikator fokus. Diganti hijau brand gelap: 7.2:1 di
+   putih, 6.7:1 di latar halaman. */
+.pilot-shell :focus-visible { outline: 3px solid #134b35; outline-offset: 4px; scroll-margin-top: 10rem; }
 #pilot-main, #pilot-pairing { scroll-margin-top: 10rem; }
 .pilot-link { display: inline-flex; align-items: center; min-height: 44px; margin: .5rem 0; font-size: .875rem; text-decoration: underline; text-underline-offset: 4px; }
-.pilot-error { background: #fff2ed; border: 1px solid #c47860; color: var(--pilot-danger); border-radius: 12px; padding: 1rem; font-size: .875rem; }
-.pilot-note { display: flex; gap: .75rem; padding: 1rem 1.25rem; background: var(--pilot-soft); border-radius: 12px; font-size: .8125rem; color: var(--pilot-muted); }
+.pilot-error { background: #fff2ed; border: 1px solid #c47860; color: var(--pilot-danger); border-radius: var(--pilot-radius-pesan); padding: 1rem; font-size: .875rem; }
+.pilot-note { display: flex; gap: .75rem; padding: 1rem 1.25rem; background: var(--pilot-soft); border-radius: var(--pilot-radius-pesan); font-size: .8125rem; color: var(--pilot-muted); }
 .pilot-device-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 .pilot-device { display: flex; flex-direction: column; gap: .75rem; margin-bottom: 0; text-decoration: none; transition: border-color 150ms, box-shadow 150ms, transform 150ms; }
 .pilot-device:hover { border-color: #86a68b; box-shadow: 0 8px 24px #193e300a; transform: translateY(-2px); }
 .pilot-device h2 { font-size: 1.375rem; margin-bottom: .25rem; overflow-wrap: anywhere; }
 .pilot-device-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .pilot-device-model { font-size: .75rem; color: var(--pilot-muted); }
-.pilot-device-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: .75rem; padding: 1rem; background: #f6f8f3; border: 1px solid #e5ece2; border-radius: 12px; }
+.pilot-device-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: .75rem; padding: 1rem; background: #f6f8f3; border: 1px solid #e5ece2; border-radius: var(--pilot-radius-pesan); }
 .pilot-device-values dt { font-size: .6875rem; color: var(--pilot-muted); }
 .pilot-device-values dd { margin-top: .25rem; font-size: 1.375rem; font-weight: 600; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .pilot-device-values small { font-size: .6875rem; font-weight: 400; }
@@ -111,17 +118,17 @@
 .pilot-status.online { color: var(--pilot-brand); background: #eef6ec; }
 .pilot-empty { text-align: center; padding: 3rem 1rem; }
 .pilot-empty p { max-width: 52ch; margin-inline: auto; }
-.pilot-empty-mark { display: inline-grid; place-items: center; width: 56px; height: 56px; background: var(--pilot-soft); border: 1px dashed #829e7d; border-radius: 16px; font-size: 1.75rem; margin-bottom: .75rem; }
+.pilot-empty-mark { display: inline-grid; place-items: center; width: 56px; height: 56px; background: var(--pilot-soft); border: 1px dashed #829e7d; border-radius: var(--pilot-radius-pesan); font-size: 1.75rem; margin-bottom: .75rem; }
 .pilot-loading { display: flex; align-items: center; justify-content: center; gap: .75rem; min-height: 180px; color: var(--pilot-muted); font-size: .875rem; }
 .pilot-loading-dot { width: 10px; height: 10px; border: 2px solid var(--pilot-brand); border-radius: 50%; }
 .pilot-pairing { background: #fafdF7; border-color: #a9c29f; }
 .pilot-pairing form { max-width: 600px; }
 .pilot-field { display: flex; flex-direction: column; gap: .45rem; font-size: .8125rem; font-weight: 600; margin: 1.25rem 0; }
-.pilot-field input, .pilot-field select { background: #fcfdfa; color: var(--pilot-ink); border: 1px solid #8aab94; border-radius: 10px; padding: .75rem; width: 100%; min-height: 48px; font-size: 1rem; font-weight: 400; }
+.pilot-field input, .pilot-field select { background: #fcfdfa; color: var(--pilot-ink); border: 1px solid #8aab94; border-radius: var(--pilot-radius-kontrol); padding: .75rem; width: 100%; min-height: 48px; font-size: 1rem; font-weight: 400; }
 .pilot-field input::placeholder { color: var(--pilot-muted); }
 .pilot-field input:hover, .pilot-field select:hover { border-color: var(--pilot-brand); }
 .pilot-auth-layout { display: grid; gap: 1.5rem; max-width: 1060px; margin: 1.5rem auto; }
-.pilot-auth-story { position: relative; overflow: hidden; background: #e6eedc; border: 1px solid #d0dfc5; border-radius: 24px; padding: 2rem; }
+.pilot-auth-story { position: relative; overflow: hidden; background: #e6eedc; border: 1px solid #d0dfc5; border-radius: var(--pilot-radius); padding: 2rem; }
 .pilot-auth-story h2 { font-size: clamp(1.625rem, 3vw, 2.625rem); line-height: 1.15; margin-top: 1.5rem; }
 .pilot-auth-story > p:not(.pilot-eyebrow) { font-size: .875rem; max-width: 42ch; color: #415d46; }
 .pilot-field-art { display: block; width: calc(100% + 4rem); height: 140px; margin: .5rem -2rem; color: #88aa79; }
@@ -148,7 +155,7 @@
 .pilot-connection > p { flex-basis: 100%; max-width: none; padding-top: 1rem; border-top: 1px solid var(--pilot-border); margin: 0; font-size: .75rem; }
 .pilot-shell .pilot-section-title { margin-top: 2rem; }
 .pilot-chart { height: 220px; margin-top: 1rem; }
-.pilot-table { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--pilot-border); border-radius: 16px; background: var(--pilot-surface); }
+.pilot-table { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--pilot-border); border-radius: var(--pilot-radius-pesan); background: var(--pilot-surface); }
 .pilot-table table { border-collapse: collapse; width: 100%; font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .pilot-table th, .pilot-table td { text-align: left; padding: 1rem; border-bottom: 1px solid var(--pilot-border); white-space: nowrap; }
 .pilot-table th { font-weight: 600; background: #f1f5ed; color: var(--pilot-muted); font-size: .75rem; }
@@ -165,13 +172,15 @@
 .pilot-user-list li > div { min-width: 0; overflow-wrap: anywhere; }
 .pilot-user-list strong { display: block; font-weight: 600; }
 .pilot-user-list li > div > span { color: var(--pilot-muted); font-size: .75rem; }
-.pilot-secret { margin-top: 1.5rem; background: #fff6e7; border: 1px solid #d2b67e; border-radius: 12px; padding: 1rem; font-size: .8125rem; }
+.pilot-secret { margin-top: 1.5rem; background: #fff6e7; border: 1px solid #d2b67e; border-radius: var(--pilot-radius-pesan); padding: 1rem; font-size: .8125rem; }
 .pilot-secret dt { font-weight: 600; margin-top: .75rem; }
-.pilot-secret dd { overflow-wrap: anywhere; user-select: all; padding: .5rem; margin-top: .25rem; background: #ffffff99; border-radius: 6px; font-size: .75rem; }
+.pilot-secret dd { overflow-wrap: anywhere; user-select: all; padding: .5rem; margin-top: .25rem; background: #ffffff99; border-radius: var(--pilot-radius-kontrol); font-size: .75rem; }
 .pilot-secret button { margin-top: 1rem; }
 .pilot-footer { max-width: 1168px; margin-inline: auto; text-align: center; padding: 1.5rem 1rem; border-top: 1px solid var(--pilot-border); font-size: .75rem; color: var(--pilot-muted); }
 .pilot-skip { position: absolute; left: -10000px; }
-.pilot-skip:focus { left: 1rem; top: 1rem; z-index: 100; background: white; padding: 1rem; }
+/* Target sentuh minimal 44px (R-03). Sebelumnya tinggi hanya 26px karena
+   padding saja; sekarang tinggi dipatok eksplisit + display flex. */
+.pilot-skip:focus { left: 1rem; top: 1rem; z-index: 100; background: white; padding: 1rem; display: inline-flex; align-items: center; min-height: 44px; border-radius: var(--pilot-radius-kontrol); }
 @media (min-width: 760px) {
   .pilot-device-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pilot-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }

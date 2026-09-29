@@ -26,7 +26,12 @@ function usePolling(path) {
       setSnapshot({ path, data: result, updatedAt: new Date().toISOString() }); setError('');
     } catch (failure) {
       if (active.current !== controller) return;
-      if (failure.status === 401) { window.location.assign('/'); return; }
+      // Sesi berakhir: kembali ke halaman masuk PILOT, bukan ke akar
+      // (akar dipakai SmartDashboard).
+      if (failure.status === 401) {
+        window.location.assign(window.location.pathname.startsWith('/pilot') ? '/pilot' : '/');
+        return;
+      }
       setError(controller.signal.aborted ? 'Waktu tunggu backend habis. Silakan Segarkan.' : failure.message);
     } finally {
       clearTimeout(timeout);
@@ -92,7 +97,7 @@ function Login({ onLogin, invitation, onAccepted }) {
       <Field label="Password (12–128 karakter)" name="password" type="password" minLength={12} maxLength={128} autoComplete={invitation ? 'new-password' : 'current-password'} required />
     </ActionForm>
     {message && <p role="status">{message}</p>}
-    <a className="pilot-link" href="/">Kembali ke SmartDashboard Aquaponik</a>
+    <a className="pilot-link" href="/masuk">Kembali ke SmartDashboard Aquaponik</a>
   </section></div>;
 }
 
@@ -107,7 +112,7 @@ function Devices() {
   const navigate = useNavigate();
   return <>
     <div className="pilot-heading"><div><p className="pilot-eyebrow">DASHBOARD / PERANGKAT SAYA</p><h1>Ringkasan perangkat</h1><p>Pantau tiap unit, tanpa mencampur data antarperangkat.</p></div>
-      <button className="pilot-button" aria-expanded={pairing} aria-controls="pilot-pairing" onClick={() => setPairing(!pairing)}><span aria-hidden="true">+</span> Tambah Perangkat</button></div>
+      <button className="pilot-button" aria-expanded={pairing} aria-controls="pilot-pairing" onClick={() => setPairing(!pairing)}><span aria-hidden="true">+</span> Pasang unit</button></div>
     <dl className="pilot-metrics" aria-label="Ringkasan koneksi perangkat">
       <div><dt>Total perangkat</dt><dd><span>{state.data && !state.error ? state.data.devices.length : '·'}</span><small>Unit pada akun Anda</small></dd></div>
       {['online', 'stale', 'offline'].map(status => <div key={status} className={'pilot-metric ' + status}><dt>{statusNames[status]}</dt><dd><span>{state.data && !state.error ? state.data.devices.filter(device => device.status === status).length : '·'}</span><small>{status === 'online' ? 'Koneksi tersedia' : status === 'stale' ? 'Pengukuran ≥90 detik' : 'Tanpa kiriman ≥3 menit'}</small></dd></div>)}
@@ -221,9 +226,14 @@ export default function PilotApp() {
     pilotApi('/session').then(result => { if (current) setUser(result.user); }).catch(failure => { if (current && failure.status !== 401) setError(failure.message); }).finally(() => { if (current) setReady(true); });
     return () => { current = false; };
   }, []);
-  return <BrowserRouter><div className="pilot-shell">
+  // Rute pilot hidup di bawah /pilot (BASENAME), bukan di akar. Sebelumnya
+  // aplikasi memakai rute "/", "/perangkat/:id", dan "/admin": URL berubah
+  // menjadi akar saat pengguna membuka /pilot, sehingga memuat ulang halaman
+  // atau membuka bookmark detail perangkat mendarat di SmartDashboard.
+  const basename = window.location.pathname.startsWith('/pilot') ? '/pilot' : '/';
+  return <BrowserRouter basename={basename}><div className="pilot-shell">
     <a href="#pilot-main" className="pilot-skip">Langsung ke konten</a>
-    <header className="pilot-header"><Link to="/" className="pilot-brand"><svg className="pilot-brand-symbol" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 26V14m0 5C7 20 5 14 6 7c7 0 12 3 10 12Zm0-4C16 7 21 5 27 5c1 7-3 11-11 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>JagoFarm <span>Pilot</span></Link>
+    <header className="pilot-header"><Link to="/" className="pilot-brand"><svg className="pilot-brand-symbol" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 26V14m0 5C7 20 5 14 6 7c7 0 12 3 10 12Zm0-4C16 7 21 5 27 5c1 7-3 11-11 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>JagoFarm</Link>
       {user && <nav aria-label="Navigasi pilot"><NavLink to="/" end>Perangkat</NavLink>{user.role === 'admin' && <NavLink to="/admin">Admin Pilot</NavLink>}<button onClick={async () => {
         try { await pilotApi('/session/logout', { method: 'POST' }); setUser(null); setError(''); }
         catch (failure) { if (failure.status === 401) setUser(null); else setError(failure.message); }

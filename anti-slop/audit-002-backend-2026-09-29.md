@@ -12,6 +12,37 @@ Prioritas: Hard Gate = TINGGI, Purpose-Gate = SEDANG, Quality Locks = RENDAH.
 
 ---
 
+## Status perbaikan (diperbarui 2026-09-29, belum di-push)
+
+**Semua temuan di laporan ini sudah DIPERBAIKI dan diuji ulang.** Satu temuan
+(B-2) ternyata keliru dan saya tarik — lihat catatan koreksi di bawah.
+
+| No | Aturan | Perbaikan | Bukti setelah perbaikan |
+| --- | --- | --- | --- |
+| B-1 | R-24 | `BrowserRouter` pilot memakai `basename="/pilot"`; fallback sesi 401 kembali ke `/pilot`, bukan akar; tautan ke SmartDashboard jadi `/masuk` | `/pilot` tetap `http://localhost:5173/pilot` setelah login; F5 di `/pilot/perangkat` tetap di pilot; `http://localhost:5173/pilot/perangkat/<uuid>` sekarang mendarat di halaman detail pilot (dulu halaman masuk SmartDashboard) |
+| B-3 | R-32 | Warna indikator fokus `#9b6417` → `#134b35` | Terukur 10.07:1 di atas panel putih, 9.35:1 di atas latar halaman (dulu 2.49:1). Diuji pada 4 elemen pertama yang dijangkau Tab |
+| B-4 | R-05/C-2 | Tombol heading jadi "+ Pasang unit" (sesuai fungsinya: memasang unit dengan kode aktivasi dari admin, bukan menambah perangkat) | Label baru terbaca di UI pilot |
+| B-5 | R-04 | Emoji di `<title>` | Tidak berlaku lagi: judul sekarang "AquaSmartponik: Dashboard TA JagoFarm" tanpa emoji (sudah bersih sebelum perbaikan ini) |
+| B-6 | R-09 | Kapsul "Pilot" di brand dihapus; status pilot dibawa baris akun + footer | `document.querySelector('.pilot-brand span')` → tidak ada; brand terbaca "JagoFarm" |
+| B-7 | R-10/R-12 | Kaca header dilepas; bayangan tiga lapis → satu lapis; latar hampir pekat | `backdrop-filter: none`, `box-shadow` satu lapis `rgba(25,60,44,.08) 0 1px 3px` |
+| B-8 | R-31 | Skala radius pilot ditulis sebagai variabel (10/12/20/999 px); 7 radius liar (6/16/22/24) diselaraskan | Seluruh `border-radius` di pilot.css kini memakai variabel skala |
+| B-9 | R-27 | Pesan galat badan non-JSON tidak lagi menebak sebab | "Balasan /api tidak berupa JSON. Server tidak menjawab sebagai API." |
+| — | R-03 | Bonus temuan saat uji: skip link pilot hanya 26px | Setelah difokus terukur 58px (syarat 44px) |
+
+Regresi yang dijalankan setelah perbaikan: 15/15 uji kontrak API lulus,
+0 kegagalan kontras di UI pilot (3 halaman) dan di SmartApp (9 halaman × 2 tema),
+0 teks terpotong, 0 em dash di teks UI, 0 error runtime.
+
+### Koreksi: B-2 ditarik (temuan saya salah)
+
+B-2 menyebut ada 2 em dash di `src/PilotApp.jsx`. Setelah diperiksa ulang:
+`grep -c "—" src/PilotApp.jsx` → **0**. Tidak ada em dash di berkas itu, baik di
+teks UI maupun di komentar. Halaman pilot juga terbukti 0 em dash saat dirender.
+Jadi B-2 tidak pernah nyata; yang saya lihat saat itu adalah em dash di berkas
+lain (sudah ditangani di laporan 001). Temuan ini ditarik, bukan "diperbaiki".
+
+---
+
 ## TINGGI
 
 ### B-1. R-24 (aturan navigasi) — rute UI pilot mati begitu halaman dimuat ulang
