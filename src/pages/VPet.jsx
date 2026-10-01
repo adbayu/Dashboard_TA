@@ -1,5 +1,8 @@
 import { ambangUntuk, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../store/SmartStore';
 import { Badge, Bar, Button, Card, Empty, SectionTitle, Table, Select } from '../components/ui';
+import PetKarakter, { IkonSensor } from '../components/PetKarakter';
+import { aksesoriUntukLevel, reaksiPet, sikapUntukEkspresi, URUTAN_PARAMETER } from '../data/reaksiPet';
+import '../pet.css';
 
 export default function VPet() {
   const { pet, feedPet, playPet, cleanPet, healPet, decayPet, areasSaya, applyPetToArea, devices, categoryOf } = useSmart();
@@ -30,43 +33,74 @@ export default function VPet() {
           ambang,
           ok: nilaiTerhadapAmbang(d.metric.value, ambang) === 'dalam',
         };
-      });
+      })
+      .sort((a, b) => URUTAN_PARAMETER.indexOf(a.key) - URUTAN_PARAMETER.indexOf(b.key));
   const readings = waterQuality();
   const avgHealth = Math.round(status.reduce((sum, row) => sum + row.value, 0) / status.length);
 
+  // Reaksi pet ditentukan pembacaan sensor + kondisi pet sendiri. Aturannya ada
+  // di satu tempat: src/data/reaksiPet.js.
+  const reaksi = reaksiPet(readings, {
+    lapar: 100 - pet.hunger,
+    kotor: 100 - pet.hygiene,
+    sakit: 100 - pet.health,
+  });
+  const sikap = sikapUntukEkspresi(reaksi.ekspresi);
+  const aksesori = aksesoriUntukLevel(pet.level);
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-[1.4fr,2fr]">
-        <Card className="bg-gradient-to-br from-primary/10 to-transparent text-center">
-          <SectionTitle eyebrow="Virtual Pet" title={pet.name} subtitle={`${pet.species} · Level ${pet.level} · Tahap ${pet.stage}`} />
-          <div className="my-4 flex justify-center">
-            <div className="relative w-40 h-40 rounded-full panel-inset border-4 border-primary/25 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '76px' }}>
-                {pet.species?.toLowerCase().includes('lele') ? 'phishing' : 'set_meal'}
-              </span>
-              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary text-white text-[11px] font-bold px-3 py-1 shadow-emerald-glow">
-                Level {pet.level}
-              </span>
-            </div>
-          </div>
+      <Card>
+        <SectionTitle
+          eyebrow="Virtual Pet"
+          title={pet.name}
+          subtitle={`${pet.species} · Level ${pet.level} · Tahap ${pet.stage}`}
+        />
+        <PetKarakter
+          species={pet.species}
+          ekspresi={reaksi.ekspresi}
+          aksesori={aksesori}
+          gelembung={reaksi.gelembung}
+          latar={reaksi.latar}
+          sikap={sikap}
+          pesan={reaksi.pesan}
+          tingkat={reaksi.tingkat}
+          level={pet.level}
+          tinggi={340}
+        />
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr,auto] sm:items-center">
           <p className="text-sm text-on-surface-variant">
             Kondisi rata-rata: <strong className="text-on-surface">{avgHealth}%</strong>
+            {reaksi.sebab && (
+              <>
+                {' · '}
+                <span className="font-semibold text-on-surface">Penyebab reaksi: {reaksi.sebab.label}</span>
+              </>
+            )}
           </p>
-          <div className="mt-3">
-            <div className="flex justify-between text-[11px] font-semibold mb-1">
-              <span className="text-on-surface-variant">Progres ke level {pet.level + 1}</span>
-              <span className="text-on-surface">
-                {pet.xp}/{pet.xpNext} xp
-              </span>
-            </div>
-            <Bar value={pet.xp} max={pet.xpNext} />
+          <div className="flex items-center gap-2">
+            <IkonSensor nama={reaksi.tingkat} size={22} />
+            <Badge tone={reaksi.tingkat === 'aman' ? 'ok' : reaksi.tingkat === 'bahaya' ? 'bad' : 'warn'}>
+              {reaksi.aksi}
+            </Badge>
           </div>
-          <p className="mt-3 text-[11px] text-on-surface-variant">
-            {pet.lastFed ? `Terakhir diberi pakan: ${pet.lastFed}` : 'Pet belum diberi pakan hari ini.'}
-          </p>
-        </Card>
+        </div>
+        <div className="mt-3">
+          <div className="flex justify-between text-[11px] font-semibold mb-1">
+            <span className="text-on-surface-variant">Progres ke level {pet.level + 1}</span>
+            <span className="text-on-surface">
+              {pet.xp}/{pet.xpNext} xp
+            </span>
+          </div>
+          <Bar value={pet.xp} max={pet.xpNext} />
+        </div>
+        <p className="mt-3 text-[11px] text-on-surface-variant">
+          {pet.lastFed ? `Terakhir diberi pakan: ${pet.lastFed}` : 'Pet belum diberi pakan hari ini.'}
+        </p>
+      </Card>
 
-        <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr),minmax(0,2fr)]">
+        <div className="space-y-4 min-w-0">
           <Card>
             <SectionTitle eyebrow="Perawatan" title="Rawat pet Anda" subtitle="Setiap tindakan perawatan memberi +10 point dan menambah pengalaman pet." />
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
@@ -97,51 +131,66 @@ export default function VPet() {
               </p>
             </div>
           </Card>
+        </div>
 
+        <div className="space-y-4 min-w-0">
           <Card>
             <SectionTitle
               eyebrow="Pemantauan Farm"
               title="Kualitas air area pet"
-              subtitle="Kesehatan pet mengikuti kualitas air area yang ditautkan."
+              subtitle="Reaksi pet di atas mengikuti tiga sensor area yang ditautkan."
             />
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,240px),1fr] sm:items-start">
-              <div className="grid grid-cols-3 gap-3 sm:order-2">
-                {readings.length === 0 ? (
-                  <p className="col-span-3 text-sm text-on-surface-variant">Belum ada sensor air di area ini.</p>
-                ) : (
-                  readings.map((read) => (
-                    <div key={read.key} className="rounded-xl border border-outline-variant/40 p-3 text-center">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{read.label}</p>
+            <div className="mb-4">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
+                Area pemantauan
+              </p>
+              <Select
+                value={pet.appliedToAreaId || ''}
+                onChange={applyPetToArea}
+                placeholder="Pilih area pemantauan…"
+                options={areas.map((a) => ({ value: a.id, label: a.name }))}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {readings.length === 0 ? (
+                <p className="sm:col-span-3 text-sm text-on-surface-variant">
+                  Belum ada sensor air di area ini, jadi pet belum bisa bereaksi terhadap air.
+                </p>
+              ) : (
+                readings.map((read) => {
+                  const dinilai = reaksi.parameter.find((p) => p.key === read.key);
+                  const tingkat = dinilai?.tingkat || (read.ok ? 'aman' : 'waspada');
+                  return (
+                    <div key={read.key} className="rounded-xl border border-outline-variant/40 p-3 text-center panel-inset">
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <IkonSensor nama={read.key} size={18} />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{read.label}</p>
+                      </div>
                       <p className="text-lg font-extrabold text-on-surface">
                         {read.value} <small className="text-[11px] font-semibold text-on-surface-variant">{read.unit}</small>
                       </p>
-                      <Badge tone={read.ok ? 'ok' : 'warn'}>{read.ok ? 'Aman' : 'Cek'}</Badge>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <IkonSensor nama={tingkat} size={16} />
+                        <Badge tone={tingkat === 'aman' ? 'ok' : tingkat === 'bahaya' ? 'bad' : 'warn'}>
+                          {tingkat === 'aman' ? 'Dalam ambang' : tingkat === 'bahaya' ? 'Jauh dari ambang' : 'Mendekati batas'}
+                        </Badge>
+                      </div>
                       {read.ambang && (
                         <p className="text-[10px] text-outline mt-1">
-                          Ideal {read.ambang[0]}–{read.ambang[1]}
+                          Ideal {read.ambang[0]}–{read.ambang[1]} {read.unit}
                         </p>
                       )}
                     </div>
-                  ))
-                )}
-              </div>
-              {/* Pemilih area diletakkan SEJAJAR dengan kartu metrik (order-2 di
-                  atas), bukan di bawahnya. Sebelumnya ia jatuh sebagai satu-satunya
-                  elemen baris kedua sehingga tampak "menempel" di bawah kartu. */}
-              <div className="sm:order-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
-                  Area pemantauan
-                </p>
-                <Select
-                  value={pet.appliedToAreaId || ''}
-                  onChange={applyPetToArea}
-                  placeholder="Pilih area pemantauan…"
-                  options={areas.map((a) => ({ value: a.id, label: a.name }))}
-                />
-              </div>
+                  );
+                })
+              )}
             </div>
-            <p className="text-[11px] text-on-surface-variant mt-2">
+            <p className="text-[11px] text-on-surface-variant mt-3">
               Area aktif: <strong className="text-on-surface">{area?.name || 'belum dipilih'}</strong>
+            </p>
+            <p className="text-[11px] text-on-surface-variant mt-1">
+              Ambang di atas diatur pengelola di Kelola Kategori dan Kelola Area. Mengubahnya langsung mengubah
+              reaksi pet, tanpa mengubah kode.
             </p>
           </Card>
         </div>

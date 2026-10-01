@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 110" role="img">
+<!-- Gelembung memanjang untuk kalimat lebih panjang. -->
+<!-- Teks TIDAK disimpan di berkas ini; React menumpuk tulisan di atasnya supaya
+     kalimat reaksi bisa berubah tanpa menyentuh aset. -->
+<rect x="4" y="6" width="192" height="86" rx="30" fill="#fff" stroke="#0f5238" stroke-width="3"/><path d="M84 92l-10 18 28-16Z" fill="#fff" stroke="#0f5238" stroke-width="3" stroke-linejoin="round"/>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" role="img">
+<!-- jangkar: mata=136,44; mulut=170,78 -->
+<!-- Warna badan: ubah stop gradien di bawah untuk mengganti warna karakter. -->
+<defs>
+<linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#6b5a4c"/><stop offset="1" stop-color="#3f3229"/>
+</linearGradient>
+</defs>
+<ellipse cx="112" cy="84" rx="82" ry="38" fill="url(#b)"/><path d="M92 52q30-16 62 6-24 6-40 4t-22-10Z" fill="#514134"/><path d="M40 84 4 62l16 22-16 22Z" fill="#514134"/><path d="M176 70q22-16 40-14" stroke="#3f3229" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M176 96q24 14 42 16" stroke="#3f3229" stroke-width="4" fill="none" stroke-linecap="round"/>

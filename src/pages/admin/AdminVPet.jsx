@@ -1,14 +1,42 @@
 import { useState } from 'react';
-import { useSmart } from '../../store/SmartStore';
+import { ambangUntuk, METRIC_META, useSmart } from '../../store/SmartStore';
 import { Badge, Bar, Button, Card, Empty, Field, Input, Modal, SectionTitle, Select, StatCard, Table } from '../../components/ui';
+import PetKarakter from '../../components/PetKarakter';
+import { aksesoriUntukLevel, reaksiPet, sikapUntukEkspresi } from '../../data/reaksiPet';
 import { PET_STAGES } from '../../data/seed';
+import '../../pet.css';
 
 const SPECIES = ['Ikan Nila', 'Ikan Lele', 'Ikan Gurame', 'Ikan Mas', 'Udang Galah'];
 
+// Daftar ini HARUS mencerminkan isi src/assets/v-pet/ekspresi/. Menambah
+// berkas ekspresi baru berarti menambah satu nama di sini agar ikut ditampilkan
+// pada pratinjau di bawah.
+const DAFTAR_EKSPRESI = [
+  'netral', 'senang', 'kedinginan', 'kepanasan', 'asam', 'basa',
+  'nutrisi-rendah', 'nutrisi-tinggi', 'lapar', 'kotor', 'sakit', 'mengantuk', 'gelisah',
+];
+
 export default function AdminVPet() {
-  const { pet, users, areas, renamePet, setPetSpecies, resetPet, healPet, applyPetToArea, decayPet } = useSmart();
+  const { pet, users, areas, devices, categoryOf, renamePet, setPetSpecies, resetPet, healPet, applyPetToArea, decayPet } = useSmart();
   const [form, setForm] = useState({ name: pet.name, species: pet.species, level: pet.level, appliedToAreaId: pet.appliedToAreaId || '' });
   const [confirm, setConfirm] = useState(false);
+
+  // Reaksi dihitung dari sensor area yang ditautkan, memakai aturan yang SAMA
+  // dengan halaman pengguna (src/data/reaksiPet.js). Pengelola jadi melihat
+  // akibat pengaturan ambangnya tanpa harus masuk sebagai pengguna.
+  const area = areas.find((a) => a.id === pet.appliedToAreaId);
+  const readings = devices
+    .filter((d) => d.areaId === pet.appliedToAreaId && METRIC_META[d.metric?.key])
+    .map((d) => {
+      const ambang = ambangUntuk(area, categoryOf(d.categoryId), d.metric.key);
+      return { key: d.metric.key, label: METRIC_META[d.metric.key].label, unit: METRIC_META[d.metric.key].unit,
+        value: d.metric.value, ambang };
+    });
+  const reaksi = reaksiPet(readings, {
+    lapar: 100 - pet.hunger,
+    kotor: 100 - pet.hygiene,
+    sakit: 100 - pet.health,
+  });
 
   const stats = [
     { label: 'Kenyang', value: pet.hunger },
@@ -17,7 +45,6 @@ export default function AdminVPet() {
     { label: 'Kesehatan', value: pet.health },
   ];
   const avg = Math.round(stats.reduce((sum, s) => sum + s.value, 0) / stats.length);
-  const area = areas.find((a) => a.id === pet.appliedToAreaId);
 
   const submit = (event) => {
     event.preventDefault();
@@ -35,15 +62,24 @@ export default function AdminVPet() {
         <StatCard label="Pemelihara" value={users.filter((u) => u.role === 'pengguna').length} icon="group" hint="Pengguna yang merawat pet" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.3fr,2fr]">
-        <Card className="text-center bg-gradient-to-br from-primary/10 to-transparent">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr),minmax(0,2fr)]">
+        <Card className="bg-gradient-to-br from-primary/10 to-transparent">
           <SectionTitle eyebrow="Virtual Pet Aktif" title={pet.name} subtitle={`${pet.species} · tahap ${pet.stage}`} />
-          <div className="my-3 flex justify-center">
-            <div className="w-32 h-32 rounded-full panel-inset border-4 border-primary/25 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '60px' }}>
-                {pet.species.toLowerCase().includes('lele') ? 'phishing' : 'set_meal'}
-              </span>
-            </div>
+          {/* Karakter yang sama dengan yang dilihat pengguna, supaya pengelola
+              bisa memeriksa hasil reaksi sensor tanpa berpindah akun. */}
+          <div className="my-3">
+            <PetKarakter
+              species={pet.species}
+              ekspresi={reaksi.ekspresi}
+              aksesori={aksesoriUntukLevel(pet.level)}
+              gelembung={reaksi.gelembung}
+              latar={reaksi.latar}
+              sikap={sikapUntukEkspresi(reaksi.ekspresi)}
+              pesan={reaksi.pesan}
+              tingkat={reaksi.tingkat}
+              level={pet.level}
+              tinggi={260}
+            />
           </div>
           <Badge tone="brand">Level {pet.level}</Badge>
           <div className="mt-4 space-y-2 text-left">
@@ -63,7 +99,36 @@ export default function AdminVPet() {
           </div>
         </Card>
 
-        <div className="space-y-4">
+        {/* Pratinjau aset: semua ekspresi yang tersedia ditampilkan sekaligus,
+            supaya pengelola bisa memeriksa hasil gambarnya tanpa harus membuat
+            kondisi air satu per satu di akun pengguna. Daftar mengikuti isi
+            src/assets/v-pet/ekspresi/, jadi menambah berkas baru di sana
+            langsung muncul di sini. */}
+        <Card>
+          <SectionTitle
+            eyebrow="Pratinjau Aset"
+            title="Semua ekspresi pet"
+            subtitle="Gambar diambil dari src/assets/v-pet/ekspresi. Menambah berkas baru di folder itu langsung tampil di sini."
+          />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {DAFTAR_EKSPRESI.map((nama) => (
+              <div key={nama} className="rounded-xl border border-outline-variant/40 p-2 panel-inset">
+                <PetKarakter
+                  species={pet.species}
+                  ekspresi={nama}
+                  aksesori={aksesoriUntukLevel(pet.level)}
+                  gelembung="bulat"
+                  latar="kolam-jernih"
+                  sikap={sikapUntukEkspresi(nama)}
+                  tinggi={150}
+                />
+                <p className="mt-1 text-[11px] font-bold text-center text-on-surface-variant">{nama}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="space-y-4 min-w-0">
           <Card>
             <SectionTitle
               eyebrow="Kelola Virtual Pet"

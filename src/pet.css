@@ -1,0 +1,153 @@
+/* Panggung Virtual Pet 2D.
+   Semua ukuran diturunkan dari variabel --pet-tinggi supaya satu nilai mengatur
+   seluruh panggung: ubah prop `tinggi` di <PetKarakter> dan rasio potongan
+   (badan, ekspresi, aksesori, latar) tetap seimbang. */
+
+.pet-panggung {
+  --pet-tinggi: 320px;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 24 / 18;
+  max-height: var(--pet-tinggi);
+  margin-inline: auto;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--c-outline-variant) / 0.5);
+  background: #e8f7fb;
+  isolation: isolate;
+}
+
+/* ── Latar kolam ─────────────────────────────────────────────────────────── */
+.pet-latar {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+.pet-panggung-isi {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end end;
+  padding: 4% 4% 6%;
+  z-index: 1;
+}
+
+/* ── Tubuh + potongan tempelan ───────────────────────────────────────────── */
+/* Kotak badan memakai perbandingan 240:160 yang sama dengan berkas karakter,
+   jadi posisi persen untuk ekspresi & aksesori selalu konsisten. */
+.pet-tubuh {
+  position: relative;
+  width: 66%;
+  aspect-ratio: 24 / 16;
+}
+.pet-wujud {
+  position: absolute;
+  inset: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: drop-shadow(0 6px 10px rgba(15, 82, 56, 0.18));
+}
+.pet-ekspresi,
+.pet-aksesori {
+  position: absolute;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  pointer-events: none;
+}
+
+/* ── Gelembung bicara ────────────────────────────────────────────────────── */
+/* Tulisan ditumpuk di atas gambar gelembung, bukan disimpan di dalam SVG,
+   supaya kalimat reaksi bisa berubah tanpa menggambar ulang asetnya. */
+.pet-gelembung {
+  position: absolute;
+  top: 2%;
+  left: 3%;
+  width: min(46%, 280px);
+  aspect-ratio: 20 / 11;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  z-index: 3;
+}
+.pet-gelembung p {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 16%;
+  bottom: 30%;
+  display: flex;
+  align-items: center;
+  font-size: clamp(0.75rem, 0.42rem + 1.05vw, 1rem);
+  line-height: 1.35;
+  font-weight: 600;
+  color: #14342a;
+  overflow: hidden;
+}
+
+/* ── Lencana level ───────────────────────────────────────────────────────── */
+.pet-lencana {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  background: #0f5238;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.pet-tingkat-bahaya .pet-lencana { background: #c0392b; }
+.pet-tingkat-waspada .pet-lencana { background: #b07a12; }
+
+/* ── Animasi sikap ───────────────────────────────────────────────────────── */
+/* Tiap sikap punya irama gerak sendiri supaya reaksi terbaca tanpa membaca
+   teks. `prefers-reduced-motion` di bawah mematikannya. */
+.pet-tubuh { animation: pet-gerak-tenang 4s ease-in-out infinite; }
+.pet-sikap-tenang { animation-name: pet-gerak-tenang; }
+.pet-sikap-gembira { animation-name: pet-gerak-gembira; animation-duration: 1.1s; }
+.pet-sikap-menggigil { animation-name: pet-gerak-menggigil; animation-duration: 0.55s; }
+.pet-sikap-resah { animation-name: pet-gerak-resah; animation-duration: 1.6s; }
+.pet-sikap-lemah { animation-name: pet-gerak-lemah; animation-duration: 3.4s; }
+
+@keyframes pet-gerak-tenang {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2.5%) rotate(-0.6deg); }
+}
+@keyframes pet-gerak-gembira {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  35% { transform: translateY(-7%) rotate(2deg); }
+  70% { transform: translateY(-1%) rotate(-2deg); }
+}
+@keyframes pet-gerak-menggigil {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-1.1%, 0.4%) rotate(-0.7deg); }
+  75% { transform: translate(1.1%, 0.4%) rotate(0.7deg); }
+}
+@keyframes pet-gerak-resah {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  30% { transform: translateX(2%) rotate(1deg); }
+  65% { transform: translateX(-2%) rotate(-1deg); }
+}
+@keyframes pet-gerak-lemah {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(3.5%) rotate(1.2deg); }
+}
+
+/* ── Ikon sensor kecil ───────────────────────────────────────────────────── */
+.pet-ikon {
+  display: inline-block;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: -0.2em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-tubuh { animation: none !important; }
+}

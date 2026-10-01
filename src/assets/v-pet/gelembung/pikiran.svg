@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 110" role="img">
+<!-- Gelembung pikiran (awan + titik-titik). -->
+<!-- Teks TIDAK disimpan di berkas ini; React menumpuk tulisan di atasnya supaya
+     kalimat reaksi bisa berubah tanpa menyentuh aset. -->
+<path d="M40 10q-28 0-28 22t28 22q10 0 18-4h66q26 0 26-18t-26-18h-40q-8-4-14-4Z" fill="#fff" stroke="#5b7c9d" stroke-width="3"/><circle cx="30" cy="88" r="6" fill="#fff" stroke="#5b7c9d" stroke-width="3"/><circle cx="18" cy="102" r="4" fill="#fff" stroke="#5b7c9d" stroke-width="3"/>

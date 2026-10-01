@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 110" role="img">
+<!-- Gelembung kotak, dipakai untuk ajakan perawatan. -->
+<!-- Teks TIDAK disimpan di berkas ini; React menumpuk tulisan di atasnya supaya
+     kalimat reaksi bisa berubah tanpa menyentuh aset. -->
+<rect x="4" y="8" width="192" height="74" rx="10" fill="#fff" stroke="#0f5238" stroke-width="3"/><path d="M88 82l-8 18 26-16Z" fill="#fff" stroke="#0f5238" stroke-width="3" stroke-linejoin="round"/>
