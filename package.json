@@ -14,7 +14,8 @@
     "db:size": "npm run api -- size",
     "simulator": "node --env-file-if-exists=.env --import tsx server/simulator.ts",
     "typecheck": "tsc -p server/tsconfig.json",
-    "test:pilot": "node --env-file-if-exists=.env --import tsx --test server/pilot.test.ts"
+    "test:pilot": "node --env-file-if-exists=.env --import tsx --test server/pilot.test.ts",
+    "cek:aset": "python scripts/cek-aset.py"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

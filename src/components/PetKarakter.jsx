@@ -53,19 +53,32 @@ const KARAKTER = {
 export const kunciKarakter = (species = '') =>
   KARAKTER[String(species).toLowerCase().trim()] || 'nila';
 
-// Titik tempel di badan karakter, dinyatakan sebagai pecahan dari kotak badan
-// (0..1). Angka ini HARUS cocok dengan badan SVG di `karakter/*.svg`; setiap
-// badan menuliskan jangkarnya di komentar paling atas berkasnya.
-//   mata  = titik tengah baris mata, tempat `ekspresi/<nama>.svg` ditempel
-//   kepala = bagian atas kepala, tempat `aksesori/<nama>.svg` ditempel
-// `kepala` = titik di mana bagian BAWAH aksesori diletakkan (bukan titik tengah),
-// supaya hiasan kepala terlihat menempel di atas kepala, bukan menggantung.
+// Titik tempel di badan karakter. Angka-angka ini TIDAK ditebak: semuanya
+// diukur dengan mencari posisi yang membuat seluruh piksel mata+mult (ekspresi)
+// jatuh di atas piksel badan, dengan prioritas posisi paling kanan (dekat
+// kepala). Cara mengukur ulang ada di src/assets/v-pet/README.md.
+//   mata  = titik tengah baris mata -> tempat `ekspresi/<nama>.svg` ditempel
+//   kepala = titik BAWAH aksesori -> tempat `aksesori/<nama>.svg` ditempel
+//            (jadi hiasan kepala terlihat menempel, bukan menggantung)
+//   wajahSkala = pengali ukuran kotak wajah bila bentuk badannya tipis
 const JANGKAR = {
-  nila: { mata: [133 / 240, 41 / 160], kepala: [0.47, 40 / 160] },
-  lele: { mata: [136 / 240, 44 / 160], kepala: [0.47, 54 / 160] },
-  gurame: { mata: [130 / 240, 46 / 160], kepala: [0.48, 32 / 160] },
-  mas: { mata: [136 / 240, 44 / 160], kepala: [0.49, 44 / 160] },
-  udang: { mata: [140 / 240, 40 / 160], kepala: [0.52, 28 / 160] },
+  nila: { mata: [168 / 240, 70 / 160], kepala: [0.62, 40 / 160], wajahSkala: 1 },
+  lele: { mata: [168 / 240, 77 / 160], kepala: [0.62, 52 / 160], wajahSkala: 1 },
+  gurame: { mata: [161 / 240, 62 / 160], kepala: [0.62, 31 / 160], wajahSkala: 1 },
+  mas: { mata: [166 / 240, 70 / 160], kepala: [0.62, 40 / 160], wajahSkala: 1 },
+  udang: { mata: [150 / 240, 72 / 160], kepala: [0.62, 44 / 160], wajahSkala: 0.85 },
+};
+
+// Sebagian tinta aksesori TIDAK mencapai dasar kotaknya (pita berhenti di 72%
+// tinggi kotak, medali sampai 85%). Tanpa koreksi ini hiasan kepala tampak
+// melayang di atas karakter. Angka di bawah adalah hasil pengukuran piksel tiap
+// berkas di `aksesori/`; ukur ulang kalau gambarnya diganti.
+const AKSESORI_TINTA_BAWAH = {
+  none: 1,
+  pita: 0.720,
+  daun: 0.773,
+  medali: 0.847,
+  mahkota: 0.713,
 };
 
 // Kotak ekspresi & aksesori: 60x60 pada kanvas badan 240x160.
@@ -103,21 +116,24 @@ export default function PetKarakter({
 
   const posisi = useMemo(() => {
     const [mx, my] = jangkar.mata;
+    const skala = jangkar.wajahSkala ?? 1;
+    const lebarWajah = LEBAR_WAJAH * skala;
+    const tinggiWajah = TINGGI_WAJAH * skala;
     return {
       wajah: {
-        left: `${(mx - LEBAR_WAJAH / 2) * 100}%`,
-        top: `${(my - BARIS_MATA * TINGGI_WAJAH) * 100}%`,
-        width: `${LEBAR_WAJAH * 100}%`,
-        height: `${TINGGI_WAJAH * 100}%`,
+        left: `${(mx - lebarWajah / 2) * 100}%`,
+        top: `${(my - BARIS_MATA * tinggiWajah) * 100}%`,
+        width: `${lebarWajah * 100}%`,
+        height: `${tinggiWajah * 100}%`,
       },
       aksesori: {
-        left: `${(jangkar.kepala[0] - LEBAR_WAJAH / 2) * 100}%`,
-        top: `${(jangkar.kepala[1] - TINGGI_WAJAH + 0.10) * 100}%`,
-        width: `${LEBAR_WAJAH * 100}%`,
-        height: `${TINGGI_WAJAH * 100}%`,
+        left: `${(jangkar.kepala[0] - lebarWajah / 2) * 100}%`,
+        top: `${(jangkar.kepala[1] - (AKSESORI_TINTA_BAWAH[aksesori] ?? 1) * tinggiWajah) * 100}%`,
+        width: `${lebarWajah * 100}%`,
+        height: `${tinggiWajah * 100}%`,
       },
     };
-  }, [jangkar]);
+  }, [jangkar, aksesori]);
 
   const urlKarakter = urlAset('karakter', kunci);
   const urlEkspresi = urlAset('ekspresi', ekspresi);

@@ -4,3 +4,4 @@
 <rect width="480" height="260" fill="url(#air)"/>
 <circle cx="110" cy="90" r="30" fill="#8a7f5c" opacity=".45"/><circle cx="330" cy="70" r="26" fill="#8a7f5c" opacity=".4"/>
 <circle cx="240" cy="120" r="22" fill="#8a7f5c" opacity=".35"/>
+</svg>

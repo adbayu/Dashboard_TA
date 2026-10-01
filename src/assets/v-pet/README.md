@@ -76,3 +76,48 @@ Ringkasnya, urutan prioritas reaksi:
 
 Semua berkas di sini dibuat sebagai SVG biasa (bukan hasil ekspor alat desain),
 sehingga bisa disunting dengan editor teks maupun Inkscape/Figma.
+
+## Penting: SVG wajib punya penutup `</svg>`
+
+Semua berkas di sini pernah terkirim TANPA penutup `</svg>`, sehingga XML-nya
+rusak dan browser tidak menggambar apa pun. Gejalanya menipu: build tetap hijau,
+elemen tetap ada, `background-image` tetap terisi, dan tidak ada galat di console,
+tapi panggungnya kosong.
+
+Sebelum menyerahkan hasil, jalankan:
+
+    npm run cek:aset
+
+Skrip itu memeriksa setiap berkas: XML sehat, ada `viewBox`, ukuran kanvas sesuai
+folder, dan berkas wajib tersedia. Keluar dengan kode 1 kalau ada yang salah.
+
+## Titik tempel wajah & aksesori (angka terukur)
+
+Nilai di `JANGKAR` (berkas `src/components/PetKarakter.jsx`) tidak ditebak.
+Cara mengukurnya:
+
+1. Gambar badan dan wajah ke satu kanvas pada skala yang sama.
+2. Geser kotak wajah dan hitung berapa persen piksel wajah yang jatuh di atas
+   piksel badan. Cari posisi paling kanan (dekat kepala) yang capaiannya 100%.
+3. Kalau bentuk badannya tipis sehingga tidak ada posisi yang mencapai 100%,
+   kecilkan `wajahSkala` (mis. udang 0,85) lalu ukur ulang.
+
+Hasil pengukuran terakhir (semuanya 100% di atas badan):
+
+| Karakter | mata (kanvas 240x160) | kepala | wajahSkala |
+| --- | --- | --- | --- |
+| nila | 168, 70 | 0.62, 40 | 1 |
+| lele | 168, 77 | 0.62, 52 | 1 |
+| gurame | 161, 62 | 0.62, 31 | 1 |
+| mas | 166, 70 | 0.62, 40 | 1 |
+| udang | 150, 72 | 0.62, 44 | 0,85 |
+
+`kepala` adalah titik tempat TINTA TERBAWAH aksesori diletakkan (bukan dasar
+kotaknya), karena sebagian gambar berhenti sebelum dasar kotak: pita 72%, daun
+77%, medali 85%, mahkota 71% tinggi kotak. Angka itu disimpan di
+`AKSESORI_TINTA_BAWAH`; setelah mengganti gambar aksesori, ukur ulang nilai
+tersebut atau hiasannya akan tampak melayang.
+
+Cara cepat memeriksa setelah mengubah gambar: buka `/admin/v-pet`, lihat
+pratinjau 13 ekspresi, dan pastikan mata/mulut setiap ekspresi berada di dalam
+badan ikan (bukan di air).

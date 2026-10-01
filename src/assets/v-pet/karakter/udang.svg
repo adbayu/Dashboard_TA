@@ -1,9 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" role="img">
-<!-- jangkar: mata=140,40; mulut=172,84 -->
+<!-- jangkar: mata & mulut ditentukan lewat kalibrasi terukur, lihat PetKarakter.jsx -->
 <!-- Warna badan: ubah stop gradien di bawah untuk mengganti warna karakter. -->
 <defs>
 <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
 <stop offset="0" stop-color="#e2735f"/><stop offset="1" stop-color="#b34a3a"/>
 </linearGradient>
 </defs>
-<path d="M40 96q6-52 74-56 46-2 58 20-24-10-54-4-40 8-46 60-18 6-32-20Z" fill="url(#b)"/><path d="M40 96q-16 10-30 6 12-8 18-20Z" fill="#b34a3a"/><path d="M150 34q26-20 46-18" stroke="#b34a3a" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M154 48q30-8 48 2" stroke="#b34a3a" stroke-width="3" fill="none" stroke-linecap="round"/>
+<ellipse cx="112" cy="84" rx="86" ry="48" fill="url(#b)"/>
+<path d="M34 84 4 58l14 26-14 26Z" fill="#b34a3a"/>
+<path d="M62 44q26-16 54-4-22 8-38 8t-16-4Z" fill="#c25a48"/>
+<path d="M58 122q28 14 56 2-22 12-40 12t-16-14Z" fill="#c25a48"/>
+<path d="M96 132l-10 16M118 136l-8 18M140 136l-4 18" stroke="#b34a3a" stroke-width="5" stroke-linecap="round"/>
+<path d="M186 46q26-18 46-16" stroke="#b34a3a" stroke-width="4" fill="none" stroke-linecap="round"/>
+<path d="M190 62q30-8 46 2" stroke="#b34a3a" stroke-width="3" fill="none" stroke-linecap="round"/>
+<ellipse cx="150" cy="104" rx="30" ry="12" fill="#e88a78" opacity=".45"/>
+<path d="M64 70q18-10 34 0" stroke="#a8402f" stroke-width="3" fill="none" opacity=".5"/>
+</svg>
