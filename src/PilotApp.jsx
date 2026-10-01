@@ -59,6 +59,30 @@ function usePolling(path) {
 
 function ErrorNotice({ error }) { return error ? <p className="pilot-error" role="alert">{error}</p> : null; }
 function Field({ label, ...props }) { return <label className="pilot-field">{label}<input {...props} /></label>; }
+
+// Chip akun di header. Sebelumnya hanya teks biasa: terlihat seperti kontrol,
+// tetapi kursor "auto" dan tidak ada aksi apa pun saat diklik. Sekarang menjadi
+// tombol nyata yang membuka panel akun berisi identitas dan tombol keluar.
+function Akun({ user, onKeluar }) {
+  const [terbuka, setTerbuka] = useState(false);
+  return <div className="pilot-akun">
+    <button type="button" className="pilot-akun-tombol" aria-expanded={terbuka} aria-controls="pilot-akun-panel" onClick={() => setTerbuka(!terbuka)}>
+      <span className="pilot-avatar" aria-hidden="true">{user.email.slice(0, 1).toUpperCase()}</span>
+      <span className="pilot-akun-email">{user.email}</span>
+      <span className="pilot-akun-caret" aria-hidden="true">{terbuka ? '▴' : '▾'}</span>
+    </button>
+    {terbuka && <section id="pilot-akun-panel" className="pilot-panel pilot-akun-panel">
+      <p className="pilot-eyebrow">AKUN PILOT</p>
+      <h2>Identitas akun</h2>
+      <dl>
+        <div><dt>Email</dt><dd>{user.email}</dd></div>
+        <div><dt>Peran</dt><dd>{user.role === 'admin' ? 'Admin Pilot' : 'Operator'}</dd></div>
+      </dl>
+      <p>Perubahan data akun dan password dilakukan Admin Pilot. Unit pada akun ini hanya dapat dilihat oleh Anda.</p>
+      <button type="button" className="pilot-button secondary" onClick={onKeluar}>Keluar dari akun ini</button>
+    </section>}
+  </div>;
+}
 function ActionForm({ children, action, button, onSuccess }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -240,7 +264,10 @@ export default function PilotApp() {
       }}>Keluar</button></nav>}</header>
     <main id="pilot-main" className="pilot-main"><ErrorNotice error={error} />
       {!ready ? <p role="status">Memeriksa sesi…</p> : !user || invitation ? <Login onLogin={value => { setUser(value); setError(''); }} invitation={invitation} onAccepted={() => setInvitation(null)} /> : <>
-        <div className="pilot-account"><span className="pilot-account-identity"><span className="pilot-avatar" aria-hidden="true">{user.email.slice(0, 1).toUpperCase()}</span>{user.email}</span><span>Simulator melalui backend <span aria-hidden="true">·</span> Polling 30 detik saat halaman aktif</span></div>
+        <div className="pilot-account"><Akun user={user} onKeluar={async () => {
+          try { await pilotApi('/session/logout', { method: 'POST' }); setUser(null); setError(''); }
+          catch (failure) { if (failure.status === 401) setUser(null); else setError(failure.message); }
+        }} /><span>Simulator melalui backend <span aria-hidden="true">·</span> Polling 30 detik saat halaman aktif</span></div>
         <Routes><Route path="/" element={<Devices />} /><Route path="/perangkat/:id" element={<DeviceDetail />} /><Route path="/admin" element={user.role === 'admin' ? <Admin /> : <Navigate to="/" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>
       </>}
     </main><footer className="pilot-footer">Pilot software. Bukan hardware fisik. RAG, alert email, dan pembayaran nyata belum aktif.</footer>
