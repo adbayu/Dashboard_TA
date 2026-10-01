@@ -17,28 +17,49 @@ Isi:
 
 ---
 
-## Bagian 0. Ringkas: 4 terminal
+## Bagian 0. Ringkas: satu perintah
 
-Isi yang sudah berjalan saat ini (dari sesi audit):
-  - Docker: kontainer `dashboard_ta-database-1` (port 5433) dan `dashboard_ta-mailbox-1` (1025, 8025)
-  - API pilot: node server/index.ts di 127.0.0.1:3001
-  - UI pilot (dev, ada proxy /api): vite di http://localhost:5173
-  - Pratinjau hasil build: vite preview di http://127.0.0.1:4173
-
-Cara memeriksa cepat bahwa ketiganya hidup:
+Semua yang dibutuhkan disiapkan oleh satu skrip (Docker Desktop, database, Mailpit,
+API, dev server, pratinjau). Di PowerShell:
 
 ```powershell
-docker compose ps
-(Invoke-WebRequest http://127.0.0.1:3001/api/health -UseBasicParsing).Content
-(Invoke-WebRequest http://localhost:5173/ -UseBasicParsing).StatusCode
-(Invoke-WebRequest http://127.0.0.1:4173/ -UseBasicParsing).StatusCode
+cd C:\JagoFarm_TA\Dashboard_TA
+powershell -ExecutionPolicy Bypass -File scripts\start-pilot.ps1
 ```
 
-Harapan: dua kontainer `Up`, `{"status":"ok"}`, lalu `200` dua kali.
+Skrip ini aman diulang: komponen yang sudah hidup akan dilewati, dan di akhir ia
+mencetak tabel HIDUP/MATI untuk keenam port. Butuh sampai beberapa menit pada
+pemakaian pertama (Docker Desktop harus naik lebih dulu).
+
+Setelah itu, nyalakan simulator supaya data bergerak:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-simulator.ps1
+```
+
+Simulator mengirim satu pengukuran setiap 30 detik. Hentikan semuanya dengan:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\stop-pilot.ps1
+```
+
+Catatan: `scripts\*.ps1` hanya alat bantu; semua perintah mentahnya tetap ada di
+bagian-bagian di bawah kalau Anda ingin menyalakan satu per satu secara manual.
+
+Harapan setelah `start-pilot.ps1`:
+
+| Port | Isi |
+| --- | --- |
+| 5433 | PostgreSQL pilot |
+| 1025 | Mailpit SMTP |
+| 8025 | Mailpit web (kotak surat uji) |
+| 3001 | API pilot (Fastify) |
+| 5173 | UI pilot (dev server, punya proxy /api) |
+| 4173 | Pratinjau hasil build SmartDashboard |
 
 ---
 
-## Bagian 1. Database + Mailpit (Docker)
+## Bagian 1. Database + Mailpit (Docker) — cara manual
 
 Penting: mesin ini sudah punya PostgreSQL sendiri di port 5432 (service Windows).
 Karena itu database pilot dipindah ke **5433** lewat `compose.local.yaml`, supaya
@@ -294,14 +315,37 @@ Docker Desktop juga boleh ditutup dari ikonnya di system tray.
 
 | Gejala | Sebab yang paling sering | Tindakan |
 | --- | --- | --- |
-| `/pilot` menampilkan "Balasan /api tidak berupa JSON" | UI dibuka lewat port selain 5173, atau API belum jalan | Jalankan `npm run api`, buka http://localhost:5173/pilot |
+| `/pilot` menampilkan "Balasan /api tidak berupa JSON" | UI dibuka lewat port selain 5173, atau API belum jalan | Jalankan `scripts\start-pilot.ps1`, buka http://localhost:5173/pilot |
 | "Origin tidak diizinkan." saat klik-klik | Port bukan 5173 | Pakai 5173, atau ubah `APP_ORIGIN` di `.env` + nyalakan ulang API |
-| `npm run db:migrate` gagal | Kontainer database belum siap/belum jalan | `docker compose ps`, tunggu `healthy`, ulangi |
+| `npm run db:migrate` gagal | Kontainer database belum siap/belum jalan | `scripts\start-pilot.ps1` sudah menunggu sehat; kalau masih gagal, ulangi perintahnya |
 | Login dijawab 401 padahal password benar | Batas 10 percobaan per 5 menit | Tunggu 5 menit atau nyalakan ulang API |
 | Pratinjau 4173 menampilkan tampilan lama | Pratinjau menyajikan hasil build | `node node_modules/vite/bin/vite.js build`, lalu muat ulang dengan Ctrl+Shift+R |
 | Undangan tidak muncul di Mailpit | Alamat berbeda, atau Mailpit baru dinyalakan | Lihat http://127.0.0.1:8025 dan tekan Refresh |
-| Simulator berhenti dengan "Invalid buffer" | Berkas `.pilot-buffer.json` rusak dari run sebelumnya | Hapus berkas itu lalu jalankan lagi |
+| Simulator berhenti dengan "Invalid buffer" | Berkas buffer rusak dari run sebelumnya | `scripts\start-simulator.ps1` sudah membuangnya otomatis; kalau perlu hapus `.pilot-buffer.json` |
+| Simulator berulang "Ingestion rejected: HTTP 409" dan `buffered` naik terus | Kiriman lama di buffer berasal dari masa unit belum/tidak lagi terpasang | Hentikan simulator, hapus `.pilot-buffer.json`, jalankan lagi. Kalau tetap 409, alokasikan ulang unit dari `/pilot/admin` (kepemilikan bisa sudah dilepas) |
+| Unit tampil "Tidak terhubung" padahal simulator jalan | Kredensial di `%TEMP%\audit-device.json` bukan milik unit yang sedang tampil | Alokasikan ulang unit dari `/pilot/admin`, pasangkan kode aktivasi dari akun pilot, lalu jalankan simulator lagi |
 | Halaman pilot tampak "tidak selesai memuat" | Tab browser tidak aktif, jadi polling memang dihentikan | Klik jendela browser (perilaku ini disengaja untuk hemat beban) |
+
+---
+
+## Bagian 8. Kalau data pilot ingin dimulai dari nol
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\stop-pilot.ps1 -HapusData
+powershell -ExecutionPolicy Bypass -File scripts\start-pilot.ps1
+cd C:\JagoFarm_TA\Dashboard_TA
+npm run db:migrate
+$env:ADMIN_EMAIL = 'admin@jagofarm.test'
+$secure = Read-Host 'Password admin (minimal 12 karakter)' -AsSecureString
+$env:ADMIN_PASSWORD = [System.Net.NetworkCredential]::new('', $secure).Password
+npm run db:admin
+Remove-Item Env:ADMIN_PASSWORD
+powershell -ExecutionPolicy Bypass -File scripts\start-simulator.ps1
+```
+
+Peringatan: `-HapusData` menghapus seluruh isi database pilot, termasuk akun,
+unit, dan riwayat pengukuran. Akun pilot yang dipakai untuk demo harus dibuat
+ulang lewat undangan (Bagian 3).
 
 ---
 
