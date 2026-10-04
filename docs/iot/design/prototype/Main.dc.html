@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>List IoT</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..500,0..1,0&amp;display=block">
+<style>
+body{margin:0}
+.jf{--bg:linear-gradient(135deg,#e7eef2 0%,#d9e3e9 50%,#c4d3db 100%);--ink:#191c1d;--ink2:#404943;--line:rgba(191,201,193,.6);--card:rgba(255,255,255,.92);--card-bd:rgba(15,82,56,.2);--card-sh:0 1px 2px 0 rgba(15,82,56,.06),0 8px 24px -4px rgba(15,82,56,.1);--top:rgba(255,255,255,.8);--top-bd:rgba(255,255,255,.4);--accent:#0f5238;--accent-ink:#0f5238;--inset:rgba(15,82,56,.05);--inset-bd:rgba(15,82,56,.22);--field:#ffffff;--field-bd:rgba(15,82,56,.2);--muted-bg:#eceeef;--ok-bg:#d1fae5;--ok-fg:#065f46;--ok-bd:#a7f3d0;--warn-bg:#fef3c7;--warn-fg:#78350f;--warn-bd:#fde68a;--bad-bg:#fee2e2;--bad-fg:#991b1b;--bad-bd:#fecaca;--info-bg:#e0f2fe;--info-fg:#075985;--info-bd:#bae6fd;--warn-line:#b45309}
+.jf.dark{--bg:linear-gradient(135deg,#131715 0%,#191c1d 50%,#0d1210 100%);--ink:#e9eeea;--ink2:#bac7be;--line:rgba(60,71,64,.9);--card:rgba(30,36,32,.75);--card-bd:rgba(255,255,255,.08);--card-sh:0 8px 32px 0 rgba(0,0,0,.3);--top:rgba(25,30,27,.85);--top-bd:rgba(255,255,255,.1);--accent-ink:#95d4b3;--inset:rgba(255,255,255,.06);--inset-bd:rgba(255,255,255,.12);--field:rgba(40,48,44,.6);--field-bd:rgba(255,255,255,.15);--muted-bg:#29312c;--ok-bg:rgba(6,78,59,.4);--ok-fg:#a7f3d0;--ok-bd:#065f46;--warn-bg:rgba(120,53,15,.4);--warn-fg:#fef3c7;--warn-bd:#92400e;--bad-bg:rgba(127,29,29,.4);--bad-fg:#fecaca;--bad-bd:#991b1b;--info-bg:rgba(12,74,110,.4);--info-fg:#bae6fd;--info-bd:#075985;--warn-line:#fcd34d}
+.ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;vertical-align:middle;white-space:nowrap;letter-spacing:normal;text-transform:none;font-feature-settings:'liga';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.jf :focus-visible{outline:2px solid #2d6a4f;outline-offset:2px}
+.jf.dark :focus-visible{outline-color:#b1f0ce}
+.jf input::placeholder{color:var(--ink2)}
+.jf select,.jf input{font-family:inherit}
+.jf-side{flex:0 0 288px;display:flex}.jf-menu{display:none!important}@media (max-width:720px){.jf-side{display:none}.jf-side.open{display:flex;flex:1 1 100%}.jf-menu{display:inline-flex!important}}
+</style>
+</helmet>
+<div class="jf {{themeClass}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); font-family: 'Hanken Grotesk', sans-serif; color: var(--ink)">
+<div class="jf-side {{sideClass}}"><dc-import name="Sidebar" role="pengguna" active="iot" dark="{{dark}}" alerts="1" hint-size="288px,1000px"></dc-import></div>
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="background: var(--top); border-bottom: 1px solid var(--top-bd); padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<button type="button" class="jf-menu" onClick="{{toggleSide}}" aria-expanded="{{sideExpanded}}" aria-label="Menu" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink); align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 22px">menu</span></button>
+<div style="flex: 1 1 240px; min-width: 0">
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink)">Mode Pengguna</p>
+<h1 style="margin: 0; font-family: Manrope, sans-serif; font-size: 20px; font-weight: 800; line-height: 1.25">List IoT</h1>
+<p style="margin: 0; font-size: 12px; color: var(--ink2)">Perangkat di area yang Anda ampu</p>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; border-radius: 16px; background: var(--inset); border: 1px solid var(--inset-bd); padding: 6px 12px; font-size: 12px">
+<span style="display: flex; align-items: center; gap: 6px; font-weight: 600"><span class="ms" aria-hidden="true" style="font-size: 16px; color: var(--accent-ink)">sensors</span><span class="num">3/4 terhubung</span></span>
+<span aria-hidden="true" style="color: var(--line)">|</span>
+<span style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--warn-fg)"><span class="ms" aria-hidden="true" style="font-size: 16px">notification_important</span>1 perlu perhatian</span>
+</div>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent-ink)"><span class="ms" aria-hidden="true" style="font-size: 16px">sensors</span>Live</span>
+<button type="button" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" title="{{themeLabel}}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 18px">{{themeIcon}}</span></button>
+</header>
+<main style="padding: 24px; display: flex; flex-direction: column; gap: 24px; max-width: 1200px; width: 100%; box-sizing: border-box">
+<sc-if value="{{isBerisi}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px">
+<div style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink2)">Total device</span><span class="ms" aria-hidden="true" style="font-size: 20px; color: var(--accent-ink)">devices</span></div>
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 24px; font-weight: 800; line-height: 1">4</span>
+<p style="margin: 0; padding-top: 4px; font-size: 11px; color: var(--ink2)">1 paket, 3 satuan</p>
+</div>
+<div style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink2)">Terhubung</span><span class="ms" aria-hidden="true" style="font-size: 20px; color: var(--accent-ink)">wifi</span></div>
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 24px; font-weight: 800; line-height: 1">3</span>
+<p style="margin: 0; padding-top: 4px; font-size: 11px; color: var(--ink2)">Kiriman kurang dari 90 detik</p>
+</div>
+<div style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink2)">Data tertunda</span><span class="ms" aria-hidden="true" style="font-size: 20px; color: var(--warn-line)">schedule</span></div>
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 24px; font-weight: 800; line-height: 1">1</span>
+<p style="margin: 0; padding-top: 4px; font-size: 11px; color: var(--ink2)">90 sampai 180 detik tanpa data</p>
+</div>
+<div style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink2)">Tidak terhubung</span><span class="ms" aria-hidden="true" style="font-size: 20px; color: var(--bad-fg)">wifi_off</span></div>
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 24px; font-weight: 800; line-height: 1">0</span>
+<p style="margin: 0; padding-top: 4px; font-size: 11px; color: var(--ink2)">Lebih dari 180 detik</p>
+</div>
+</div>
+</sc-if>
+<section style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<div>
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink)">Perangkat</p>
+<h2 style="margin: 2px 0 0; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800">Perangkat terpasang di farm</h2>
+<p style="margin: 2px 0 0; font-size: 13px; color: var(--ink2)">Nilai terakhir dari alat, dengan waktu ukur di setiap kartu.</p>
+</div>
+<a href="KlaimQR.dc.html" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none"><span class="ms" aria-hidden="true" style="font-size: 18px">qr_code_scanner</span>Scan QR alat</a>
+</div>
+<sc-if value="{{isBerisi}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink2)">Cari device
+<input type="search" value="{{q}}" onInput="{{onQ}}" placeholder="Nama atau kode alat" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 14px; box-sizing: border-box; width: 100%"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink2)">Tipe
+<select value="{{tipe}}" onChange="{{onTipe}}" style="height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 14px"><option value="semua">Semua tipe</option><option value="satuan">Satuan</option><option value="paket">Paket</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink2)">Area
+<select value="{{area}}" onChange="{{onArea}}" style="height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 14px"><option value="semua">Semua area</option><option value="Kolam Nila A">Kolam Nila A</option><option value="Kolam Lele B">Kolam Lele B</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink2)">Status
+<select value="{{status}}" onChange="{{onStatus}}" style="height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 14px"><option value="semua">Semua status</option><option value="online">Terhubung</option><option value="stale">Data tertunda</option><option value="offline">Tidak terhubung</option></select></label>
+</div>
+<sc-if value="{{hasResults}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px">
+<sc-for list="{{shown}}" as="d" hint-placeholder-count="4">
+<a href="DetailDevice.dc.html" aria-label="Buka detail {{d.name}}" style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 16px; text-decoration: none; color: var(--ink); background: var(--inset); {{d.cardBorder}}">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<span style="width: 40px; height: 40px; flex: 0 0 40px; border-radius: 12px; background: var(--card); border: 1px solid var(--inset-bd); display: flex; align-items: center; justify-content: center; color: var(--accent-ink)"><span class="ms" aria-hidden="true" style="font-size: 22px">{{d.icon}}</span></span>
+<div style="flex: 1; min-width: 0">
+<p style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">{{d.name}}</p>
+<p style="margin: 2px 0 0; font-size: 12px; color: var(--ink2)"><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{d.code}}</span> · {{d.area}}</p>
+</div>
+<span style="display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap; {{d.statusStyle}}"><span class="ms" aria-hidden="true" style="font-size: 13px">{{d.statusIcon}}</span>{{d.statusLabel}}</span>
+</div>
+<span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: var(--muted-bg); color: var(--ink2); border: 1px solid var(--line)"><span class="ms" aria-hidden="true" style="font-size: 13px">{{d.typeIcon}}</span>{{d.typeLabel}}</span>
+<sc-if value="{{d.paket}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px">
+<sc-for list="{{d.sensors}}" as="s" hint-placeholder-count="3">
+<div style="border-radius: 12px; background: var(--card); border: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="font-size: 12px; font-weight: 600; color: var(--ink2)">{{s.label}}</span>
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 22px; font-weight: 800; line-height: 1">{{s.value}} <span style="font-size: 12px; font-weight: 600; color: var(--ink2)">{{s.unit}}</span></span>
+<span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 3px; min-height: 22px; padding: 2px 8px; border-radius: 11px; font-size: 10.5px; font-weight: 600; line-height: 1.2; box-sizing: border-box; max-width: 100%; {{s.stateStyle}}"><span class="ms" aria-hidden="true" style="font-size: 12px">{{s.stateIcon}}</span>{{s.stateLabel}}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{d.satuan}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: var(--ink2)">{{d.main.label}}</span>
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px">
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 32px; font-weight: 800; line-height: 1">{{d.main.value}} <span style="font-size: 13px; font-weight: 600; color: var(--ink2)">{{d.main.unit}}</span></span>
+<span style="display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap; {{d.main.stateStyle}}"><span class="ms" aria-hidden="true" style="font-size: 13px">{{d.main.stateIcon}}</span>{{d.main.stateLabel}}</span>
+</div>
+<div aria-hidden="true" style="position: relative; height: 6px; border-radius: 9999px; background: var(--muted-bg)">
+<div style="position: absolute; top: 0; bottom: 0; left: {{d.main.zoneLeft}}; width: {{d.main.zoneWidth}}; border-radius: 9999px; background: var(--ok-bd)"></div>
+<div style="position: absolute; top: -3px; width: 12px; height: 12px; margin-left: -6px; left: {{d.main.dot}}; border-radius: 9999px; background: var(--accent-ink); border: 2px solid var(--card)"></div>
+</div>
+<span style="font-size: 12px; color: var(--ink2)">{{d.main.range}}</span>
+</div>
+</sc-if>
+<span style="font-size: 12px; display: flex; align-items: center; gap: 4px; {{d.timeStyle}}"><span class="ms" aria-hidden="true" style="font-size: 14px">schedule</span><time>{{d.time}}</time></span>
+</a>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{noResults}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 32px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px">
+<span class="ms" aria-hidden="true" style="font-size: 32px; color: var(--ink2)">search_off</span>
+<p style="margin: 0; font-weight: 700">Tidak ada device cocok</p>
+<p style="margin: 0; font-size: 13px; color: var(--ink2)">Ubah kata kunci atau filter tipe, area, dan status.</p>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{isLoading}}" hint-placeholder-val="{{ false }}">
+<p role="status" style="margin: 0; padding: 40px 16px; text-align: center; font-size: 14px; color: var(--ink2)"><span class="ms" aria-hidden="true" style="font-size: 20px; margin-right: 6px">hourglass_top</span>Memuat perangkat...</p>
+</sc-if>
+<sc-if value="{{isKosong}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 40px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span class="ms" aria-hidden="true" style="font-size: 36px; color: var(--ink2)">sensors_off</span>
+<p style="margin: 0; font-weight: 700; font-size: 16px">Belum ada perangkat di akun ini.</p>
+<p style="margin: 0; font-size: 13px; color: var(--ink2); max-width: 420px">Scan QR yang tertempel di alat untuk mengklaimnya. Datanya akan muncul di sini setelah alat mengirim pengukuran pertama.</p>
+<a href="KlaimQR.dc.html" style="margin-top: 8px; height: 44px; padding: 0 16px; border-radius: 12px; background: #0f5238; color: #ffffff; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none"><span class="ms" aria-hidden="true" style="font-size: 20px">qr_code_scanner</span>Scan QR alat</a>
+</div>
+</sc-if>
+<sc-if value="{{isError}}" hint-placeholder-val="{{ false }}">
+<div role="alert" style="padding: 32px 16px; border-radius: 12px; background: var(--bad-bg); border: 1px solid var(--bad-bd); color: var(--bad-fg); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center">
+<span class="ms" aria-hidden="true" style="font-size: 32px">cloud_off</span>
+<p style="margin: 0; font-weight: 700">Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.</p>
+<p style="margin: 0; font-size: 12px">Kode permintaan: [requestId]</p>
+<button type="button" onClick="{{retry}}" style="margin-top: 4px; height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--bad-bd); background: var(--card); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px"><span class="ms" aria-hidden="true" style="font-size: 18px">refresh</span>Coba lagi</button>
+</div>
+</sc-if>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"gelap":{"editor":"boolean","default":false},"keadaan":{"editor":"enum","options":["berisi","loading","kosong","error"],"default":"berisi"},"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.gelap ?? false);
+    const keadaan = this.state.keadaan ?? (this.props.keadaan ?? 'berisi');
+    const q = this.state.q ?? '';
+    const tipe = this.state.tipe ?? 'semua';
+    const area = this.state.area ?? 'semua';
+    const status = this.state.status ?? 'semua';
+    const tone = (t) => `background: var(--${t}-bg); color: var(--${t}-fg); border: 1px solid var(--${t}-bd)`;
+    const ST = { online: ['Terhubung', 'wifi', 'ok'], stale: ['Data tertunda', 'schedule', 'warn'], offline: ['Tidak terhubung', 'wifi_off', 'bad'] };
+    const SS = { normal: ['Normal', 'check_circle', 'ok'], low: ['Di bawah ambang', 'arrow_downward', 'warn'], high: ['Di atas ambang', 'arrow_upward', 'warn'] };
+    const sensor = (label, value, unit, state) => ({ label, value, unit, state, stateLabel: SS[state][0], stateIcon: SS[state][1], stateStyle: tone(SS[state][2]) });
+    const all = [
+      { code: 'AQ-PKT-001', name: 'Paket Kolam Lele B', area: 'Kolam Lele B', kind: 'paket', status: 'online', icon: 'deployed_code', typeLabel: 'Paket · AQ-WATER-01', time: 'Diukur 12 detik lalu', alert: true,
+        sensors: [sensor('pH', '6,1', '', 'low'), sensor('TDS', '625', 'ppm', 'normal'), sensor('Suhu air', '26,3', '°C', 'normal')] },
+      { code: 'AQ-PH-001', name: 'Sensor pH Kolam Nila A', area: 'Kolam Nila A', kind: 'satuan', status: 'online', icon: 'water_ph', typeLabel: 'Satuan · AQ-PH', time: 'Diukur 8 detik lalu',
+        main: { ...sensor('pH Air', '6,8', 'pH', 'normal'), range: '6,5 sampai 7,5 · ambang area', zoneLeft: '25%', zoneWidth: '50%', dot: '40%' } },
+      { code: 'AQ-TMP-002', name: 'Sensor Suhu Air Kolam Nila A', area: 'Kolam Nila A', kind: 'satuan', status: 'stale', icon: 'thermostat', typeLabel: 'Satuan · AQ-TMP', time: 'Diukur 2 menit lalu', stale: true,
+        main: { ...sensor('Suhu air', '25,8', '°C', 'normal'), range: '25 sampai 29 °C · ambang area', zoneLeft: '30%', zoneWidth: '40%', dot: '38%' } },
+      { code: 'AQ-TDS-003', name: 'Sensor TDS Kolam Nila A', area: 'Kolam Nila A', kind: 'satuan', status: 'online', icon: 'water_ec', typeLabel: 'Satuan · AQ-TDS', time: 'Diukur 15 detik lalu',
+        main: { ...sensor('TDS', '780', 'ppm', 'normal'), range: '500 sampai 900 ppm · ambang area', zoneLeft: '25%', zoneWidth: '50%', dot: '60%' } }
+    ].map((d) => ({
+      ...d,
+      paket: d.kind === 'paket',
+      satuan: d.kind === 'satuan',
+      typeIcon: d.kind === 'paket' ? 'deployed_code' : 'sensors',
+      statusLabel: ST[d.status][0], statusIcon: ST[d.status][1], statusStyle: tone(ST[d.status][2]),
+      cardBorder: d.alert ? 'border: 1.5px solid var(--warn-line)' : 'border: 1px solid var(--inset-bd)',
+      timeStyle: d.stale ? 'color: var(--warn-fg); font-weight: 600' : 'color: var(--ink2)'
+    }));
+    const needle = q.trim().toLowerCase();
+    const shown = all.filter((d) =>
+      (tipe === 'semua' || d.kind === tipe) &&
+      (area === 'semua' || d.area === area) &&
+      (status === 'semua' || d.status === status) &&
+      (!needle || d.name.toLowerCase().includes(needle) || d.code.toLowerCase().includes(needle)));
+    return {
+      themeClass: dark ? 'dark' : '', dark, sideClass: this.state.side ? 'open' : '', sideExpanded: this.state.side ? 'true' : 'false', toggleSide: () => this.setState({ side: !this.state.side }),
+      themeIcon: dark ? 'light_mode' : 'dark_mode',
+      themeLabel: dark ? 'Mode terang' : 'Mode gelap',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      isBerisi: keadaan === 'berisi', isLoading: keadaan === 'loading', isKosong: keadaan === 'kosong', isError: keadaan === 'error',
+      retry: () => this.setState({ keadaan: 'berisi' }),
+      q, tipe, area, status, shown,
+      hasResults: shown.length > 0, noResults: shown.length === 0,
+      onQ: (e) => this.setState({ q: e.target.value }),
+      onTipe: (e) => this.setState({ tipe: e.target.value }),
+      onArea: (e) => this.setState({ area: e.target.value }),
+      onStatus: (e) => this.setState({ status: e.target.value })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Monitoring</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..500,0..1,0&amp;display=block">
+<style>
+body{margin:0}
+.jf{--bg:linear-gradient(135deg,#e7eef2 0%,#d9e3e9 50%,#c4d3db 100%);--ink:#191c1d;--ink2:#404943;--line:rgba(191,201,193,.6);--card:rgba(255,255,255,.92);--card-bd:rgba(15,82,56,.2);--card-sh:0 1px 2px 0 rgba(15,82,56,.06),0 8px 24px -4px rgba(15,82,56,.1);--top:rgba(255,255,255,.8);--top-bd:rgba(255,255,255,.4);--accent-ink:#0f5238;--inset:rgba(15,82,56,.05);--inset-bd:rgba(15,82,56,.22);--muted-bg:#eceeef;--ok-bg:#d1fae5;--ok-fg:#065f46;--ok-bd:#a7f3d0;--warn-bg:#fef3c7;--warn-fg:#78350f;--warn-bd:#fde68a;--bad-bg:#fee2e2;--bad-fg:#991b1b;--bad-bd:#fecaca;--info-bg:#e0f2fe;--info-fg:#075985;--info-bd:#bae6fd;--warn-line:#b45309;--chart:#0f5238;--c2:#134b74;--c3:#00696c;--grid:rgba(191,201,193,.7)}
+.jf.dark{--bg:linear-gradient(135deg,#131715 0%,#191c1d 50%,#0d1210 100%);--ink:#e9eeea;--ink2:#bac7be;--line:rgba(60,71,64,.9);--card:rgba(30,36,32,.75);--card-bd:rgba(255,255,255,.08);--card-sh:0 8px 32px 0 rgba(0,0,0,.3);--top:rgba(25,30,27,.85);--top-bd:rgba(255,255,255,.1);--accent-ink:#95d4b3;--inset:rgba(255,255,255,.06);--inset-bd:rgba(255,255,255,.12);--muted-bg:#29312c;--ok-bg:rgba(6,78,59,.4);--ok-fg:#a7f3d0;--ok-bd:#065f46;--warn-bg:rgba(120,53,15,.4);--warn-fg:#fef3c7;--warn-bd:#92400e;--bad-bg:rgba(127,29,29,.4);--bad-fg:#fecaca;--bad-bd:#991b1b;--info-bg:rgba(12,74,110,.4);--info-fg:#bae6fd;--info-bd:#075985;--warn-line:#fcd34d;--chart:#95d4b3;--c2:#9ccbfb;--c3:#72d6da;--grid:rgba(60,71,64,.9)}
+.ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;vertical-align:middle;white-space:nowrap;letter-spacing:normal;text-transform:none;font-feature-settings:'liga';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.jf :focus-visible{outline:2px solid #2d6a4f;outline-offset:2px}
+.jf.dark :focus-visible{outline-color:#b1f0ce}
+.jf-side{flex:0 0 288px;display:flex}.jf-menu{display:none!important}@media (max-width:720px){.jf-side{display:none}.jf-side.open{display:flex;flex:1 1 100%}.jf-menu{display:inline-flex!important}}
+</style>
+</helmet>
+<div class="jf {{themeClass}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); font-family: 'Hanken Grotesk', sans-serif; color: var(--ink)">
+<div class="jf-side {{sideClass}}"><dc-import name="Sidebar" role="pengelola" active="monitoring" dark="{{dark}}" alerts="1" hint-size="288px,1000px"></dc-import></div>
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="background: var(--top); border-bottom: 1px solid var(--top-bd); padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<button type="button" class="jf-menu" onClick="{{toggleSide}}" aria-expanded="{{sideExpanded}}" aria-label="Menu" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink); align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 22px">menu</span></button>
+<div style="flex: 1 1 240px; min-width: 0">
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink)">Mode Pengelola</p>
+<h1 style="margin: 0; font-family: Manrope, sans-serif; font-size: 20px; font-weight: 800; line-height: 1.25">Monitoring</h1>
+<p style="margin: 0; font-size: 12px; color: var(--ink2)">Semua device di farm, dilihat per paket, per sensor, atau per area</p>
+</div>
+<div class="num" style="display: flex; align-items: center; gap: 12px; border-radius: 16px; background: var(--inset); border: 1px solid var(--inset-bd); padding: 6px 12px; font-size: 12px">
+<span style="display: flex; align-items: center; gap: 6px; font-weight: 600"><span class="ms" aria-hidden="true" style="font-size: 16px; color: var(--accent-ink)">sensors</span>3/5 terhubung</span>
+<span aria-hidden="true" style="color: var(--line)">|</span>
+<span style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--warn-fg)"><span class="ms" aria-hidden="true" style="font-size: 16px">notification_important</span>1 di luar ambang</span>
+</div>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent-ink)"><span class="ms" aria-hidden="true" style="font-size: 16px">sensors</span>Live</span>
+<button type="button" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" title="{{themeLabel}}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 18px">{{themeIcon}}</span></button>
+</header>
+<main style="padding: 24px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; max-width: 1200px; width: 100%; box-sizing: border-box">
+<div style="flex: 3 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div role="tablist" aria-label="Sudut pandang monitoring" style="display: inline-flex; align-self: flex-start; padding: 4px; border-radius: 14px; background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh)">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+<button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="height: 40px; padding: 0 16px; border: 0; border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; {{t.style}}"><span class="ms" aria-hidden="true" style="font-size: 18px">{{t.icon}}</span>{{t.label}}</button>
+</sc-for>
+</div>
+<sc-if value="{{isPaket}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px">
+<sc-for list="{{pakets}}" as="p" hint-placeholder-count="2">
+<section style="background: var(--card); border-radius: 16px; box-shadow: var(--card-sh); padding: 18px; display: flex; flex-direction: column; gap: 12px; {{p.border}}">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+<div style="min-width: 0">
+<a href="DetailDevice.dc.html" style="font-size: 15px; font-weight: 700; text-decoration: none; color: var(--ink)">{{p.name}}</a>
+<p style="margin: 2px 0 0; font-size: 12px; color: var(--ink2)"><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{p.code}}</span> · {{p.area}}</p>
+</div>
+<span style="display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap; {{p.statusStyle}}"><span class="ms" aria-hidden="true" style="font-size: 13px">{{p.statusIcon}}</span>{{p.statusLabel}}</span>
+</div>
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+<sc-for list="{{p.rows}}" as="r" hint-placeholder-count="3">
+<li style="display: grid; grid-template-columns: minmax(70px, 0.9fr) minmax(0, 1.2fr) minmax(90px, 1fr); align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line)">
+<span style="font-size: 13px; font-weight: 600; color: var(--ink2)">{{r.label}}</span>
+<svg viewBox="0 0 120 32" preserveAspectRatio="none" role="img" aria-label="{{r.aria}}" style="width: 100%; height: 32px; display: block"><path d="{{r.spark}}" fill="none" stroke="{{r.sparkColor}}" stroke-width="1.8" stroke-linejoin="round"></path></svg>
+<span style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+<span class="num" style="font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800; line-height: 1; {{r.valueStyle}}">{{r.value}} <span style="font-size: 11px; font-weight: 600; color: var(--ink2)">{{r.unit}}</span></span>
+<span style="display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 7px; border-radius: 9999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; {{r.stateStyle}}"><span class="ms" aria-hidden="true" style="font-size: 12px">{{r.stateIcon}}</span>{{r.stateLabel}}</span>
+</span>
+</li>
+</sc-for>
+</ul>
+<p style="margin: 0; font-size: 12px; display: flex; align-items: center; gap: 4px; {{p.timeStyle}}"><span class="ms" aria-hidden="true" style="font-size: 14px">schedule</span>{{p.time}}</p>
+</section>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{isSensor}}" hint-placeholder-val="{{ false }}">
+<section style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<div>
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink)">Per sensor</p>
+<h2 style="margin: 2px 0 0; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800">{{sensorTitle}}</h2>
+<p style="margin: 2px 0 0; font-size: 13px; color: var(--ink2)">IoT satuan dan sensor di dalam paket ditampilkan bersama.</p>
+</div>
+<div role="group" aria-label="Pilih sensor" style="display: inline-flex; padding: 3px; border-radius: 12px; background: var(--inset); border: 1px solid var(--inset-bd)">
+<sc-for list="{{sensorTabs}}" as="t" hint-placeholder-count="3">
+<button type="button" onClick="{{t.pick}}" aria-pressed="{{t.pressed}}" style="height: 32px; padding: 0 12px; border: 0; border-radius: 9px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; {{t.style}}">{{t.label}}</button>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink2)">
+<sc-for list="{{compare}}" as="c" hint-placeholder-count="3">
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 16px; height: 3px; border-radius: 2px; background: {{c.color}}"></span>{{c.code}}</span>
+</sc-for>
+<span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 16px; border-top: 1.5px dashed var(--warn-line)"></span>Ambang default {{sensorRange}}</span>
+</div>
+<div>
+<svg viewBox="0 0 640 170" role="img" aria-label="Perbandingan 24 jam {{sensorTitle}}" style="width: 100%; height: auto; display: block">
+<line x1="8" x2="632" y1="12" y2="12" stroke="var(--grid)"></line>
+<line x1="8" x2="632" y1="84" y2="84" stroke="var(--grid)"></line>
+<line x1="8" x2="632" y1="156" y2="156" stroke="var(--grid)"></line>
+<line x1="8" x2="632" y1="{{yLow}}" y2="{{yLow}}" stroke="var(--warn-line)" stroke-width="1.5" stroke-dasharray="5 4"></line>
+<line x1="8" x2="632" y1="{{yHigh}}" y2="{{yHigh}}" stroke="var(--warn-line)" stroke-width="1.5" stroke-dasharray="5 4"></line>
+<sc-for list="{{compare}}" as="c" hint-placeholder-count="3">
+<path d="{{c.path}}" fill="none" stroke="{{c.color}}" stroke-width="2.2" stroke-linejoin="round"></path>
+</sc-for>
+</svg>
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--ink2)"><span>24 jam lalu</span><span>12 jam lalu</span><span>Sekarang</span></div>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px">
+<thead>
+<tr style="text-align: left; color: var(--ink2)">
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Device</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Area</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line); text-align: right">Nilai</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Ambang</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Diukur</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{sensorRows}}" as="r" hint-placeholder-count="3">
+<tr>
+<td style="padding: 10px; border-bottom: 1px solid var(--line)"><span style="font-weight: 700">{{r.name}}</span><br><span style="font-size: 12px; color: var(--ink2)">{{r.kind}} · <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{r.code}}</span></span></td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line); color: var(--ink2)">{{r.area}}</td>
+<td class="num" style="padding: 10px; border-bottom: 1px solid var(--line); text-align: right; font-family: Manrope, sans-serif; font-weight: 800; font-size: 15px; {{r.valueStyle}}">{{r.value}}</td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line)"><span style="display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap; {{r.stateStyle}}"><span class="ms" aria-hidden="true" style="font-size: 12px">{{r.stateIcon}}</span>{{r.stateLabel}}</span></td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line); font-size: 12px; {{r.timeStyle}}">{{r.time}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+</sc-if>
+<sc-if value="{{isArea}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px">
+<sc-for list="{{areas}}" as="a" hint-placeholder-count="3">
+<section style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+<div>
+<h3 style="margin: 0; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 800">{{a.name}}</h3>
+<p style="margin: 2px 0 0; font-size: 12px; color: var(--ink2)">{{a.devices}}</p>
+</div>
+<span class="ms" aria-hidden="true" style="font-size: 22px; color: var(--accent-ink)">{{a.icon}}</span>
+</div>
+<table class="num" style="width: 100%; border-collapse: collapse; font-size: 13px">
+<thead><tr style="color: var(--ink2)"><th scope="col" style="text-align: left; font-size: 11px; font-weight: 700; padding: 6px 0; border-bottom: 1px solid var(--line)">Hari ini</th><th scope="col" style="text-align: right; font-size: 11px; font-weight: 700; padding: 6px 0; border-bottom: 1px solid var(--line)">Min</th><th scope="col" style="text-align: right; font-size: 11px; font-weight: 700; padding: 6px 0; border-bottom: 1px solid var(--line)">Rata-rata</th><th scope="col" style="text-align: right; font-size: 11px; font-weight: 700; padding: 6px 0; border-bottom: 1px solid var(--line)">Maks</th></tr></thead>
+<tbody>
+<sc-for list="{{a.rows}}" as="r" hint-placeholder-count="3">
+<tr><td style="padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--ink2)">{{r.label}}</td><td style="padding: 7px 0; border-bottom: 1px solid var(--line); text-align: right; {{r.minStyle}}">{{r.min}}</td><td style="padding: 7px 0; border-bottom: 1px solid var(--line); text-align: right; font-weight: 700">{{r.avg}}</td><td style="padding: 7px 0; border-bottom: 1px solid var(--line); text-align: right">{{r.max}}</td></tr>
+</sc-for>
+</tbody>
+</table>
+<p style="margin: 0; font-size: 12px; color: var(--ink2)">Ambang area: {{a.target}}</p>
+</section>
+</sc-for>
+</div>
+</sc-if>
+</div>
+<aside aria-label="Log kejadian" style="flex: 1 1 280px; min-width: 0; background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 800">Log kejadian</h2>
+<div role="group" aria-label="Filter kejadian" style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.pressed}}" style="height: 32px; padding: 0 12px; border-radius: 9999px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; {{f.style}}">{{f.label}}</button>
+</sc-for>
+</div>
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+<sc-for list="{{events}}" as="e" hint-placeholder-count="5">
+<li style="display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line)">
+<span style="width: 28px; height: 28px; flex: 0 0 28px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; {{e.style}}"><span class="ms" aria-hidden="true" style="font-size: 16px">{{e.icon}}</span></span>
+<div style="min-width: 0">
+<p class="num" style="margin: 0; font-size: 13px; font-weight: 600">{{e.text}}</p>
+<p style="margin: 2px 0 0; font-size: 12px; color: var(--ink2)"><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace">{{e.code}}</span> · {{e.at}}</p>
+</div>
+</li>
+</sc-for>
+</ul>
+</aside>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"gelap":{"editor":"boolean","default":false},"tab":{"editor":"enum","options":["paket","sensor","area"],"default":"paket"},"$preview":{"width":1280,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.gelap ?? false);
+    const tab = this.state.tab ?? (this.props.tab ?? 'paket');
+    const sensorKey = this.state.sensor ?? 'ph';
+    const filter = this.state.filter ?? 'semua';
+    const tone = (t) => `background: var(--${t}-bg); color: var(--${t}-fg); border: 1px solid var(--${t}-bd)`;
+    const ST = { online: ['Terhubung', 'wifi', 'ok'], stale: ['Data tertunda', 'schedule', 'warn'], offline: ['Tidak terhubung', 'wifi_off', 'bad'] };
+    const SS = { normal: ['Normal', 'check_circle', 'ok'], low: ['Di bawah ambang', 'arrow_downward', 'warn'], high: ['Di atas ambang', 'arrow_upward', 'warn'] };
+    const META = { ph: { label: 'pH', unit: '', dom: [5.8, 8.4], range: '6,2 sampai 7,6', lo: 6.2, hi: 7.6 }, tds: { label: 'TDS', unit: 'ppm', dom: [400, 1000], range: '400 sampai 900 ppm', lo: 400, hi: 900 }, suhu: { label: 'Suhu air', unit: '°C', dom: [22, 32], range: '24 sampai 30 °C', lo: 24, hi: 30 } };
+    const W = (k, base, amp, freq, phase, drift) => (t) => base + amp * Math.sin(freq * t + phase) + drift * t * t;
+    const devices = [
+      { code: 'AQ-PKT-001', name: 'Paket Kolam Lele B', area: 'Kolam Lele B', kind: 'Paket', status: 'online', time: 'Diukur 12 detik lalu',
+        s: { ph: { v: '6,1', st: 'low', f: W('ph', 6.9, 0.05, 20, 0, -0.8) }, tds: { v: '625', st: 'normal', f: W('tds', 640, 40, 6, 0, -12) }, suhu: { v: '26,3', st: 'normal', f: W('suhu', 27.2, 1.1, 6.28, -1, 0) } } },
+      { code: 'AQ-PKT-002', name: 'Paket Growbed Sayur 1', area: 'Growbed Sayur 1', kind: 'Paket', status: 'offline', time: 'Terakhir diterima 2 jam lalu',
+        s: { ph: { v: '6,6', st: 'normal', f: W('ph', 6.6, 0.12, 5, 1, 0) }, tds: { v: '820', st: 'normal', f: W('tds', 810, 35, 4, 2, 0) }, suhu: { v: '27,9', st: 'normal', f: W('suhu', 27.5, 1.3, 6.28, -0.6, 0) } } },
+      { code: 'AQ-PH-001', name: 'Sensor pH Kolam Nila A', area: 'Kolam Nila A', kind: 'Satuan', status: 'online', time: 'Diukur 8 detik lalu', s: { ph: { v: '6,8', st: 'normal', f: W('ph', 6.85, 0.1, 7, 0.5, 0) } } },
+      { code: 'AQ-TMP-002', name: 'Sensor Suhu Air Kolam Nila A', area: 'Kolam Nila A', kind: 'Satuan', status: 'stale', time: 'Diukur 2 menit lalu', s: { suhu: { v: '25,8', st: 'normal', f: W('suhu', 26.2, 0.9, 6.28, -1.2, 0) } } },
+      { code: 'AQ-TDS-003', name: 'Sensor TDS Kolam Nila A', area: 'Kolam Nila A', kind: 'Satuan', status: 'online', time: 'Diukur 15 detik lalu', s: { tds: { v: '780', st: 'normal', f: W('tds', 760, 25, 5, 1, 0) } } }
+    ];
+    const path = (f, dom, x0, x1, y0, y1, n) => {
+      let d = '';
+      for (let i = 0; i < n; i++) { const u = i / (n - 1); const v = f(u); const x = x0 + (x1 - x0) * u; const y = y1 - ((v - dom[0]) / (dom[1] - dom[0])) * (y1 - y0); d += `${i ? 'L' : 'M'}${x.toFixed(1)} ${Math.max(y0, Math.min(y1, y)).toFixed(1)} `; }
+      return d.trim();
+    };
+    const pakets = devices.filter((d) => d.kind === 'Paket').map((d) => ({
+      ...d,
+      statusLabel: ST[d.status][0], statusIcon: ST[d.status][1], statusStyle: tone(ST[d.status][2]),
+      border: d.status === 'offline' ? 'border: 1.5px solid var(--bad-bd)' : Object.values(d.s).some((x) => x.st !== 'normal') ? 'border: 1.5px solid var(--warn-line)' : 'border: 1px solid var(--card-bd)',
+      timeStyle: d.status === 'offline' ? 'color: var(--bad-fg); font-weight: 600' : 'color: var(--ink2)',
+      rows: ['ph', 'tds', 'suhu'].map((k) => {
+        const x = d.s[k]; const m = META[k];
+        return { label: m.label, unit: m.unit, value: x.v, stateLabel: SS[x.st][0], stateIcon: SS[x.st][1], stateStyle: tone(SS[x.st][2]),
+          spark: path(x.f, m.dom, 2, 118, 3, 29, 32), sparkColor: d.status === 'offline' ? 'var(--ink2)' : x.st === 'normal' ? 'var(--chart)' : 'var(--warn-line)',
+          valueStyle: d.status === 'offline' ? 'color: var(--ink2)' : '', aria: `${m.label} 24 jam, nilai terakhir ${x.v}` };
+      })
+    }));
+    const m = META[sensorKey];
+    const withSensor = devices.filter((d) => d.s[sensorKey]);
+    const colors = ['var(--chart)', 'var(--c2)', 'var(--c3)'];
+    const yOf = (v) => 156 - ((v - m.dom[0]) / (m.dom[1] - m.dom[0])) * 144;
+    const compare = withSensor.slice(0, 3).map((d, i) => ({ code: d.code, color: colors[i], path: path(d.s[sensorKey].f, m.dom, 8, 632, 12, 156, 48) }));
+    const order = { low: 0, high: 0, normal: 1 };
+    const sensorRows = withSensor.slice().sort((a, b) => order[a.s[sensorKey].st] - order[b.s[sensorKey].st]).map((d) => {
+      const x = d.s[sensorKey];
+      return { code: d.code, name: d.name, kind: d.kind, area: d.area, value: x.v + (m.unit ? ' ' + m.unit : ''),
+        stateLabel: SS[x.st][0], stateIcon: SS[x.st][1], stateStyle: tone(SS[x.st][2]),
+        valueStyle: d.status === 'offline' ? 'color: var(--ink2)' : '', time: d.time,
+        timeStyle: d.status === 'offline' ? 'color: var(--bad-fg); font-weight: 600' : d.status === 'stale' ? 'color: var(--warn-fg); font-weight: 600' : 'color: var(--ink2)' };
+    });
+    const areas = [
+      { name: 'Kolam Nila A', icon: 'water', devices: '3 IoT satuan', target: 'pH 6,5 sampai 7,5 · 25 sampai 29 °C · 500 sampai 900 ppm',
+        rows: [{ label: 'pH', min: '6,7', avg: '6,8', max: '7,0' }, { label: 'Suhu air', min: '25,1 °C', avg: '26,0 °C', max: '27,2 °C' }, { label: 'TDS', min: '735 ppm', avg: '762 ppm', max: '790 ppm' }] },
+      { name: 'Kolam Lele B', icon: 'water', devices: '1 IoT paket', target: 'pH 6,5 sampai 8,0 · 26 sampai 30 °C · 500 sampai 900 ppm',
+        rows: [{ label: 'pH', min: '6,1', avg: '6,6', max: '6,9', low: true }, { label: 'Suhu air', min: '26,1 °C', avg: '27,2 °C', max: '28,3 °C' }, { label: 'TDS', min: '590 ppm', avg: '638 ppm', max: '688 ppm' }] },
+      { name: 'Growbed Sayur 1', icon: 'potted_plant', devices: '1 IoT paket, tidak terhubung', target: 'pH 6,2 sampai 7,0 · 24 sampai 30 °C · 600 sampai 1.000 ppm',
+        rows: [{ label: 'pH', min: '6,4', avg: '6,6', max: '6,7' }, { label: 'Suhu air', min: '26,2 °C', avg: '27,4 °C', max: '28,8 °C' }, { label: 'TDS', min: '775 ppm', avg: '808 ppm', max: '845 ppm' }] }
+    ].map((a) => ({ ...a, rows: a.rows.map((r) => ({ ...r, minStyle: r.low ? 'color: var(--warn-fg); font-weight: 700' : '' })) }));
+    const allEvents = [
+      { kind: 'ambang', icon: 'arrow_downward', t: 'warn', text: 'pH di bawah ambang: 6,1', code: 'AQ-PKT-001', at: '[waktu]' },
+      { kind: 'koneksi', icon: 'wifi_off', t: 'bad', text: 'Tidak terhubung', code: 'AQ-PKT-002', at: '[waktu]' },
+      { kind: 'koneksi', icon: 'schedule', t: 'warn', text: 'Data tertunda', code: 'AQ-TMP-002', at: '[waktu]' },
+      { kind: 'ambang', icon: 'check_circle', t: 'ok', text: 'TDS kembali normal: 880', code: 'AQ-TDS-003', at: '[waktu]' },
+      { kind: 'ambang', icon: 'arrow_upward', t: 'warn', text: 'TDS di atas ambang: 912', code: 'AQ-TDS-003', at: '[waktu]' },
+      { kind: 'koneksi', icon: 'wifi', t: 'ok', text: 'Terhubung kembali', code: 'AQ-PKT-001', at: '[waktu]' }
+    ];
+    const events = allEvents.filter((e) => filter === 'semua' || e.kind === filter).map((e) => ({ ...e, style: tone(e.t) }));
+    const segOn = 'background: var(--accent-ink); color: var(--card)';
+    const seg = (on) => on ? 'background: var(--card); color: var(--accent-ink); box-shadow: 0 1px 2px rgba(15,82,56,.15)' : 'background: transparent; color: var(--ink2)';
+    const tabs = [['paket', 'Per paket', 'deployed_code'], ['sensor', 'Per sensor', 'sensors'], ['area', 'Per area', 'water']].map(([k, label, icon]) => ({ label, icon, selected: k === tab ? 'true' : 'false', style: k === tab ? 'background: #0f5238; color: #ffffff' : 'background: transparent; color: var(--ink2)', pick: () => this.setState({ tab: k }) }));
+    const sensorTabs = ['ph', 'tds', 'suhu'].map((k) => ({ label: META[k].label, pressed: k === sensorKey ? 'true' : 'false', style: seg(k === sensorKey), pick: () => this.setState({ sensor: k }) }));
+    const filters = [['semua', 'Semua'], ['ambang', 'Ambang'], ['koneksi', 'Koneksi']].map(([k, label]) => ({ label, pressed: k === filter ? 'true' : 'false', style: k === filter ? 'background: var(--inset); color: var(--accent-ink); border: 1px solid var(--accent-ink)' : 'background: transparent; color: var(--ink2); border: 1px solid var(--line)', pick: () => this.setState({ filter: k }) }));
+    return {
+      themeClass: dark ? 'dark' : '', dark, sideClass: this.state.side ? 'open' : '', sideExpanded: this.state.side ? 'true' : 'false', toggleSide: () => this.setState({ side: !this.state.side }), themeIcon: dark ? 'light_mode' : 'dark_mode', themeLabel: dark ? 'Mode terang' : 'Mode gelap',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      tabs, isPaket: tab === 'paket', isSensor: tab === 'sensor', isArea: tab === 'area',
+      pakets, compare, sensorRows, sensorTabs, areas, filters, events,
+      sensorTitle: `${m.label} di semua device`, sensorRange: m.range,
+      yLow: yOf(m.lo).toFixed(1), yHigh: yOf(m.hi).toFixed(1)
+    };
+  }
+}
+</script>
+</body>
+</html>

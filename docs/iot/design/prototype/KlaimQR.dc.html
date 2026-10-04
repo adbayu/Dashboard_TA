@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Klaim alat lewat QR</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..500,0..1,0&amp;display=block">
+<style>
+body{margin:0}
+.ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;vertical-align:middle;white-space:nowrap;letter-spacing:normal;text-transform:none;font-feature-settings:'liga';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.qr :focus-visible{outline:2px solid #2d6a4f;outline-offset:2px}
+.qr{--bg:linear-gradient(135deg,#e7eef2 0%,#d9e3e9 50%,#c4d3db 100%);--ink:#191c1d;--ink2:#404943;--card:rgba(255,255,255,.95);--card-bd:rgba(15,82,56,.2);--accent-ink:#0f5238;--inset:rgba(15,82,56,.06);--inset-bd:rgba(15,82,56,.22);--field:#ffffff;--field-bd:rgba(15,82,56,.2);--ok-bg:#d1fae5;--ok-fg:#065f46;--ok-bd:#a7f3d0;--warn-bg:#fef3c7;--warn-fg:#78350f;--warn-bd:#fde68a;--bad-bg:#fee2e2;--bad-fg:#991b1b;--bad-bd:#fecaca;--info-bg:#e0f2fe;--info-fg:#075985;--info-bd:#bae6fd}
+.qr.dark{--bg:linear-gradient(135deg,#131715 0%,#191c1d 50%,#0d1210 100%);--ink:#e9eeea;--ink2:#bac7be;--card:rgba(30,36,32,.85);--card-bd:rgba(255,255,255,.1);--accent-ink:#95d4b3;--inset:rgba(255,255,255,.06);--inset-bd:rgba(255,255,255,.12);--field:rgba(40,48,44,.6);--field-bd:rgba(255,255,255,.15);--ok-bg:rgba(6,78,59,.4);--ok-fg:#a7f3d0;--ok-bd:#065f46;--warn-bg:rgba(120,53,15,.4);--warn-fg:#fef3c7;--warn-bd:#92400e;--bad-bg:rgba(127,29,29,.4);--bad-fg:#fecaca;--bad-bd:#991b1b;--info-bg:rgba(12,74,110,.4);--info-fg:#bae6fd;--info-bd:#075985}
+.qr.dark :focus-visible{outline-color:#b1f0ce}
+.qr input::placeholder{color:var(--ink2)}
+
+.qr input{font-family:inherit}
+</style>
+</helmet>
+<div class="qr {{themeClass}}" style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: var(--bg); font-family: 'Hanken Grotesk', sans-serif; color: var(--ink); overflow: hidden">
+<header style="display: flex; align-items: center; gap: 10px; padding: 16px; background: linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 100%); color: #ffffff">
+<span style="width: 36px; height: 36px; border-radius: 12px; background: rgba(0,200,117,0.2); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center"><span class="ms" aria-hidden="true" style="font-size: 20px; font-variation-settings: 'FILL' 1">eco</span></span>
+<div style="flex: 1"><p style="margin: 0; font-weight: 800; font-size: 15px">JagoFarm</p><p style="margin: 0; font-size: 11px; color: #b1f0ce">Klaim alat dari QR</p></div>
+<button type="button" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 20px">{{themeIcon}}</span></button>
+</header>
+<main style="flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto">
+<sc-if value="{{showDevice}}" hint-placeholder-val="{{ true }}">
+<section style="background: var(--card); border: 1px solid var(--card-bd); border-radius: 16px; box-shadow: 0 8px 24px -4px rgba(15,82,56,0.1); padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px; align-items: flex-start">
+<span style="width: 48px; height: 48px; flex: 0 0 48px; border-radius: 14px; background: var(--inset); border: 1px solid var(--inset-bd); display: flex; align-items: center; justify-content: center; color: var(--accent-ink)"><span class="ms" aria-hidden="true" style="font-size: 26px">deployed_code</span></span>
+<div style="min-width: 0">
+<h1 style="margin: 0; font-family: Manrope, sans-serif; font-size: 20px; font-weight: 800; line-height: 1.25">Paket Kolam Lele B</h1>
+<p style="margin: 4px 0 0; font-size: 13px; color: var(--ink2)"><span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace">AQ-PKT-001</span> · IoT Paket</p>
+</div>
+</div>
+<span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; {{chip.style}}"><span class="ms" aria-hidden="true" style="font-size: 15px">{{chip.icon}}</span>{{chip.label}}</span>
+<dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 14px">
+<dt style="color: var(--ink2)">Sensor</dt><dd style="margin: 0; font-weight: 600">pH, TDS, suhu air</dd>
+<dt style="color: var(--ink2)">Area</dt><dd style="margin: 0; font-weight: 600">Kolam Lele B</dd>
+<dt style="color: var(--ink2)">Fungsi</dt><dd style="margin: 0">Memantau kualitas air kolam tiap 30 detik</dd>
+</dl>
+</section>
+</sc-if>
+<sc-if value="{{isLogin}}" hint-placeholder-val="{{ false }}">
+<section style="background: var(--card); border: 1px solid var(--card-bd); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<p style="margin: 0; font-size: 14px">Masuk dulu untuk mengklaim alat ini ke akun Anda. Setelah masuk, Anda kembali ke halaman ini.</p>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink2)">Email<input type="email" autocomplete="email" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 16px"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink2)">Password<input type="password" autocomplete="current-password" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 16px"></label>
+<button type="button" onClick="{{login}}" style="height: 48px; border-radius: 12px; border: 0; background: #0f5238; color: #ffffff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit">Masuk</button>
+</section>
+</sc-if>
+<sc-if value="{{isKlaim}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<button type="button" onClick="{{claim}}" style="height: 52px; border-radius: 14px; border: 0; background: #0f5238; color: #ffffff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 8px"><span class="ms" aria-hidden="true" style="font-size: 22px">add_link</span>Klaim alat ini</button>
+<p style="margin: 0; font-size: 13px; color: var(--ink2); text-align: center">Alat akan masuk ke akun <strong>[email akun]</strong></p>
+</div>
+</sc-if>
+<sc-if value="{{isBerhasil}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="padding: 14px; border-radius: 14px; background: var(--ok-bg); border: 1px solid var(--ok-bd); color: var(--ok-fg); font-size: 14px; display: flex; gap: 8px; align-items: flex-start"><span class="ms" aria-hidden="true" style="font-size: 20px">check_circle</span><span>AQ-PKT-001 sudah masuk ke akun Anda. Data pertama muncul setelah alat mengirim pengukuran.</span></div>
+<a href="DetailDevice.dc.html" style="height: 52px; border-radius: 14px; background: #0f5238; color: #ffffff; font-size: 16px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none">Buka detail alat</a>
+</sc-if>
+<sc-if value="{{isSendiri}}" hint-placeholder-val="{{ false }}">
+<a href="DetailDevice.dc.html" style="height: 52px; border-radius: 14px; background: #0f5238; color: #ffffff; font-size: 16px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none">Buka detail alat</a>
+</sc-if>
+<sc-if value="{{isOrang}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 14px; border-radius: 14px; background: var(--warn-bg); border: 1px solid var(--warn-bd); color: var(--warn-fg); font-size: 14px; display: flex; gap: 8px"><span class="ms" aria-hidden="true" style="font-size: 20px">lock</span><span>Alat ini sudah dipakai akun lain. Hubungi pengelola kalau ini keliru.</span></div>
+</sc-if>
+<sc-if value="{{isExpired}}" hint-placeholder-val="{{ false }}">
+<div role="alert" style="padding: 14px; border-radius: 14px; background: var(--bad-bg); border: 1px solid var(--bad-bd); color: var(--bad-fg); font-size: 14px; display: flex; gap: 8px"><span class="ms" aria-hidden="true" style="font-size: 20px">timer_off</span><span>Kode di QR ini sudah kedaluwarsa. Minta pengelola mencetak ulang QR.</span></div>
+</sc-if>
+<sc-if value="{{isUnknown}}" hint-placeholder-val="{{ false }}">
+<section style="background: var(--card); border: 1px solid var(--card-bd); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<p style="margin: 0; display: flex; gap: 8px; font-size: 14px; font-weight: 700"><span class="ms" aria-hidden="true" style="font-size: 20px; color: var(--bad-fg)">help</span>Kode alat tidak dikenal</p>
+<p style="margin: 0; font-size: 13px; color: var(--ink2)">QR mungkin rusak atau bukan milik JagoFarm. Ketik kode yang tercetak di bawah QR.</p>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink2)">Kode alat<input placeholder="Contoh AQ-PKT-001" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase"></label>
+<button type="button" onClick="{{findCode}}" style="height: 48px; border-radius: 12px; border: 0; background: #0f5238; color: #ffffff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit">Cari alat</button>
+</section>
+</sc-if>
+<sc-if value="{{isDown}}" hint-placeholder-val="{{ false }}">
+<div role="alert" style="padding: 18px; border-radius: 14px; background: var(--bad-bg); border: 1px solid var(--bad-bd); color: var(--bad-fg); font-size: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start">
+<span style="display: flex; gap: 8px"><span class="ms" aria-hidden="true" style="font-size: 20px">cloud_off</span>Backend tidak tersedia. Coba lagi beberapa saat lagi.</span>
+<button type="button" onClick="{{retry}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--bad-bd); background: var(--card); color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit">Coba lagi</button>
+</div>
+</sc-if>
+</main>
+<p style="margin: 0; padding: 12px 16px 20px; font-size: 11px; color: var(--ink2); text-align: center">Prototype · data contoh</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"keadaan":{"editor":"enum","options":["belum_klaim","belum_login","berhasil","milik_sendiri","milik_orang","kedaluwarsa","tidak_dikenal","backend_mati"],"default":"belum_klaim"},"gelap":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const k = this.state.k ?? (this.props.keadaan ?? 'belum_klaim');
+    const chips = {
+      belum_klaim: ['Belum diklaim', 'radio_button_unchecked', 'background: var(--info-bg); color: var(--info-fg); border: 1px solid var(--info-bd)'],
+      belum_login: ['Belum diklaim', 'radio_button_unchecked', 'background: var(--info-bg); color: var(--info-fg); border: 1px solid var(--info-bd)'],
+      berhasil: ['Milik Anda', 'check_circle', 'background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-bd)'],
+      milik_sendiri: ['Milik Anda', 'check_circle', 'background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-bd)'],
+      milik_orang: ['Sudah dipakai akun lain', 'lock', 'background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-bd)'],
+      kedaluwarsa: ['Kode kedaluwarsa', 'timer_off', 'background: var(--bad-bg); color: var(--bad-fg); border: 1px solid var(--bad-bd)']
+    }[k] || ['', '', ''];
+    const dark = this.state.dark ?? (this.props.gelap ?? false);
+    return {
+      themeClass: dark ? 'dark' : '', themeIcon: dark ? 'light_mode' : 'dark_mode', themeLabel: dark ? 'Mode terang' : 'Mode gelap', toggleTheme: () => this.setState({ dark: !dark }),
+      chip: { label: chips[0], icon: chips[1], style: chips[2] },
+      showDevice: !['tidak_dikenal', 'backend_mati'].includes(k),
+      isLogin: k === 'belum_login', isKlaim: k === 'belum_klaim', isBerhasil: k === 'berhasil', isSendiri: k === 'milik_sendiri',
+      isOrang: k === 'milik_orang', isExpired: k === 'kedaluwarsa', isUnknown: k === 'tidak_dikenal', isDown: k === 'backend_mati',
+      login: () => this.setState({ k: 'belum_klaim' }),
+      claim: () => this.setState({ k: 'berhasil' }),
+      findCode: () => this.setState({ k: 'belum_klaim' }),
+      retry: () => this.setState({ k: 'belum_klaim' })
+    };
+  }
+}
+</script>
+</body>
+</html>

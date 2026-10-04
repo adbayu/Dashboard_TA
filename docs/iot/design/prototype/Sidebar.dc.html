@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Sidebar JagoFarm</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..500,0..1,0&amp;display=block">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<aside style="width: 288px; min-height: 1000px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; background: linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%); font-family: 'Hanken Grotesk', sans-serif; color: #ffffff">
+<div style="display: flex; align-items: center; gap: 12px; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1)">
+<div style="width: 44px; height: 44px; border-radius: 16px; background: rgba(0,200,117,0.2); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center">
+<span aria-hidden="true" style="font-family: 'Material Symbols Outlined'; font-size: 24px; line-height: 1; font-variation-settings: 'FILL' 1, 'wght' 500; color: #ffffff">eco</span>
+</div>
+<div style="line-height: 1.25">
+<p style="margin: 0; font-weight: 800; letter-spacing: -0.01em">JagoFarm</p>
+<p style="margin: 0; font-size: 11px; font-weight: 600; color: #00c875">SmartDashboard Aquaponik</p>
+</div>
+</div>
+<div style="padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.1)">
+<div style="display: flex; align-items: center; gap: 12px; border-radius: 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); padding: 12px">
+<span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 9999px; background: {{avatarBg}}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #ffffff; box-shadow: 0 0 0 2px rgba(0,200,117,0.4)">{{initials}}</span>
+<div style="min-width: 0; flex: 1">
+<p style="margin: 0; font-size: 14px; font-weight: 700">{{userName}}</p>
+<p style="margin: 0; font-size: 11px; color: rgba(255,255,255,0.6)">{{roleLabel}}</p>
+</div>
+</div>
+</div>
+<nav aria-label="Menu utama" style="flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 20px">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<div>
+<p style="margin: 0 0 8px; padding: 0 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.6)">{{g.group}}</p>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<sc-if value="{{it.isLink}}" hint-placeholder-val="{{ true }}">
+<a href="{{it.href}}" aria-current="{{it.current}}" style="display: flex; align-items: flex-start; gap: 12px; border-radius: 12px; padding: 10px 12px; text-decoration: none; background: {{it.bg}}; color: {{it.fg}}">
+<span aria-hidden="true" style="font-family: 'Material Symbols Outlined'; font-size: 20px; line-height: 1; margin-top: 2px; font-variation-settings: 'FILL' {{it.fill}}, 'wght' 400">{{it.icon}}</span>
+<span style="min-width: 0">
+<span style="display: block; font-size: 13px; font-weight: 700; line-height: 1.25">{{it.label}}</span>
+<span style="display: block; font-size: 11px; line-height: 1.25; color: {{it.hintFg}}">{{it.hint}}</span>
+</span>
+<sc-if value="{{it.hasBadge}}" hint-placeholder-val="{{ false }}"><span aria-label="{{it.badgeLabel}}" style="margin-left: auto; align-self: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 9999px; background: #fcd34d; color: #3b2a00; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center">{{it.badge}}</span></sc-if>
+</a>
+</sc-if>
+<sc-if value="{{it.isText}}" hint-placeholder-val="{{ false }}">
+<div aria-disabled="true" title="Belum ada di prototype" style="display: flex; align-items: flex-start; gap: 12px; border-radius: 12px; padding: 10px 12px; color: rgba(255,255,255,0.8); opacity: 0.55">
+<span aria-hidden="true" style="font-family: 'Material Symbols Outlined'; font-size: 20px; line-height: 1; margin-top: 2px">{{it.icon}}</span>
+<span style="min-width: 0">
+<span style="display: block; font-size: 13px; font-weight: 700; line-height: 1.25">{{it.label}}</span>
+<span style="display: block; font-size: 11px; line-height: 1.25; color: rgba(255,255,255,0.6)">{{it.hint}}</span>
+</span>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</nav>
+<div style="padding: 16px; border-top: 1px solid rgba(255,255,255,0.1)">
+<p style="margin: 0 0 6px; font-size: 10px; line-height: 1.4; color: rgba(255,255,255,0.75)">Menu redup belum ada di prototype.</p>
+<p style="margin: 0; font-size: 10px; line-height: 1.4; color: rgba(255,255,255,0.75)">Prototype. Nama dan angka adalah data contoh, bukan data alat.</p>
+</div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"role":{"editor":"enum","options":["pengguna","pengelola"],"default":"pengguna"},"active":{"editor":"enum","options":["iot","monitoring","kelolaiot","developer","none"],"default":"iot"},"dark":{"editor":"boolean","default":false},"alerts":{"editor":"int","default":0},"$preview":{"width":288,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const role = this.props.role ?? 'pengguna';
+    const active = this.props.active ?? 'iot';
+    const dark = this.props.dark === true || this.props.dark === 'true';
+    const alerts = Number(this.props.alerts ?? 0);
+    const M = {
+      pengguna: [
+        { group: 'Pemantauan', items: [
+          { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', hint: 'Ringkasan kolam & sensor aktif' },
+          { key: 'iot', label: 'List IoT', icon: 'sensors', hint: 'Semua perangkat terpasang', href: 'Main.dc.html' },
+          { key: 'monitoring', label: 'Monitoring', icon: 'monitoring', hint: 'Per paket, per sensor, per area', href: 'Monitoring.dc.html' },
+          { key: 'detail', label: 'Detail Information', icon: 'qr_code_scanner', hint: 'Pindai QR alat & klaim' }
+        ] },
+        { group: 'Operasional Farm', items: [
+          { key: 'area', label: 'Kelola Area', icon: 'water', hint: 'Kolam, growbed, HPP & pemantauan' },
+          { key: 'vpet', label: 'V-Pet', icon: 'pets', hint: 'Pelihara hewan virtual farm' }
+        ] },
+        { group: 'Belajar & Poin', items: [
+          { key: 'gami', label: 'Gamifikasi', icon: 'emoji_events', hint: 'Misi, badge, papan peringkat' },
+          { key: 'chat', label: 'Chatbot Aquaponik', icon: 'smart_toy', hint: 'Tanya soal ikan, sayur & sistem' }
+        ] }
+      ],
+      pengelola: [
+        { group: 'Ringkasan', items: [
+          { key: 'admin', label: 'Dashboard Pengelola', icon: 'dashboard', hint: 'Kondisi seluruh farm' },
+          { key: 'monitoring', label: 'Monitoring', icon: 'monitoring', hint: 'Semua device di farm', href: 'Monitoring.dc.html' }
+        ] },
+        { group: 'Kelola Master Data', items: [
+          { key: 'user', label: 'Kelola User', icon: 'group', hint: 'Akun pengguna & hak akses area' },
+          { key: 'kelolaiot', label: 'Kelola IoT', icon: 'devices', hint: 'Device, tipe IoT & jenis sensor', href: 'KelolaIoT.dc.html' },
+          { key: 'detail', label: 'Detail Information', icon: 'qr_code_2', hint: 'Penjelasan alat yang dibaca pengguna' },
+          { key: 'area', label: 'Kelola Area', icon: 'water', hint: 'Kolam/growbed yang dipasangi IoT' },
+          { key: 'vpet', label: 'Kelola Virtual Pet', icon: 'pets', hint: 'Jenis pet, kondisi & reset' },
+          { key: 'point', label: 'Sistem Point', icon: 'stars', hint: 'Aturan poin, badge & saldo' }
+        ] },
+        { group: 'Integrasi', items: [
+          { key: 'developer', label: 'Developer', icon: 'key', hint: 'API key, pemakaian & sandbox', href: 'Developer.dc.html' }
+        ] }
+      ]
+    };
+    const groups = (M[role] || M.pengguna).map((g) => ({
+      group: g.group,
+      items: g.items.map((it) => {
+        const on = it.key === active;
+        return {
+          ...it,
+          isLink: !!it.href,
+          isText: !it.href,
+          current: on ? 'page' : 'false',
+          bg: on ? (dark ? 'rgba(149,212,179,0.15)' : '#ffffff') : 'transparent',
+          fg: on ? (dark ? '#b1f0ce' : '#0f5238') : 'rgba(255,255,255,0.85)',
+          hintFg: on ? (dark ? '#95d4b3' : 'rgb(64,73,67)') : 'rgba(255,255,255,0.6)',
+          fill: on ? 1 : 0,
+          hasBadge: it.key === 'monitoring' && alerts > 0, badge: String(alerts), badgeLabel: alerts + ' kejadian perlu perhatian'
+        };
+      })
+    }));
+    const isAdmin = role === 'pengelola';
+    return {
+      groups,
+      userName: isAdmin ? 'Hendra Wicaksono' : 'Budi Santoso',
+      initials: isAdmin ? 'HW' : 'BS',
+      avatarBg: isAdmin ? '#134b74' : '#2d6a4f',
+      roleLabel: isAdmin ? 'Akun Pengelola' : 'Akun Pengguna'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Developer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400..500,0..1,0&amp;display=block">
+<style>
+body{margin:0}
+.jf{--bg:linear-gradient(135deg,#e7eef2 0%,#d9e3e9 50%,#c4d3db 100%);--ink:#191c1d;--ink2:#404943;--line:rgba(191,201,193,.6);--card:rgba(255,255,255,.92);--panel:#ffffff;--card-bd:rgba(15,82,56,.2);--card-sh:0 1px 2px 0 rgba(15,82,56,.06),0 8px 24px -4px rgba(15,82,56,.1);--top:rgba(255,255,255,.8);--top-bd:rgba(255,255,255,.4);--accent-ink:#0f5238;--inset:rgba(15,82,56,.05);--inset-bd:rgba(15,82,56,.22);--field:#ffffff;--field-bd:rgba(15,82,56,.2);--muted-bg:#eceeef;--ok-bg:#d1fae5;--ok-fg:#065f46;--ok-bd:#a7f3d0;--warn-bg:#fef3c7;--warn-fg:#78350f;--warn-bd:#fde68a;--bad-bg:#fee2e2;--bad-fg:#991b1b;--bad-bd:#fecaca;--info-bg:#e0f2fe;--info-fg:#075985;--info-bd:#bae6fd;--brand-bg:rgba(15,82,56,.1);--brand-fg:#0f5238;--brand-bd:rgba(15,82,56,.2);--warn-line:#b45309;--bar:#2d6a4f;--code-bg:#191c1d;--code-fg:#e9eeea}
+.jf.dark{--bg:linear-gradient(135deg,#131715 0%,#191c1d 50%,#0d1210 100%);--ink:#e9eeea;--ink2:#bac7be;--line:rgba(60,71,64,.9);--card:rgba(30,36,32,.75);--panel:#191e1b;--card-bd:rgba(255,255,255,.08);--card-sh:0 8px 32px 0 rgba(0,0,0,.3);--top:rgba(25,30,27,.85);--top-bd:rgba(255,255,255,.1);--accent-ink:#95d4b3;--inset:rgba(255,255,255,.06);--inset-bd:rgba(255,255,255,.12);--field:rgba(40,48,44,.6);--field-bd:rgba(255,255,255,.15);--muted-bg:#29312c;--ok-bg:rgba(6,78,59,.4);--ok-fg:#a7f3d0;--ok-bd:#065f46;--warn-bg:rgba(120,53,15,.4);--warn-fg:#fef3c7;--warn-bd:#92400e;--bad-bg:rgba(127,29,29,.4);--bad-fg:#fecaca;--bad-bd:#991b1b;--info-bg:rgba(12,74,110,.4);--info-fg:#bae6fd;--info-bd:#075985;--brand-bg:rgba(149,212,179,.12);--brand-fg:#b1f0ce;--brand-bd:rgba(149,212,179,.3);--warn-line:#fcd34d;--bar:#95d4b3;--code-bg:#0c100e;--code-fg:#e9eeea}
+.ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;vertical-align:middle;white-space:nowrap;letter-spacing:normal;text-transform:none;font-feature-settings:'liga';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--accent-ink)}a:hover{color:var(--ink)}
+.jf :focus-visible{outline:2px solid #2d6a4f;outline-offset:2px}
+.jf.dark :focus-visible{outline-color:#b1f0ce}
+.jf select,.jf input{font-family:inherit}
+.jf-side{flex:0 0 288px;display:flex}.jf-menu{display:none!important}@media (max-width:720px){.jf-side{display:none}.jf-side.open{display:flex;flex:1 1 100%}.jf-menu{display:inline-flex!important}}
+</style>
+</helmet>
+<div class="jf {{themeClass}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--bg); font-family: 'Hanken Grotesk', sans-serif; color: var(--ink)">
+<div class="jf-side {{sideClass}}"><dc-import name="Sidebar" role="pengelola" active="developer" dark="{{dark}}" alerts="1" hint-size="288px,1000px"></dc-import></div>
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="background: var(--top); border-bottom: 1px solid var(--top-bd); padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<button type="button" class="jf-menu" onClick="{{toggleSide}}" aria-expanded="{{sideExpanded}}" aria-label="Menu" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink); align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 22px">menu</span></button>
+<div style="flex: 1 1 240px; min-width: 0">
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink)">Mode Pengelola</p>
+<h1 style="margin: 0; font-family: Manrope, sans-serif; font-size: 20px; font-weight: 800; line-height: 1.25">Developer</h1>
+<p style="margin: 0; font-size: 12px; color: var(--ink2)">API key untuk /api/v1, pemakaian, dan sandbox</p>
+</div>
+<button type="button" onClick="{{openDocs}}" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-family: inherit"><span class="ms" aria-hidden="true" style="font-size: 18px">menu_book</span>Referensi API</button>
+<button type="button" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" title="{{themeLabel}}" style="width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 18px">{{themeIcon}}</span></button>
+</header>
+<main style="padding: 24px; display: flex; flex-direction: column; gap: 20px; max-width: 1200px; width: 100%; box-sizing: border-box">
+<section style="background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<div>
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-ink)">Dashboard API</p>
+<h2 style="margin: 2px 0 0; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800">API key</h2>
+<p style="margin: 2px 0 0; font-size: 13px; color: var(--ink2)">Secret hanya tampil sekali saat dibuat. Yang tersimpan cuma prefix-nya.</p>
+</div>
+<button type="button" onClick="{{openCreate}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: #0f5238; color: #ffffff; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-family: inherit"><span class="ms" aria-hidden="true" style="font-size: 20px">add</span>Buat key</button>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px">
+<thead><tr style="text-align: left; color: var(--ink2)">
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Nama</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Env</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Prefix</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Scope</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line)">Terakhir dipakai</th>
+<th scope="col" style="padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line); text-align: right">Aksi</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{keys}}" as="k" hint-placeholder-count="3">
+<tr style="{{k.rowStyle}}">
+<td style="padding: 10px; border-bottom: 1px solid var(--line); font-weight: 700">{{k.name}}</td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line)"><span style="display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; {{k.envStyle}}"><span class="ms" aria-hidden="true" style="font-size: 13px">{{k.envIcon}}</span>{{k.env}}</span></td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ink2)">{{k.prefix}}</td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line); color: var(--ink2); font-size: 12px">{{k.scopes}}</td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line); color: var(--ink2); font-size: 12px">{{k.used}}</td>
+<td style="padding: 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap">
+<sc-if value="{{k.active}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{k.ask}}" style="height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--bad-bd); background: transparent; color: var(--bad-fg); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit">Cabut</button></sc-if>
+<sc-if value="{{k.revoked}}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: var(--bad-bg); color: var(--bad-fg); border: 1px solid var(--bad-bd)"><span class="ms" aria-hidden="true" style="font-size: 13px">block</span>Dicabut</span></sc-if>
+</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<sc-if value="{{confirming}}" hint-placeholder-val="{{ false }}">
+<div role="alertdialog" aria-label="Konfirmasi cabut key" style="border-radius: 12px; padding: 14px; background: var(--bad-bg); border: 1px solid var(--bad-bd); display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<p style="margin: 0; flex: 1 1 320px; font-size: 14px">Cabut key <strong>{{confirmName}}</strong>? Semua request dengan key ini langsung ditolak.</p>
+<button type="button" onClick="{{cancelRevoke}}" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--card); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit">Batal</button>
+<button type="button" onClick="{{doRevoke}}" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 0; background: #dc2626; color: #ffffff; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit">Cabut key</button>
+</div>
+</sc-if>
+</section>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch">
+<section style="flex: 3 1 460px; min-width: 0; background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<div>
+<h2 style="margin: 0; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800">Pemakaian 7 hari</h2>
+<p style="margin: 2px 0 0; font-size: 12px; color: var(--ink2)">Angka contoh untuk tata letak.</p>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink2)">Key
+<select value="{{usageKey}}" onChange="{{onUsage}}" style="height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 14px; min-width: 200px"><option value="k1">Modul V-Pet</option><option value="k2">Uji mitra</option></select></label>
+</div>
+<sc-if value="{{hasUsage}}" hint-placeholder-val="{{ true }}">
+<div class="num" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<div style="padding: 12px; border-radius: 12px; background: var(--inset); border: 1px solid var(--inset-bd)"><p style="margin: 0; font-size: 12px; color: var(--ink2)">Request</p><p style="margin: 4px 0 0; font-family: Manrope, sans-serif; font-size: 22px; font-weight: 800">[jumlah]</p></div>
+<div style="padding: 12px; border-radius: 12px; background: var(--inset); border: 1px solid var(--inset-bd)"><p style="margin: 0; font-size: 12px; color: var(--ink2)">Error</p><p style="margin: 4px 0 0; font-family: Manrope, sans-serif; font-size: 22px; font-weight: 800">[x]%</p></div>
+<div style="padding: 12px; border-radius: 12px; background: var(--inset); border: 1px solid var(--inset-bd)"><p style="margin: 0; font-size: 12px; color: var(--ink2)">Kena 429</p><p style="margin: 4px 0 0; font-family: Manrope, sans-serif; font-size: 22px; font-weight: 800">[n]</p></div>
+</div>
+<div role="img" aria-label="Grafik batang request per hari selama 7 hari" style="display: flex; align-items: flex-end; gap: 10px; height: 140px; padding: 0 4px; border-bottom: 1px solid var(--line)">
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="7">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end">
+<div style="width: 100%; max-width: 44px; border-radius: 6px 6px 0 0; background: var(--bar); height: {{b.h}}"></div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; gap: 10px; padding: 0 4px; font-size: 11px; color: var(--ink2)">
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="7"><span style="flex: 1; text-align: center">{{b.d}}</span></sc-for>
+</div>
+<div>
+<p style="margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--ink2)">Route terbanyak</p>
+<ol style="margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace">
+<li>GET /api/v1/devices/:id/latest</li>
+<li>GET /api/v1/devices</li>
+<li>GET /api/v1/events</li>
+</ol>
+</div>
+</sc-if>
+<sc-if value="{{noUsage}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 40px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px"><span class="ms" aria-hidden="true" style="font-size: 32px; color: var(--ink2)">query_stats</span><p style="margin: 0; font-weight: 700">Key ini belum pernah dipakai.</p><p style="margin: 0; font-size: 13px; color: var(--ink2)">Grafik muncul setelah request pertama masuk dengan key ini.</p></div>
+</sc-if>
+</section>
+<section style="flex: 2 1 340px; min-width: 0; background: var(--card); border: 1px solid var(--card-bd); box-shadow: var(--card-sh); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div>
+<p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--info-fg)">Sandbox</p>
+<h2 style="margin: 2px 0 0; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800">Paket virtual</h2>
+<p style="margin: 2px 0 0; font-size: 13px; color: var(--ink2)">Hanya bisa dibaca dengan key Test. Data dibuat simulator tiap 30 detik.</p>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px; border-radius: 12px; background: var(--inset); border: 1px solid var(--inset-bd)">
+<div><p style="margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; font-size: 14px">AQ-SBX-001</p><p style="margin: 2px 0 0; font-size: 12px; color: var(--ink2)">Paket · AQ-WATER-01</p></div>
+<span style="display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; {{sbx.statusStyle}}"><span class="ms" aria-hidden="true" style="font-size: 13px">{{sbx.statusIcon}}</span>{{sbx.statusLabel}}</span>
+</div>
+<div role="group" aria-label="Skenario sandbox" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{scenarios}}" as="s" hint-placeholder-count="4">
+<button type="button" onClick="{{s.pick}}" aria-pressed="{{s.pressed}}" style="height: 40px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; {{s.style}}"><span class="ms" aria-hidden="true" style="font-size: 18px">{{s.icon}}</span>{{s.label}}</button>
+</sc-for>
+</div>
+<ul class="num" style="list-style: none; margin: 0; padding: 0">
+<sc-for list="{{sbx.rows}}" as="r" hint-placeholder-count="3">
+<li style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px">
+<span style="color: var(--ink2)">{{r.label}}</span>
+<span style="display: flex; align-items: center; gap: 8px"><strong style="font-family: Manrope, sans-serif; font-size: 16px; {{r.valueStyle}}">{{r.value}}</strong><span style="display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 8px; border-radius: 9999px; font-size: 10.5px; font-weight: 600; {{r.stateStyle}}"><span class="ms" aria-hidden="true" style="font-size: 12px">{{r.stateIcon}}</span>{{r.stateLabel}}</span></span>
+</li>
+</sc-for>
+</ul>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 12px; font-weight: 700; color: var(--ink2)">Coba dari terminal</span><button type="button" onClick="{{copyCurl}}" style="height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--inset-bd); background: transparent; color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit">{{copyLabel}}</button></div>
+<pre style="margin: 0; padding: 12px; border-radius: 12px; background: var(--code-bg); color: var(--code-fg); font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; word-break: break-all"><code>curl https://[host]/api/v1/devices/[id]/latest \
+  -H "Authorization: Bearer jf_test_[secret]"</code></pre>
+</div>
+</section>
+</div>
+</main>
+</div>
+<sc-if value="{{toast}}" hint-placeholder-val="{{ false }}">
+<div role="status" style="position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: 520px; width: calc(100% - 32px); box-sizing: border-box; padding: 12px 16px; border-radius: 12px; background: #191c1d; color: #ffffff; font-size: 13px; display: flex; gap: 10px; align-items: flex-start"><span class="ms" aria-hidden="true" style="font-size: 18px">info</span><span style="flex: 1">{{toastText}}</span><button type="button" onClick="{{closeToast}}" aria-label="Tutup pesan" style="border: 0; background: transparent; color: #ffffff; cursor: pointer; width: 28px; height: 28px"><span class="ms" aria-hidden="true" style="font-size: 18px">close</span></button></div>
+</sc-if>
+<sc-if value="{{creating}}" hint-placeholder-val="{{ false }}">
+<div style="position: fixed; inset: 0; background: rgba(13,18,16,.45); display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box">
+<div role="dialog" aria-modal="true" aria-labelledby="judul-key" ref="{{dialogRef}}" tabIndex="-1" onKeyDown="{{onDialogKey}}" style="width: 100%; max-width: 520px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--card-bd); border-radius: 16px; box-shadow: 0 12px 40px -8px rgba(15,82,56,.25); padding: 22px; display: flex; flex-direction: column; gap: 16px; color: var(--ink)">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+<h2 id="judul-key" style="margin: 0; font-family: Manrope, sans-serif; font-size: 18px; font-weight: 800">Buat API key</h2>
+<button type="button" onClick="{{closeCreate}}" aria-label="Tutup" style="width: 32px; height: 32px; border-radius: 10px; border: 0; background: transparent; color: var(--ink2); cursor: pointer"><span class="ms" aria-hidden="true" style="font-size: 20px">close</span></button>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--ink2)">Nama key
+<input placeholder="Contoh: Modul V-Pet" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--field-bd); background: var(--field); color: var(--ink); font-size: 14px"></label>
+<fieldset style="border: 0; margin: 0; padding: 0">
+<legend style="padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--ink2)">Environment</legend>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<label style="display: flex; gap: 8px; align-items: flex-start; padding: 12px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer"><input type="radio" name="env" checked="{{true}}" style="accent-color: #0f5238; margin-top: 2px"><span><strong style="font-size: 14px">Test</strong><span style="display: block; font-size: 12px; color: var(--ink2)">Hanya device sandbox</span></span></label>
+<label style="display: flex; gap: 8px; align-items: flex-start; padding: 12px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer"><input type="radio" name="env" style="accent-color: #0f5238; margin-top: 2px"><span><strong style="font-size: 14px">Live</strong><span style="display: block; font-size: 12px; color: var(--ink2)">Data alat sungguhan</span></span></label>
+</div>
+</fieldset>
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--ink2)">Scope</legend>
+<label style="display: flex; gap: 8px; align-items: center; font-size: 14px"><input type="checkbox" checked="{{true}}" style="accent-color: #0f5238; width: 18px; height: 18px"><code>devices:read</code><span style="font-size: 12px; color: var(--ink2)">daftar device, tipe, sensor</span></label>
+<label style="display: flex; gap: 8px; align-items: center; font-size: 14px"><input type="checkbox" checked="{{true}}" style="accent-color: #0f5238; width: 18px; height: 18px"><code>readings:read</code><span style="font-size: 12px; color: var(--ink2)">nilai, riwayat, kejadian</span></label>
+<label style="display: flex; gap: 8px; align-items: center; font-size: 14px"><input type="checkbox" style="accent-color: #0f5238; width: 18px; height: 18px"><code>devices:write</code><span style="font-size: 12px; color: var(--ink2)">klaim dan lepas device</span></label>
+<label style="display: flex; gap: 8px; align-items: center; font-size: 14px"><input type="checkbox" style="accent-color: #0f5238; width: 18px; height: 18px"><code>admin</code><span style="font-size: 12px; color: var(--ink2)">kelola tipe, sensor, device</span></label>
+</fieldset>
+<div style="display: flex; justify-content: flex-end; gap: 8px">
+<button type="button" onClick="{{closeCreate}}" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--inset-bd); background: var(--inset); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit">Batal</button>
+<a href="SecretKey.dc.html" style="height: 40px; padding: 0 16px; border-radius: 12px; background: #0f5238; color: #ffffff; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; text-decoration: none">Buat key</a>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"gelap":{"editor":"boolean","default":false},"$preview":{"width":1280,"height":1250}}'>
+class Component extends DCLogic {
+  modalKey() { return this.state.creating ? 'create' : 'none'; }
+  focusables() {
+    const el = this.dialogRef && this.dialogRef.current;
+    if (!el) return [];
+    return Array.from(el.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select, textarea'));
+  }
+  componentDidMount() { this._lastKey = 'none'; this.componentDidUpdate(); }
+  componentDidUpdate() {
+    const key = this.modalKey();
+    if (key === this._lastKey) return;
+    const wasOpen = this._lastKey && this._lastKey !== 'none';
+    this._lastKey = key;
+    if (key !== 'none') {
+      setTimeout(() => { const f = this.focusables(); const t = f[0] || (this.dialogRef && this.dialogRef.current); if (t) t.focus(); }, 0);
+    } else if (wasOpen && this._trigger && this._trigger.focus) {
+      this._trigger.focus();
+    }
+  }
+  dialogKey(e, close) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const f = this.focusables();
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  renderVals() {
+    if (!this.dialogRef) this.dialogRef = { current: null };
+    const dark = this.state.dark ?? (this.props.gelap ?? false);
+    const revoked = this.state.revoked ?? {};
+    const scenario = this.state.scenario ?? 'normal';
+    const tone = (t) => `background: var(--${t}-bg); color: var(--${t}-fg); border: 1px solid var(--${t}-bd)`;
+    const rawKeys = [
+      { id: 'k1', name: 'Modul V-Pet', env: 'Live', prefix: 'jf_live_3fa9', scopes: 'readings:read', used: '[waktu]' },
+      { id: 'k2', name: 'Uji mitra', env: 'Test', prefix: 'jf_test_81c2', scopes: 'devices:read, readings:read', used: 'Belum pernah' },
+      { id: 'k3', name: 'Dashboard lama', env: 'Live', prefix: 'jf_live_c07e', scopes: 'devices:read', used: '[waktu]', pre: true }
+    ];
+    const keys = rawKeys.map((k) => {
+      const isRevoked = !!revoked[k.id] || !!k.pre;
+      return { ...k, active: !isRevoked, revoked: isRevoked,
+        envStyle: tone(k.env === 'Live' ? 'brand' : 'info'), envIcon: k.env === 'Live' ? 'bolt' : 'science',
+        rowStyle: isRevoked ? 'opacity: 0.6' : '',
+        ask: () => this.setState({ confirm: k.id }) };
+    });
+    const confirmKey = rawKeys.find((k) => k.id === this.state.confirm);
+    const heights = [42, 55, 48, 70, 62, 80, 74];
+    const days = ['[h-6]', '[h-5]', '[h-4]', '[h-3]', '[h-2]', 'Kemarin', 'Hari ini'];
+    const bars = heights.map((h, i) => ({ h: h + '%', d: days[i] }));
+    const SC = {
+      normal: { status: 'online', ph: ['7,0', 'normal'], tds: ['640', 'normal'], suhu: ['27,4', 'normal'] },
+      ph_turun: { status: 'online', ph: ['6,0', 'low'], tds: ['655', 'normal'], suhu: ['27,3', 'normal'] },
+      suhu_naik: { status: 'online', ph: ['6,9', 'normal'], tds: ['648', 'normal'], suhu: ['31,2', 'high'] },
+      offline: { status: 'offline', ph: ['7,0', 'normal'], tds: ['640', 'normal'], suhu: ['27,4', 'normal'] }
+    }[scenario];
+    const ST = { online: ['Terhubung', 'wifi', 'ok'], offline: ['Tidak terhubung', 'wifi_off', 'bad'] }[SC.status];
+    const SS = { normal: ['Normal', 'check_circle', 'ok'], low: ['Di bawah ambang', 'arrow_downward', 'warn'], high: ['Di atas ambang', 'arrow_upward', 'warn'] };
+    const row = (label, [v, st], unit) => ({ label, value: v + (unit ? ' ' + unit : ''), stateLabel: SS[st][0], stateIcon: SS[st][1], stateStyle: tone(SS[st][2]), valueStyle: SC.status === 'offline' ? 'color: var(--ink2)' : '' });
+    const sbx = { statusLabel: ST[0], statusIcon: ST[1], statusStyle: tone(ST[2]), rows: [row('pH', SC.ph, ''), row('TDS', SC.tds, 'ppm'), row('Suhu air', SC.suhu, '°C')] };
+    const scenarios = [['normal', 'Normal', 'check_circle'], ['ph_turun', 'pH turun', 'arrow_downward'], ['suhu_naik', 'Suhu naik', 'arrow_upward'], ['offline', 'Offline', 'wifi_off']].map(([k, label, icon]) => ({
+      label, icon, pressed: k === scenario ? 'true' : 'false',
+      style: k === scenario ? 'background: var(--info-bg); color: var(--info-fg); border: 1.5px solid var(--info-fg)' : 'background: transparent; color: var(--ink2); border: 1px solid var(--line)',
+      pick: () => this.setState({ scenario: k })
+    }));
+    return {
+      themeClass: dark ? 'dark' : '', dark, sideClass: this.state.side ? 'open' : '', sideExpanded: this.state.side ? 'true' : 'false', toggleSide: () => this.setState({ side: !this.state.side }), themeIcon: dark ? 'light_mode' : 'dark_mode', themeLabel: dark ? 'Mode terang' : 'Mode gelap',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      keys, bars, sbx, scenarios, usageKey: this.state.usageKey ?? 'k1', hasUsage: (this.state.usageKey ?? 'k1') === 'k1', noUsage: (this.state.usageKey ?? 'k1') === 'k2', onUsage: (e) => this.setState({ usageKey: e.target.value }),
+      confirming: !!confirmKey, confirmName: confirmKey ? confirmKey.name : '',
+      cancelRevoke: () => this.setState({ confirm: null }),
+      doRevoke: () => this.setState({ revoked: { ...revoked, [this.state.confirm]: true }, confirm: null }),
+      creating: !!this.state.creating,
+      openCreate: () => { this._trigger = document.activeElement; this.setState({ creating: true }); },
+      closeCreate: () => this.setState({ creating: false }),
+      onDialogKey: (e) => this.dialogKey(e, () => this.setState({ creating: false })), dialogRef: this.dialogRef,
+      copyLabel: this.state.copied ? 'Tersalin' : 'Salin',
+      copyCurl: () => this.setState({ copied: true }),
+      toast: !!this.state.toast, toastText: this.state.toast || '',
+      openDocs: () => this.setState({ toast: 'Prototype: membuka /docs (Scalar) di tab baru saat diimplementasi.' }),
+      closeToast: () => this.setState({ toast: '' })
+    };
+  }
+}
+</script>
+</body>
+</html>
