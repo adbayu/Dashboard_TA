@@ -15,11 +15,13 @@
     "simulator": "node --env-file-if-exists=.env --import tsx server/simulator.ts",
     "typecheck": "tsc -p server/tsconfig.json",
     "test:pilot": "node --env-file-if-exists=.env --import tsx --test server/pilot.test.ts",
+    "test:v1": "node --env-file-if-exists=.env --import tsx --test server/v1.test.ts",
     "cek:aset": "python scripts/cek-aset.py"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
     "@fastify/rate-limit": "^11.2.0",
+    "@fastify/swagger": "^9.9.1",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "fastify": "^5.12.3",
@@ -37,6 +39,7 @@
     "@types/node": "^26.5.0",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",

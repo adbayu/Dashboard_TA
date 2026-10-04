@@ -191,11 +191,11 @@ Tidak ada email sensor yang dipicu oleh ingestion Sprint 1.
 
 ### Skema dan migrasi
 
-server/schema.sql memuat migrasi awal transaksional/idempotent, dikunci advisory lock:
-users → sessions; users/devices → ownerships; ownerships/devices → readings.
-Index unik membatasi satu pemilik aktif per unit dan satu kiriman per ID/unit.
-Model/sensor didefinisikan sekali di server/domain.ts dan disajikan melalui /models;
-tidak membuat tabel katalog tambahan untuk dua model tetap.
+`server/migrations/001_pilot.sql` mempertahankan skema pilot lama. Migrasi
+`002_iot_platform.sql` menambahkan katalog sensor dan tipe perangkat beserta
+metadata IoT. `migrate()` menjalankan versi yang belum tercatat secara berurutan,
+satu transaksi per file dengan advisory lock `90260909`. Model v1 tetap ada untuk
+menjaga ingest pilot yang sudah berjalan.
 
 Admin tidak dapat memindahkan unit aktif. Pemilik melepas, admin mengalokasikan ulang
 unit yang sama, kredensial dirotasi, pengguna baru melakukan pairing. Riwayat lama tetap

@@ -1,10 +1,14 @@
 import Fastify, { type FastifyError } from 'fastify';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { transaction } from './db.js';
 import { models, hash, secret, passwordHash, passwordMatches, connectionStatus, type Model } from './domain.js';
+import { failV1 } from './v1/common.js';
+import { ingestV2, type V2IngestBody } from './v1/ingest.js';
+import { registerV1Routes } from './v1/index.js';
 
 type User = { id: string; email: string; role: 'admin' | 'user' };
 declare module 'fastify' { interface FastifyRequest { actor: User | null } }
@@ -24,6 +28,23 @@ const object = (properties: Record<string, unknown>, required = Object.keys(prop
   type: 'object', additionalProperties: false, required, properties,
 });
 const params = object({ id: uuid });
+type LegacyIngestBody = { version: 1; deviceId: string; model: Model; messageId: string; measuredAt: string; readings: Record<string, number> };
+type IngestBody = LegacyIngestBody | V2IngestBody;
+const ingestTime = { type: 'string', format: 'date-time', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$' };
+const ingestV1Schema = object({
+  version: { const: 1 }, deviceId: uuid, model: { enum: Object.keys(models) }, messageId: uuid,
+  measuredAt: ingestTime,
+  readings: { type: 'object', minProperties: 2, maxProperties: 3, additionalProperties: { type: 'number' } },
+});
+const ingestV2Schema = object({
+  version: { const: 2 }, deviceId: uuid, type: { type: 'string', pattern: '^[A-Z0-9-]{3,32}$' }, messageId: uuid,
+  measuredAt: ingestTime,
+  readings: { type: 'object', minProperties: 1, maxProperties: 16, additionalProperties: { type: 'number' } },
+  meta: object({
+    rssi: { type: 'integer', minimum: -32768, maximum: 32767 },
+    fw: { type: 'string', maxLength: 32 },
+  }, []),
+}, ['version', 'deviceId', 'type', 'messageId', 'measuredAt', 'readings']);
 function fail(statusCode: number, message: string): never {
   throw Object.assign(new Error(message), { statusCode });
 }
@@ -40,14 +61,29 @@ export async function buildApp(options: Options) {
   });
   await app.register(cookie);
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  await app.register(swagger, {
+    openapi: {
+      openapi: '3.1.0',
+      info: { title: 'JagoFarm IoT API', version: '1.0.0' },
+      servers: [{ url: options.origin }],
+    },
+  });
   app.decorateRequest('actor', null);
   app.setNotFoundHandler(() => fail(404, 'Endpoint tidak ditemukan.'));
   const dummyPassword = await passwordHash(secret());
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     const status = error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 503;
+    const isV1 = request.url.startsWith('/api/v1/');
+    const isV2Ingest = request.url === '/api/ingest' && (request.body as { version?: number } | undefined)?.version === 2;
+    const usesContractErrors = isV1 || isV2Ingest;
+    const apiCode = (error as FastifyError & { apiCode?: string }).apiCode;
+    const defaultV1Code: Record<number, string> = {
+      400: 'VALIDATION_FAILED', 401: 'UNAUTHENTICATED', 403: 'FORBIDDEN_SCOPE',
+      404: 'NOT_FOUND', 409: 'CONFLICT', 429: 'RATE_LIMITED',
+    };
     if (status === 503) request.log.error({ requestId: request.id }, 'Request failed');
     reply.code(status).send({ error: {
-      code: status === 503 ? 'UNAVAILABLE' : 'REQUEST_REJECTED',
+      code: status === 503 ? 'UNAVAILABLE' : usesContractErrors ? apiCode ?? defaultV1Code[status] ?? 'VALIDATION_FAILED' : 'REQUEST_REJECTED',
       message: status === 503 ? 'Layanan tidak tersedia. Coba lagi.' : error.validation ? 'Payload tidak valid.' : error.message,
       requestId: request.id,
     } });
@@ -56,23 +92,43 @@ export async function buildApp(options: Options) {
     reply.header('Cache-Control', 'no-store');
     reply.header('X-Content-Type-Options', 'nosniff');
     if (options.production) reply.header('Strict-Transport-Security', 'max-age=31536000');
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && request.url !== '/api/ingest') {
-      if (request.headers.origin !== options.origin) fail(403, 'Origin tidak diizinkan.');
+    const hasSessionCookie = Boolean(request.cookies.pilot_session);
+    const isV1 = request.url.startsWith('/api/v1/');
+    const authorization = request.headers.authorization ?? '';
+    const hasApiKey = /^Bearer jf_(?:live|test)_[a-f0-9]{64}$/.test(authorization);
+    if (isV1 && hasSessionCookie && hasApiKey) {
+      failV1(400, 'AMBIGUOUS_AUTH', 'Kirim cookie sesi atau API key, bukan keduanya.');
+    }
+    if (hasSessionCookie && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      if (request.headers.origin !== options.origin) {
+        if (isV1) failV1(403, 'ORIGIN_REJECTED', 'Origin tidak diizinkan.');
+        fail(403, 'Origin tidak diizinkan.');
+      }
     }
   });
-  const publicRoutes = new Set(['/api/health', '/api/session/login', '/api/invitations/accept', '/api/ingest']);
+  const publicRoutes = new Set(['/api/health', '/api/session/login', '/api/invitations/accept', '/api/ingest', '/docs/openapi.json']);
   app.addHook('preHandler', async request => {
     if (publicRoutes.has(request.routeOptions.url ?? '')) return;
+    if (request.routeOptions.url === '/api/v1/devices' && request.method === 'GET' && typeof (request.query as { code?: unknown }).code === 'string') return;
     const session = request.cookies.pilot_session;
-    if (!session || !/^[a-f0-9]{64}$/.test(session)) fail(401, 'Silakan masuk.');
+    if (!session || !/^[a-f0-9]{64}$/.test(session)) {
+      if (request.url.startsWith('/api/v1/')) failV1(401, 'UNAUTHENTICATED', 'Silakan masuk.');
+      fail(401, 'Silakan masuk.');
+    }
     const result = await pool.query<User>(
       'SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()',
       [hash(session)],
     );
     request.actor = result.rows[0] ?? null;
-    if (!request.actor) fail(401, 'Sesi berakhir. Silakan masuk kembali.');
+    if (!request.actor) {
+      if (request.url.startsWith('/api/v1/')) failV1(401, 'UNAUTHENTICATED', 'Sesi berakhir. Silakan masuk kembali.');
+      fail(401, 'Sesi berakhir. Silakan masuk kembali.');
+    }
     if (request.routeOptions.url?.startsWith('/api/admin/') && request.actor.role !== 'admin') fail(403, 'Khusus Admin Pilot.');
   });
+  app.get('/docs/openapi.json', {
+    schema: { tags: ['Dokumentasi'], summary: 'Skema OpenAPI untuk API IoT' },
+  }, async () => app.swagger());
   app.get('/api/health', async () => {
     await pool.query('SELECT 1 FROM schema_migrations WHERE version=1');
     return { status: 'ok' };
@@ -161,7 +217,7 @@ export async function buildApp(options: Options) {
     '(SELECT max(received_at) FROM readings WHERE ownership_id=o.id) AS last_received_at ' +
     'FROM devices d JOIN ownerships o ON o.device_id=d.id ' +
     'LEFT JOIN LATERAL (SELECT * FROM readings WHERE ownership_id=o.id ORDER BY measured_at DESC,message_id DESC LIMIT 1) r ON true ' +
-    'WHERE o.user_id=$1 AND o.ended_at IS NULL';
+    'WHERE o.user_id=$1 AND o.ended_at IS NULL AND d.model IS NOT NULL';
   const present = (device: Record<string, any>) => ({
     ...device, sensors: models[device.model as Model].sensors, source: 'simulator',
     status: connectionStatus(device.measured_at, device.last_received_at),
@@ -194,30 +250,39 @@ export async function buildApp(options: Options) {
     const last = readings.at(-1);
     return { readings, nextCursor: result.rows.length > 100 ? Buffer.from(JSON.stringify({ time: last.measured_at, id: last.message_id })).toString('base64url') : null };
   });
-  app.post<{ Body: { version: number; deviceId: string; model: Model; messageId: string; measuredAt: string; readings: Record<string, number> } }>('/api/ingest', {
-    schema: { body: object({ version: { const: 1 }, deviceId: uuid, model: { enum: Object.keys(models) }, messageId: uuid,
-      measuredAt: { type: 'string', format: 'date-time', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$' }, readings: { type: 'object', minProperties: 2, maxProperties: 3, additionalProperties: { type: 'number' } },
-    }) },
-  }, async request => {
-    const { deviceId, model, messageId, measuredAt, readings } = request.body;
-    const authorization = request.headers.authorization;
-    if (!authorization || !/^Bearer [a-f0-9]{64}$/.test(authorization)) fail(401, 'Kredensial perangkat salah.');
-    if (Date.parse(measuredAt) > Date.now() + 60_000) fail(400, 'Waktu perangkat lebih dari 60 detik di masa depan.');
-    const sensors = models[model].sensors;
-    if (Object.keys(readings).length !== sensors.length || sensors.some(sensor => !Number.isFinite(readings[sensor.code]) || readings[sensor.code] < sensor.min || readings[sensor.code] > sensor.max)) fail(400, 'Sensor, nilai, atau model tidak valid.');
-    return transaction(pool, async client => {
-      const device = (await client.query('SELECT id FROM devices WHERE id=$1 AND model=$2 AND credential_hash=$3 AND credential_since<=$4::timestamptz FOR UPDATE', [deviceId, model, hash(authorization.slice(7)), measuredAt])).rows[0];
-      if (!device) fail(401, 'Kredensial perangkat salah.');
-      const prior = (await client.query('SELECT (measured_at=$3::timestamptz AND readings=$4::jsonb) AS matches FROM readings WHERE device_id=$1 AND message_id=$2', [deviceId, messageId, measuredAt, JSON.stringify(readings)])).rows[0];
-      if (prior) {
-        if (!prior.matches) fail(409, 'ID kiriman sudah dipakai untuk payload berbeda.');
-        return { accepted: true, duplicate: true };
+  app.post<{ Body: IngestBody }>('/api/ingest', {
+      schema: { body: { oneOf: [ingestV1Schema, ingestV2Schema] } },
+    }, async request => {
+      const authorization = request.headers.authorization;
+      if (!authorization || !/^Bearer [a-f0-9]{64}$/.test(authorization)) {
+        if (request.body.version === 2) failV1(401, 'UNAUTHENTICATED', 'Credential device salah atau sudah dirotasi.');
+        fail(401, 'Kredensial perangkat salah.');
       }
-      const owner = (await client.query('SELECT id FROM ownerships WHERE device_id=$1 AND started_at<=$2::timestamptz AND (ended_at IS NULL OR ended_at>$2::timestamptz)', [deviceId, measuredAt])).rows[0];
-      if (!owner) fail(409, 'Tidak ada kepemilikan pada waktu pengukuran.');
-      await client.query('INSERT INTO readings(device_id,message_id,ownership_id,measured_at,readings) VALUES ($1,$2,$3,$4,$5)', [deviceId, messageId, owner.id, measuredAt, JSON.stringify(readings)]);
-      return { accepted: true, duplicate: false };
+      if (request.body.version === 2) return ingestV2(pool, request.body, authorization.slice(7));
+
+      const { deviceId, model, messageId, measuredAt, readings } = request.body;
+      if (Date.parse(measuredAt) > Date.now() + 60_000) fail(400, 'Waktu perangkat lebih dari 60 detik di masa depan.');
+      const sensors = models[model].sensors;
+      if (Object.keys(readings).length !== sensors.length || sensors.some(sensor => !Number.isFinite(readings[sensor.code]) || readings[sensor.code] < sensor.min || readings[sensor.code] > sensor.max)) fail(400, 'Sensor, nilai, atau model tidak valid.');
+      return transaction(pool, async client => {
+        const device = (await client.query('SELECT id FROM devices WHERE id=$1 AND model=$2 AND credential_hash=$3 AND credential_since<=$4::timestamptz FOR UPDATE', [deviceId, model, hash(authorization.slice(7)), measuredAt])).rows[0];
+        if (!device) fail(401, 'Kredensial perangkat salah.');
+        const prior = (await client.query(`
+          SELECT (measured_at=$3::timestamptz AND readings=$4::jsonb AND ingest_version=1
+            AND ingest_type=$5 AND ingest_meta='{}'::jsonb) AS matches
+          FROM readings WHERE device_id=$1 AND message_id=$2`, [deviceId, messageId, measuredAt, JSON.stringify(readings), model])).rows[0];
+        if (prior) {
+          if (!prior.matches) fail(409, 'ID kiriman sudah dipakai untuk payload berbeda.');
+          return { accepted: true, duplicate: true };
+        }
+        const owner = (await client.query('SELECT id FROM ownerships WHERE device_id=$1 AND started_at<=$2::timestamptz AND (ended_at IS NULL OR ended_at>$2::timestamptz)', [deviceId, measuredAt])).rows[0];
+        if (!owner) fail(409, 'Tidak ada kepemilikan pada waktu pengukuran.');
+        await client.query(`
+          INSERT INTO readings(device_id,message_id,ownership_id,measured_at,readings,ingest_version,ingest_type,ingest_meta)
+          VALUES($1,$2,$3,$4,$5,1,$6,'{}'::jsonb)`, [deviceId, messageId, owner.id, measuredAt, JSON.stringify(readings), model]);
+        return { accepted: true, duplicate: false };
+      });
     });
-  });
+  registerV1Routes(app, pool, options.origin);
   return app;
 }
