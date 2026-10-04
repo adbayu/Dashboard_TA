@@ -34,6 +34,7 @@ function ukuranMuat(g, teks, maks, awal) {
 }
 
 // Label PNG (data URL) berisi QR + keterangan alat.
+// oxlint-disable-next-line react/only-export-components -- Shared QR helper stays beside its existing consumer.
 export async function buatLabelPng(value, { kode, nama } = {}) {
   const qrUrl = await QRCode.toDataURL(value, {
     width: QR_PX,

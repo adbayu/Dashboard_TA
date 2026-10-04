@@ -3,6 +3,7 @@ import { useSmart } from '../store/SmartStore';
 import { Avatar } from './ui';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
+// oxlint-disable-next-line react/only-export-components -- Shared menu data stays beside its existing consumer.
 export const MENUS = {
   pengguna: [
     {

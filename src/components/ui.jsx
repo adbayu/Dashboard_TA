@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 //
 // Radius juga dipisah menurut peran: kartu 16px (rounded-2xl), kontrol 12px
 // (rounded-xl), chip/badge penuh (rounded-full).
+// oxlint-disable-next-line react/only-export-components -- Shared size tokens stay beside their existing consumers.
 export const UKURAN = {
   sm: { kontrol: 'h-8 px-2.5 text-[13px]', ikon: 'h-8 w-8', teksIkon: 'text-[16px]' },
   md: { kontrol: 'h-10 px-3.5 text-sm', ikon: 'h-10 w-10', teksIkon: 'text-[18px]' },
@@ -117,7 +118,9 @@ export function Badge({ children, tone = 'muted', icon, className = '' }) {
   );
 }
 
+// oxlint-disable-next-line react/only-export-components -- Shared status tokens stay beside their existing consumers.
 export const STATUS_TONE = { online: 'ok', warning: 'warn', maintenance: 'info', offline: 'bad' };
+// oxlint-disable-next-line react/only-export-components -- Shared status labels stay beside their existing consumers.
 export const STATUS_LABEL = { online: 'Terhubung', warning: 'Perlu perhatian', maintenance: 'Perawatan', offline: 'Tidak terhubung' };
 
 const TONE_IKON = { brand: 'text-primary', warn: 'text-amber-600', bad: 'text-red-600', info: 'text-sky-600' };

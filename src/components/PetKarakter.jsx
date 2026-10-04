@@ -50,6 +50,7 @@ const KARAKTER = {
   'udang galah': 'udang',
 };
 
+// oxlint-disable-next-line react/only-export-components -- Shared character lookup stays beside its existing consumer.
 export const kunciKarakter = (species = '') =>
   KARAKTER[String(species).toLowerCase().trim()] || 'nila';
 

@@ -19,6 +19,7 @@ import {
 const KEY = 'aquasmart_smart_v1';
 const SmartCtx = createContext(null);
 
+// oxlint-disable-next-line react/only-export-components -- Shared store hook stays beside its provider.
 export const useSmart = () => {
   const ctx = useContext(SmartCtx);
   if (!ctx) throw new Error('useSmart harus dipakai di dalam <SmartProvider>');
@@ -28,6 +29,7 @@ export const useSmart = () => {
 // Pembeda nilai sensor: tiap device punya rentang wajar sendiri.
 // Diekspor karena formulir pengelola memakainya sebagai nilai usulan ambang,
 // supaya angka di UI tidak lagi ditulis ulang di banyak tempat.
+// oxlint-disable-next-line react/only-export-components -- Shared metric configuration stays beside its provider.
 export const METRIC_RANGE = {
   ph: [6.2, 7.6, 2],
   temp: [23.5, 30.5, 1],
@@ -36,11 +38,13 @@ export const METRIC_RANGE = {
 
 // Tiga parameter yang benar-benar diukur sensor (pH, suhu air, TDS).
 // Dipakai untuk kartu telemetri, statistik harian, dan form pemantauan manual.
+// oxlint-disable-next-line react/only-export-components -- Shared metric metadata stays beside its provider.
 export const METRIC_META = {
   ph: { label: 'pH Air', unit: 'pH', icon: 'science', precision: 2 },
   temp: { label: 'Suhu Air', unit: '°C', icon: 'device_thermostat', precision: 1 },
   tds: { label: 'TDS Nutrisi', unit: 'ppm', icon: 'water_ec', precision: 0 },
 };
+// oxlint-disable-next-line react/only-export-components -- Shared metric keys stay beside their provider.
 export const METRIC_KEYS = ['ph', 'temp', 'tds'];
 
 // Satu-satunya sumber ambang ideal di seluruh aplikasi.
@@ -49,6 +53,7 @@ export const METRIC_KEYS = ['ph', 'temp', 'tds'];
 // AMBANG_TELEMETRI sendiri, List IoT memakai metrik kategori, dan statistik
 // harian memakai area.targets — sehingga satu pembacaan yang sama bisa berlabel
 // "Ideal" di satu halaman dan "Keluar ambang" di halaman lain.
+// oxlint-disable-next-line react/only-export-components -- Shared threshold utility stays beside its provider.
 export function ambangUntuk(area, kategori, key) {
   const khusus = area?.targets?.[key];
   if (Array.isArray(khusus) && khusus.length === 2) return khusus;
@@ -59,6 +64,7 @@ export function ambangUntuk(area, kategori, key) {
 
 // Penilaian satu nilai terhadap ambang. Dipakai kartu telemetri, List IoT, dan
 // ringkasan statistik supaya bahasanya seragam.
+// oxlint-disable-next-line react/only-export-components -- Shared threshold helper stays beside its provider.
 export function nilaiTerhadapAmbang(value, ambang) {
   if (value == null || !ambang) return null;
   const [min, max] = ambang;
@@ -71,6 +77,7 @@ export function nilaiTerhadapAmbang(value, ambang) {
 // mencetak format berbeda untuk alat yang sama. Bentuk "JAGOFARM|<kode>|<id>"
 // dikenali pemindai di halaman Detail Information (dan URL /iot/:id tetap bisa
 // dibaca, jadi label lama yang sudah ditempel tidak perlu dicetak ulang).
+// oxlint-disable-next-line react/only-export-components -- Shared QR formatter stays beside its provider.
 export const ambilKodeAlat = (device) =>
   device ? `JAGOFARM|${device.code}|${device.id}` : '';
 
@@ -79,6 +86,7 @@ const hariKey = (date = new Date()) =>
 
 // Label tanggal Indonesia: "Sen, 27 Sep 2026". Dipakai histori harian supaya
 // tanggal, bulan, dan tahunnya terbaca jelas — bukan "2026-09-27".
+// oxlint-disable-next-line react/only-export-components -- Shared date formatter stays beside its provider.
 export const labelTanggal = (iso) => {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
@@ -88,6 +96,7 @@ export const labelTanggal = (iso) => {
 };
 
 // Daftar tanggal mundur dari hari ini: [hari ini, kemarin, ...] sepanjang n hari.
+// oxlint-disable-next-line react/only-export-components -- Shared date utility stays beside its provider.
 export function tanggalMundur(n = 7, dari = hariKey()) {
   const dasar = new Date(`${dari}T00:00:00`);
   const keluar = [];
@@ -103,6 +112,7 @@ export function tanggalMundur(n = 7, dari = hariKey()) {
 // dihitung dari riwayat pembacaan sensor. Mengembalikan null bila belum ada
 // pembacaan sama sekali, supaya UI bisa jujur menampilkan "belum ada data"
 // alih-alih angka nol yang menyesatkan.
+// oxlint-disable-next-line react/only-export-components -- Shared statistics utility stays beside its provider.
 export function statistikHarian(riwayat, areaId, tanggal = hariKey()) {
   const baris = (riwayat || []).filter((r) => r.areaId === areaId && (r.tanggal || hariKey(r.at)) === tanggal);
   // Pembacaan TERAKHIR = jam paling besar, bukan elemen terakhir array. Riwayat
@@ -257,6 +267,7 @@ const DEFAULT_STATE = {
 // menyimpan seluruh datanya di localStorage, jadi tidak ada permintaan jaringan
 // yang bisa berjalan lama; yang bisa terjadi adalah: belum ada data sama sekali,
 // atau data tersimpan rusak/tidak bisa dibaca (R-27).
+// oxlint-disable-next-line react/only-export-components -- Shared store status values stay beside their provider.
 export const KONDISI = { siap: 'siap', kosong: 'kosong', rusak: 'rusak' };
 
 function loadState() {
@@ -1060,6 +1071,7 @@ function advancePet(pet, gained) {
   return { level, stage, xp, xpNext };
 }
 
+// oxlint-disable-next-line react/only-export-components -- Shared metric helper stays beside its provider.
 export const metricLabel = (key, categories) => {
   for (const category of categories) {
     const found = category.metrics.find((m) => m.key === key);
@@ -1068,5 +1080,6 @@ export const metricLabel = (key, categories) => {
   return { key, label: key, unit: '' };
 };
 
+// oxlint-disable-next-line react/only-export-components -- Shared currency formatter stays beside its provider.
 export const formatRupiah = (value) =>
   'Rp' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 });

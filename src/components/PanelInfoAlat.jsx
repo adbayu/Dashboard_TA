@@ -16,6 +16,7 @@ import { Badge, Card, SectionTitle, Table, STATUS_LABEL, STATUS_TONE } from './u
 // Sumber penjelasan = DATA (kategori + perangkat), bukan teks mati: kalau
 // pengelola mengubah fungsi/kategori/ambang alat, penjelasan ikut berubah.
 
+// oxlint-disable-next-line react/only-export-components -- Shared QR labels stay beside their existing consumer.
 export const LABEL_BENTUK = {
   url: 'Tautan halaman perangkat',
   'kode-ringkas': 'Kode ringkas JagoFarm',
@@ -36,6 +37,7 @@ const ARTI_STATUS = {
 
 // Catatan perawatan dibedakan per jenis parameter, supaya pemilik alat pH tidak
 // disuruh mengkalibrasi larutan TDS.
+// oxlint-disable-next-line react/only-export-components -- Shared care notes stay beside their existing consumer.
 export function catatanPerawatan(metricKey) {
   const umum = [
     'Bersihkan ujung probe dari biofilm seminggu sekali, karena lapisan ini penyebab utama angka melenceng.',

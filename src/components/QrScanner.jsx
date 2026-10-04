@@ -30,6 +30,7 @@ export default function QrScanner({ onHasil, onBatal }) {
   useEffect(() => {
     const didukung = typeof window !== 'undefined' && 'BarcodeDetector' in window;
     if (!didukung) {
+      // oxlint-disable-next-line react/set-state-in-effect -- Unsupported BarcodeDetector mounts explicit fallback/error UI.
       setStatus('gagal');
       setGalat(
         'Browser ini belum mendukung pemindaian QR langsung (butuh Chrome/Edge). ' +
