@@ -30,6 +30,11 @@ export default function QrScanner({ onHasil, onBatal }) {
   useEffect(() => {
     let cancelled = false;
     const video = videoRef.current;
+    // Cleanup di bawah menyetel berhentiRef ke true. React StrictMode (dev) menjalankan
+    // effect dua kali saat mount, jadi tanpa reset ini loop deteksi langsung berhenti
+    // di run kedua: kamera tampil, tapi QR tidak pernah terbaca.
+    berhentiRef.current = false;
+    kandidatRef.current = { nilai: '', ulang: 0 };
     const didukung = typeof window !== 'undefined' && 'BarcodeDetector' in window;
     if (!didukung) {
       // oxlint-disable-next-line react/set-state-in-effect -- Unsupported BarcodeDetector mounts explicit fallback/error UI.
