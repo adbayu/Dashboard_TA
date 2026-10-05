@@ -10,6 +10,7 @@ export async function pilotApi(path, { method = 'GET', body, signal } = {}) {
     if (signal?.aborted) throw error;
     throw new Error('Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.');
   }
+  if (response.status === 204) return undefined;
   let data;
   try { data = await response.json(); }
   catch {

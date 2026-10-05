@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
+import { IOT_SOURCE } from '../services/iotApi.js';
 import { Avatar } from './ui';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
@@ -28,6 +30,10 @@ export const MENUS = {
         { to: '/chatbot', label: 'Chatbot Aquaponik', icon: 'smart_toy', hint: 'Tanya soal ikan, sayur & sistem' },
       ],
     },
+    {
+      group: 'Integrasi',
+      items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key dan pemakaian' }],
+    },
   ],
   pengelola: [
     {
@@ -46,21 +52,38 @@ export const MENUS = {
         { to: '/admin/point', label: 'Sistem Point', icon: 'stars', hint: 'Aturan poin, badge & saldo pengguna' },
       ],
     },
+    {
+      group: 'Integrasi',
+      items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key dan pemakaian' }],
+    },
   ],
 };
 
 // ── Sidebar per role: menu diambil dari MENUS sesuai role aktif (dari URL) ───
 // Tombol Keluar sengaja TIDAK ada di sini — logout ada di halaman /profil.
-export default function SmartSidebar({ role: roleProp }) {
-  const { role: roleCtx, currentUser, points, activeAlerts } = useSmart();
+export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }) {
+  const { role: roleCtx, currentUser, points } = useSmart();
   const role = roleProp || roleCtx;
   const menu = MENUS[role] || MENUS.pengguna;
-  const pending = activeAlerts.length;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    document.querySelector('.smart-sidebar nav a')?.focus();
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      document.querySelector('.mobile-menu-button')?.focus();
+    };
+  }, [isOpen, onClose]);
 
   return (
     <>
+      {isOpen && <button type="button" className="sidebar-backdrop" aria-label="Tutup menu" onClick={onClose} />}
       <aside
-        className="fixed left-0 top-0 bottom-0 z-50 w-52 sm:w-56 md:w-64 xl:w-72 flex flex-col"
+        className={`smart-sidebar fixed left-0 top-0 bottom-0 z-50 w-52 sm:w-56 md:w-64 xl:w-72 flex flex-col ${isOpen ? 'is-open' : ''}`}
         style={{ background: 'linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
       >
         {/* Kepala: brand */}
@@ -79,6 +102,7 @@ export default function SmartSidebar({ role: roleProp }) {
           <Link
             to="/profil"
             title="Buka profil saya"
+            onClick={onClose}
             className="flex items-center gap-3 rounded-2xl bg-white/10 border border-white/10 p-3 hover:bg-white/20 transition-colors group"
           >
             <Avatar avatar={currentUser.avatar} nama={currentUser.name} size={40} className="ring-2 ring-emerald-accent/40" />
@@ -93,6 +117,7 @@ export default function SmartSidebar({ role: roleProp }) {
 
           <Link
             to="/profil"
+            onClick={onClose}
             className="flex items-center justify-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-2 py-1.5 text-[11px] font-bold text-white/80 hover:bg-white/15 hover:text-white transition-colors"
           >
             <span className="material-symbols-outlined text-[15px]">account_circle</span>
@@ -111,6 +136,7 @@ export default function SmartSidebar({ role: roleProp }) {
                     key={item.to}
                     to={item.to}
                     end={item.end}
+                    onClick={onClose}
                     className={({ isActive }) =>
                       `flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all group ${
                         isActive
@@ -144,13 +170,9 @@ export default function SmartSidebar({ role: roleProp }) {
             </span>
             <span className="text-sm font-extrabold text-white">{points.toLocaleString('id-ID')}</span>
           </div>
-          {pending > 0 && (
-            <p className="text-[11px] text-amber-200 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">warning</span>
-              {pending} device butuh perhatian
-            </p>
-          )}
-          <p className="text-[10px] text-white/60 leading-snug">Data demo lokal, belum terhubung hardware IoT fisik.</p>
+          <p className="text-[10px] text-white/70 leading-snug">
+            {IOT_SOURCE === 'api' ? 'Fitur non-IoT menggunakan data contoh.' : 'Data contoh lokal. IoT contoh hanya berlaku selama sesi ini.'}
+          </p>
         </div>
       </aside>
     </>

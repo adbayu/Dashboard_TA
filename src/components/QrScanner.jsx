@@ -28,6 +28,8 @@ export default function QrScanner({ onHasil, onBatal }) {
   const [manual, setManual] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
+    const video = videoRef.current;
     const didukung = typeof window !== 'undefined' && 'BarcodeDetector' in window;
     if (!didukung) {
       // oxlint-disable-next-line react/set-state-in-effect -- Unsupported BarcodeDetector mounts explicit fallback/error UI.
@@ -50,14 +52,18 @@ export default function QrScanner({ onHasil, onBatal }) {
           video: { facingMode: 'environment' },
           audio: false,
         });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         // Elemen <video> SELALU ter-mount (lihat render di bawah), jadi
         // srcObject bisa dipasang di sini. Kalau video baru dirender setelah
         // status berubah, ref-nya masih null dan kamera tidak pernah tersambung.
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        if (video) {
+          video.srcObject = stream;
           try {
-            await videoRef.current.play();
+            await video.play();
           } catch {
             /* autoplay bisa ditolak — deteksi tetap jalan dari frame yang ada */
           }
@@ -65,8 +71,7 @@ export default function QrScanner({ onHasil, onBatal }) {
         setStatus('jalan');
 
         timerRef.current = setInterval(async () => {
-          if (berhentiRef.current || !videoRef.current || !canvasRef.current) return;
-          const video = videoRef.current;
+          if (berhentiRef.current || !video || !canvasRef.current) return;
           if (video.readyState < 2 || !video.videoWidth) return;
           try {
             const kode = await detector.detect(video);
@@ -92,6 +97,7 @@ export default function QrScanner({ onHasil, onBatal }) {
           }
         }, JEDA_MS);
       } catch (err) {
+        if (cancelled) return;
         setStatus('gagal');
         const nama = err?.name || '';
         if (nama === 'NotAllowedError') {
@@ -107,9 +113,12 @@ export default function QrScanner({ onHasil, onBatal }) {
     })();
 
     return () => {
+      cancelled = true;
       berhentiRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (video) video.srcObject = null;
     };
   }, [onHasil]);
 

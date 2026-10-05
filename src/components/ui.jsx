@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useId, useRef } from 'react';
+import { linkLabelToControl } from '../utils/frontendReview.js';
 
 // ── Sistem ukuran (satu skala untuk SELURUH aplikasi) ─────────────────────────
 // Sebelumnya tinggi tombol berbeda-beda (20/24/30/33/36/38/60/66 px) karena tiap
@@ -208,15 +209,17 @@ export function IconButton({ icon, onClick, title, tone = 'brand', size = 'md', 
 }
 
 export function Field({ label, hint, children, className = '' }) {
+  const generatedId = useId();
+  const { id, control } = linkLabelToControl(children, generatedId, [Input, NumberInput, Select, TextArea]);
   // Label dipatok satu baris (h-4 + truncate). Sebelumnya label panjang seperti
   // "Harga satuan" membungkus jadi dua baris, sehingga kotak input di kolom itu
   // turun 16px dibanding kolom sebelahnya pada baris form yang sama.
   return (
-    <label className={`block min-w-0 ${className}`}>
-      <span className="block h-4 truncate text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</span>
-      {children}
+    <div className={`block min-w-0 ${className}`}>
+      <label htmlFor={id} className="block h-4 truncate text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</label>
+      {control}
       {hint && <span className="block text-[11px] text-on-surface-variant mt-1">{hint}</span>}
-    </label>
+    </div>
   );
 }
 
@@ -282,30 +285,69 @@ export function Empty({ title, hint, icon = 'inbox', action }) {
   );
 }
 
-export function Modal({ open, onClose, title, children, wide }) {
+export function Modal({ open, onClose, title, children, wide, closeDisabled = false }) {
+  const dialogRef = useRef(null);
+  const closeRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
-    if (open) document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    if (!open) return undefined;
+    const previousFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    const focusable = () => [...(dialog?.querySelectorAll('a[href],button:not([disabled]),input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') || [])]
+      .filter(element => element.getAttribute('aria-hidden') !== 'true');
+    const initialTarget = dialog?.querySelector('[autofocus],input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]):not(.modal-close)') || dialog;
+    initialTarget?.focus();
+
+    const onKey = event => {
+      if (event.key === 'Escape') {
+        if (!closeDisabled) closeRef.current?.();
+        event.preventDefault();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (!items.length) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+    };
+  }, [open, closeDisabled]);
   if (!open) return null;
   return (
-    // Dialog dibatasi pada RUANG KONTEN, bukan seluruh viewport. Sebelumnya
-    // overlay + panel menutupi sidebar 227px (panel max-w-3xl = 768px pada
-    // lebar CSS 826px), dan karena overlay z-[60] ada di atas aside z-50,
-    // menu sidebar tidak bisa diklik selama modal terbuka. Offset kiri
-    // mengikuti lebar sidebar (pl-52 sm:pl-56 md:pl-64 xl:pl-72).
     <div
-      className="fixed inset-0 z-[60] left-52 sm:left-56 md:left-64 xl:left-72 flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto custom-scrollbar"
-      onClick={onClose}
+      className="modal-overlay fixed inset-0 z-[60] flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto custom-scrollbar"
+      onClick={() => { if (!closeDisabled) closeRef.current?.(); }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={`glass-panel rounded-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} my-auto p-5 shadow-glass-elevated`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 pb-3 mb-4 border-b border-outline-variant/40">
-          <h3 className="text-lg font-bold text-on-surface min-w-0">{title}</h3>
-          <IconButton icon="close" onClick={onClose} title="Tutup" size="sm" className="-mt-1 -mr-1" />
+          <h3 id={titleId} className="text-lg font-bold text-on-surface min-w-0">{title}</h3>
+          <IconButton icon="close" onClick={() => closeRef.current?.()} title="Tutup" size="sm" disabled={closeDisabled} className="modal-close -mt-1 -mr-1" />
         </div>
         {children}
       </div>

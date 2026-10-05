@@ -15,6 +15,9 @@ import {
   SEED_USERS,
   STATUS_AKUN,
 } from '../data/seed';
+import { pilotApi } from '../services/pilotApi.js';
+import { IOT_SOURCE, iotApi } from '../services/iotApi.js';
+import { mapSessionUser } from '../services/sessionUser.js';
 
 const KEY = 'aquasmart_smart_v1';
 const SmartCtx = createContext(null);
@@ -316,6 +319,7 @@ function migrateState(parsed) {
   ];
   return {
     ...parsed,
+    devices,
     readings,
     kematian: Array.isArray(parsed.kematian) ? parsed.kematian : [],
     users: users.map((u) => {
@@ -349,8 +353,13 @@ const now = () =>
 
 
 export function SmartProvider({ children }) {
-  const [state, setState] = useState(loadState);
+  const [state, setState] = useState(() => {
+    const loaded = loadState();
+    return IOT_SOURCE === 'api' ? { ...loaded, sessionUserId: null } : loaded;
+  });
   const [toast, setToast] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState(IOT_SOURCE === 'api' ? 'loading' : 'local');
+  const [sessionError, setSessionError] = useState('');
   const toastTimer = useRef(null);
 
   // Role datang dari akun yang login:
@@ -358,14 +367,47 @@ export function SmartProvider({ children }) {
   // - bila belum login, ikut URL supaya alamat /admin tetap punya konteks.
   const { pathname } = useLocation();
 
-  // Persist seluruh state ke localStorage
+  // IoT tetap disiapkan di memori untuk konsumen lama, tetapi tidak disimpan.
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(state));
+      const { devices, readings, ...persisted } = state;
+      void devices;
+      void readings;
+      localStorage.setItem(KEY, JSON.stringify(persisted));
     } catch {
       /* kuota penuh — abaikan */
     }
   }, [state]);
+
+  useEffect(() => {
+    if (IOT_SOURCE !== 'api') return undefined;
+    let current = true;
+    pilotApi('/session').then(({ user }) => {
+      if (!current) return;
+      setState(prev => {
+        const account = mapSessionUser(user, prev.users);
+        const email = account.email.toLowerCase();
+        return {
+          ...prev,
+          users: [...prev.users.filter(item => (item.email || '').toLowerCase() !== email), account],
+          sessionUserId: account.id,
+        };
+      });
+      setSessionError('');
+      setSessionStatus('authenticated');
+    }).catch(error => {
+      if (!current) return;
+      setState(prev => ({ ...prev, sessionUserId: null }));
+      if (error.status === 401) {
+        setSessionError('');
+        setSessionStatus('unauthenticated');
+      } else {
+        setSessionError(error.message);
+        setSessionStatus('error');
+      }
+    });
+    return () => { current = false; };
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', state.theme === 'dark');
@@ -424,10 +466,31 @@ export function SmartProvider({ children }) {
       notify,
 
       // ── Login / logout ──────────────────────────────────────────────────────
-      // Verifikasi sederhana di sisi browser. Belum ada backend, jadi ini BUKAN
-      // pengamanan sungguhan — cukup untuk alur demo.
+      // Mode API memakai sesi backend. Mode local mempertahankan login browser untuk data contoh.
       login: async (email, password) => {
         const bersih = (email || '').trim().toLowerCase();
+        if (IOT_SOURCE === 'api') {
+          try {
+            const result = await pilotApi('/session/login', {
+              method: 'POST',
+              body: { email: bersih, password },
+            });
+            const akun = mapSessionUser(result.user, state.users);
+            setState(prev => {
+              const account = mapSessionUser(result.user, prev.users);
+              return {
+                ...prev,
+                users: [...prev.users.filter(item => (item.email || '').toLowerCase() !== account.email), account],
+                sessionUserId: account.id,
+              };
+            });
+            setSessionError('');
+            setSessionStatus('authenticated');
+            return { ok: true, akun };
+          } catch (error) {
+            return { ok: false, pesan: error.message };
+          }
+        }
         const kandidat = state.users.filter((u) => (u.email || '').toLowerCase() === bersih);
         if (!kandidat.length) return { ok: false, pesan: 'Email tidak terdaftar.' };
         // Bisa ada lebih dari satu baris dengan email sama (mis. pengelola menambah
@@ -466,7 +529,18 @@ export function SmartProvider({ children }) {
         }));
         return { ok: true, akun };
       },
-      logout: () => {
+      logout: async () => {
+        if (IOT_SOURCE === 'api') {
+          try {
+            await pilotApi('/session/logout', { method: 'POST' });
+            setSessionError('');
+            setSessionStatus('unauthenticated');
+            setState(prev => ({ ...prev, sessionUserId: null }));
+            return { ok: true };
+          } catch (error) {
+            return { ok: false, pesan: error.message };
+          }
+        }
         setState((prev) => ({ ...prev, sessionUserId: null }));
         return { ok: true };
       },
@@ -895,6 +969,7 @@ export function SmartProvider({ children }) {
         notify('Riwayat percakapan dibersihkan.');
       },
       resetDemo: () => {
+        if (IOT_SOURCE === 'local') iotApi.resetLocalData();
         setState({ ...DEFAULT_STATE, theme: state.theme, sessionUserId: state.sessionUserId });
         notify('Data demo dikembalikan ke kondisi awal.', 'warn');
       },
@@ -1045,6 +1120,8 @@ export function SmartProvider({ children }) {
       role,
       currentUser,
       isLoggedIn: !!currentUser,
+      sessionStatus,
+      sessionError,
       // Saldo poin = poin akun yang login (satu-satunya sumber).
       points: currentUser ? currentUser.points || 0 : 0,
       // Kondisi penyimpanan browser. 'kosong' = jumlah data nol (mis. localStorage
@@ -1053,7 +1130,7 @@ export function SmartProvider({ children }) {
       jumlahData: (state.areas?.length || 0) + (state.devices?.length || 0) + (state.users?.length || 0),
       toast,
     }),
-    [state, actions, derived, role, currentUser, toast],
+    [state, actions, derived, role, currentUser, toast, sessionStatus, sessionError],
   );
   return <SmartCtx.Provider value={value}>{children}</SmartCtx.Provider>;
 }

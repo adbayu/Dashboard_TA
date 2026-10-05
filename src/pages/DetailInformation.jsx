@@ -1,181 +1,166 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ambilKodeAlat, useSmart } from '../store/SmartStore';
-import { cariPerangkat } from '../services/iotInfo';
-import QrCode from '../components/QrCode';
+import { useCallback, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import QrScanner from '../components/QrScanner';
-import PanelInfoAlat from '../components/PanelInfoAlat';
-import { Button, Card, Empty, Field, Input, SectionTitle } from '../components/ui';
-
-// Halaman Detail Information (menu sidebar pengguna).
-//
-// Alur: pengguna memindai QR yang tertempel di alat → isi QR dicocokkan ke data
-// perangkat → aplikasi menjelaskan ALAT APA ITU: nama, jenis, fungsi, parameter
-// yang diukur beserta ambang idealnya, cara membaca nilainya, perawatan, dan
-// letaknya.
-//
-// Isi penjelasannya sendiri TIDAK ditulis di sini, melainkan di komponen
-// `PanelInfoAlat` — komponen yang sama dipakai halaman pengelola
-// (/admin/detail-informasi), supaya penjelasan kedua role tidak pernah berbeda.
+import { iotApi, parseIotInput } from '../services/iotApi.js';
+import { Badge, Button, Card, Empty, Field, Input, SectionTitle } from '../components/ui';
 
 export default function DetailInformation() {
-  const { devices, categoryOf, areaOf, role, currentUser } = useSmart();
-  const [teksQr, setTeksQr] = useState('');
-  const [hasil, setHasil] = useState(null);
-  const [pindai, setPindai] = useState(false);
-  const [galat, setGalat] = useState('');
+  const navigate = useNavigate();
+  const [input, setInput] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [lastCode, setLastCode] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
 
-  // Perangkat yang boleh dibaca: pengelola semuanya, pengguna hanya area yang
-  // diampu — sama dengan aturan di List IoT.
-  const terlihat = (d) => role === 'pengelola' || (d.areaId && (currentUser?.areaIds || []).includes(d.areaId));
+  const lookup = useCallback(async value => {
+    const parsed = parseIotInput(value);
+    setIsScanning(false);
+    setInput(value.trim());
+    setError('');
+    setPreview(null);
+    setLastCode('');
 
-  function proses(nilai) {
-    const mentah = (nilai || '').trim();
-    setPindai(false);
-    setTeksQr(mentah);
-    if (!mentah) {
-      setGalat('Isi QR kosong. Coba pindai ulang atau ketik kode alatnya.');
-      setHasil(null);
+    if (parsed.kind === 'empty') {
+      setError('Isi QR kosong. Pindai ulang atau masukkan kode alat.');
       return;
     }
-    const { device, cara, bentuk } = cariPerangkat(devices, mentah);
-    if (!device) {
-      setGalat(
-        `Kode "${mentah}" tidak cocok dengan perangkat mana pun. Periksa kembali labelnya, ` +
-          'atau minta pengelola memastikan alat ini sudah terdaftar di Kelola IoT.',
-      );
-      setHasil(null);
+    if (parsed.kind === 'claim') {
+      navigate(parsed.path);
       return;
     }
-    setGalat('');
-    setHasil({ device, cara, bentuk, mentah });
-  }
+    if (parsed.kind === 'invalid') {
+      setError('Tautan QR tidak dikenal. Gunakan tautan klaim atau kode alat.');
+      return;
+    }
 
-  const device = hasil?.device;
-  const kategori = device ? categoryOf(device.categoryId) : null;
-  const area = device ? areaOf(device.areaId) : null;
+    setLastCode(parsed.code);
+    setIsLoading(true);
+    try {
+      const result = await iotApi.getQrPreview(parsed.code);
+      setPreview(result);
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate]);
+
+  const retry = () => {
+    if (lastCode) void lookup(lastCode);
+  };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-gradient-to-br from-primary/10 to-transparent">
+    <div className="space-y-5 min-w-0">
+      <Card>
         <SectionTitle
           eyebrow="Detail Information"
-          title="Pindai QR alat untuk tahu alatnya"
-          subtitle="Setiap perangkat IoT punya kode QR. Setelah dipindai, halaman ini menjelaskan alat apa itu, apa fungsinya, parameter apa yang diukur beserta ambang idealnya, dan bagaimana memperlakukannya."
+          title="Pindai atau masukkan kode alat"
+          subtitle="Pratinjau publik hanya menampilkan identitas dasar alat dan status klaim. QR yang memuat tautan klaim akan membuka halaman klaim."
         />
-        {/* Dua kolom sama lebar (bukan flex-wrap): pada lebar efektif layar user
-            (~841px CSS) dua tombol ini berjumlah 484px sedangkan ruangnya 480px,
-            sehingga tombol kedua terjatuh sendirian dan tampak melenceng. */}
-        <div className="grid grid-cols-2 gap-2 sm:max-w-md">
+        <div className="flex flex-wrap gap-2">
           <Button
             icon="qr_code_scanner"
-            className="w-full justify-center"
-            onClick={() => {
-              setPindai((v) => !v);
-              // Turunkan pandangan ke kartu pencarian — tanpa ini pengguna
-              // menekan tombol lalu tidak melihat apa pun berubah.
-              requestAnimationFrame(() => {
-                document.getElementById('cari-perangkat')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              });
-            }}
+            variant={isScanning ? 'ghost' : 'primary'}
+            onClick={() => setIsScanning(value => !value)}
+            aria-expanded={isScanning}
           >
-            {pindai ? 'Tutup kamera' : 'Pindai QR alat'}
+            {isScanning ? 'Tutup pemindai' : 'Pindai QR alat'}
           </Button>
           <Link to="/iot" className="inline-flex">
-            <Button variant="ghost" icon="sensors" className="w-full justify-center">
-              Lihat daftar perangkat
-            </Button>
+            <Button variant="ghost" icon="sensors">Lihat perangkat saya</Button>
           </Link>
         </div>
       </Card>
 
-      <div id="cari-perangkat" className="scroll-mt-24">
       <Card>
         <SectionTitle
-          eyebrow="Cari Perangkat"
-          title={pindai ? 'Arahkan kamera ke kode QR' : 'Sudah punya kodenya?'}
-          subtitle={
-            pindai
-              ? 'Pemindaian memakai kamera perangkat. Kolom kode di bawah tetap tersedia bila kamera sulit diarahkan.'
-              : 'Pindai QR alat lewat kamera, atau ketik / tempel kodenya bila kamera tidak memungkinkan.'
-          }
+          eyebrow="Pemindai QR"
+          title={isScanning ? 'Arahkan kamera ke kode QR' : 'Masukkan kode alat'}
+          subtitle="Kamera tidak didukung di semua browser. Kode alat bisa dimasukkan secara manual."
         />
-
-        {/* Kamera dan kolom kode tinggal di SATU kartu: dulu keduanya kartu
-            terpisah yang bergantian muncul, sehingga isi halaman melompat naik
-            turun setiap kali kamera dibuka/ditutup. */}
-        {pindai && (
-          <div className="mb-6">
-            <QrScanner onHasil={proses} onBatal={() => setPindai(false)} />
-          </div>
-        )}
-
+        {isScanning && <QrScanner onHasil={lookup} onBatal={() => setIsScanning(false)} />}
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            proses(teksQr);
+          onSubmit={event => {
+            event.preventDefault();
+            void lookup(input);
           }}
-          className="grid gap-3 lg:grid-cols-[1fr,auto] lg:items-start"
+          className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr),auto] sm:items-end"
         >
-          <Field label="Isi QR atau kode alat" hint="cth. AQ-PH-001, JAGOFARM|AQ-PH-001|IOT-001, atau tautan /iot/IOT-001">
-            <Input value={teksQr} onChange={setTeksQr} placeholder="AQ-PH-001" />
+          <Field label="Tautan QR atau kode alat">
+            <Input value={input} onChange={setInput} placeholder="AQ-PKT-001" autoComplete="off" />
           </Field>
-          <Button type="submit" icon="search" className="w-full lg:w-auto">
-            Tampilkan penjelasan
+          <Button type="submit" icon="search" disabled={isLoading} className="w-full sm:w-auto">
+            Cari perangkat
           </Button>
         </form>
-
-        {/* Contoh QR asli supaya fitur ini bisa dicoba walau tanpa label fisik. */}
-        <div className="mt-5 rounded-2xl panel-inset p-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-3">
-            Coba tanpa kamera
-          </p>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="shrink-0">
-              <QrCode value={ambilKodeAlat(devices[0])} size={128} caption={devices[0]?.code} />
-            </div>
-            <div className="min-w-0 flex-1 text-[12px] text-on-surface-variant">
-              <p className="font-bold text-on-surface">{devices[0]?.name || 'Belum ada perangkat'}</p>
-              <p className="mt-1">
-                Tempel kode di atas ke kolom pencarian, atau tampilkan QR ini di layar lain lalu pindai dengan
-                kamera untuk mencoba alur pemindaian.
-              </p>
-            </div>
-          </div>
-        </div>
       </Card>
-      </div>
 
-      {galat && (
+      {isLoading && <Card><p className="text-sm text-on-surface-variant" role="status">Memuat pratinjau perangkat...</p></Card>}
+
+      {error && (
         <Card>
-          <p role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 dark:bg-amber-900/25 border border-amber-400/60 px-3 py-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
-            <span className="material-symbols-outlined text-[18px]">error</span>
-            {galat}
-          </p>
+          <div role="alert" className="space-y-3">
+            <p className="flex items-start gap-2 text-sm font-semibold text-red-800 dark:text-red-200">
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">error</span>
+              <span>{error}</span>
+            </p>
+            {lastCode && <Button variant="ghost" icon="refresh" onClick={retry}>Coba lagi</Button>}
+          </div>
         </Card>
       )}
 
-      {hasil && device && !terlihat(device) && (
+      {preview && (
         <Card>
-          <Empty
-            title="Perangkat ini bukan di area Anda"
-            icon="lock"
-            hint="Alat ini memang terdaftar, tetapi berada di area yang bukan tanggung jawab Anda. Hubungi pengelola bila perlu akses."
-          />
+          {preview.label && <p className="mb-3 text-xs font-bold text-on-surface-variant">{preview.label}</p>}
+          <SectionTitle eyebrow="Pratinjau publik" title={preview.device.name} />
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div className="min-w-0 rounded-xl panel-inset p-3">
+              <dt className="text-xs text-on-surface-variant">Kode alat</dt>
+              <dd className="mt-1 font-mono text-sm font-semibold text-on-surface break-all">{preview.device.code}</dd>
+            </div>
+            <div className="min-w-0 rounded-xl panel-inset p-3">
+              <dt className="text-xs text-on-surface-variant">Tipe</dt>
+              <dd className="mt-1 text-sm font-semibold text-on-surface break-words">
+                {preview.device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {preview.device.type?.code || 'Tidak tersedia'}
+              </dd>
+            </div>
+            <div className="min-w-0 rounded-xl panel-inset p-3">
+              <dt className="text-xs text-on-surface-variant">Status klaim</dt>
+              <dd className="mt-2">
+                <Badge tone={preview.device.claimed ? 'muted' : 'info'} icon={preview.device.claimed ? 'lock' : 'hourglass_top'}>
+                  {preview.device.claimed ? 'Sudah diklaim' : 'Belum diklaim'}
+                </Badge>
+              </dd>
+            </div>
+            <div className="min-w-0 rounded-xl panel-inset p-3">
+              <dt className="text-xs text-on-surface-variant">Validitas kode aktivasi</dt>
+              <dd className="mt-2">
+                <Badge tone={preview.device.activationValid ? 'ok' : 'warn'} icon={preview.device.activationValid ? 'check_circle' : 'schedule'}>
+                  {preview.device.activationValid ? 'Berlaku' : 'Tidak diperiksa tanpa QR aktivasi'}
+                </Badge>
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-4">
+            <h3 className="text-sm font-bold text-on-surface">Sensor yang tersedia</h3>
+            {preview.device.sensors.length ? (
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {preview.device.sensors.map(sensor => (
+                  <li key={sensor.code}>
+                    <Badge icon="sensors">{sensor.name || sensor.label || sensor.code}{sensor.unit ? ` (${sensor.unit})` : ''}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-2 text-sm text-on-surface-variant">Informasi sensor belum tersedia.</p>}
+          </div>
+          {preview.source === 'local' && <p className="mt-4 text-xs text-on-surface-variant">Data contoh. Perubahan demo hanya berlaku selama sesi ini.</p>}
         </Card>
       )}
 
-      {hasil && device && terlihat(device) && (
-        <PanelInfoAlat device={device} cari={hasil} kategori={kategori} area={area} />
-      )}
-
-      {!hasil && !galat && !pindai && (
+      {!isLoading && !error && !preview && !isScanning && (
         <Card>
-          <Empty
-            title="Belum ada alat yang dipindai"
-            hint="Pindai kode QR yang tertempel di perangkat, atau ketik kode alatnya untuk melihat penjelasan lengkap."
-            icon="qr_code_scanner"
-          />
+          <Empty title="Belum ada alat yang dicari" hint="Pindai QR atau masukkan kode alat untuk memuat pratinjau publik." icon="qr_code_scanner" />
         </Card>
       )}
     </div>

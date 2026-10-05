@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { Avatar, Button, Field, Input } from '../components/ui';
 import { DEMO_PASSWORD } from '../data/seed';
+import { IOT_SOURCE } from '../services/iotApi.js';
 
 // Halaman masuk. Role TIDAK dipilih di sini — ditentukan oleh akun yang dipakai:
 // akun pengguna masuk ke "/", akun pengelola masuk ke "/admin".
 export default function Login() {
-  const { login, users, resetDemoPassword } = useSmart();
+  const { login, users, resetDemoPassword, sessionError } = useSmart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [galat, setGalat] = useState('');
@@ -28,7 +30,11 @@ export default function Login() {
       setGalat(hasil.pesan);
       return;
     }
-    navigate(hasil.akun.role === 'pengelola' ? '/admin' : '/', { replace: true });
+    const returnTo = location.state?.from;
+    const destination = typeof returnTo === 'string' && returnTo.startsWith('/d/')
+      ? returnTo
+      : hasil.akun.role === 'pengelola' ? '/admin' : '/';
+    navigate(destination, { replace: true });
   }
 
   function pakaiAkun(akun) {
@@ -65,14 +71,23 @@ export default function Login() {
             </p>
           </div>
           <div className="mt-8 space-y-2 text-[12px] text-white/60">
-            <p className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px] text-emerald-accent">info</span>
-              Data demo: belum terhubung perangkat IoT fisik.
-            </p>
-            <p className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px] text-emerald-accent">lock</span>
-              Akun disimpan di browser ini saja (belum ada server autentikasi).
-            </p>
+            {IOT_SOURCE === 'local' ? (
+              <>
+                <p className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-emerald-accent">info</span>
+                  Data contoh. Perangkat IoT contoh hanya berlaku selama sesi ini.
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-emerald-accent">lock</span>
+                  Akun demo disimpan di browser ini.
+                </p>
+              </>
+            ) : (
+              <p className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-emerald-accent">lock</span>
+                Masuk memakai sesi backend JagoFarm.
+              </p>
+            )}
           </div>
         </div>
 
@@ -80,11 +95,18 @@ export default function Login() {
         <div className="glass-panel rounded-3xl px-7 py-8 shadow-glass-elevated flex flex-col">
           <h2 className="text-xl font-extrabold text-on-surface">Masuk</h2>
           <p className="text-sm text-on-surface-variant mt-1">
-            Belum punya akun?{' '}
-            <Link to="/daftar" className="font-bold text-primary hover:underline">
-              Daftar di sini
-            </Link>
+            {IOT_SOURCE === 'local' ? (
+              <>Belum punya akun?{' '}
+                <Link to="/daftar" className="font-bold text-primary hover:underline">Daftar di sini</Link>
+              </>
+            ) : 'Masuk dengan akun yang sudah terdaftar.'}
           </p>
+
+          {sessionError && (
+            <p role="alert" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
+              {sessionError}
+            </p>
+          )}
 
           <form onSubmit={kirim} className="mt-6 space-y-4">
             <Field label="Email">
@@ -131,8 +153,7 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* Akun demo, supaya mudah dicoba */}
-          <div className="mt-7 pt-5 border-t border-outline-variant/40">
+          {IOT_SOURCE === 'local' && <div className="mt-7 pt-5 border-t border-outline-variant/40">
             <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
               Akun demo: klik untuk mengisi
             </p>
@@ -165,7 +186,7 @@ export default function Login() {
                 disetujui di menu Kelola User.
               </p>
             )}
-          </div>
+          </div>}
         </div>
       </div>
     </div>

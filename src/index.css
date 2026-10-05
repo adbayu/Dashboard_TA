@@ -277,3 +277,99 @@
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
 }
+
+.mobile-menu-button,
+.sidebar-backdrop {
+  display: none;
+}
+
+.modal-overlay {
+  left: 13rem;
+}
+
+@media (min-width: 640px) {
+  .modal-overlay { left: 14rem; }
+}
+
+@media (min-width: 768px) {
+  .modal-overlay { left: 16rem; }
+}
+
+@media (min-width: 1280px) {
+  .modal-overlay { left: 18rem; }
+}
+
+@media print {
+  @page { size: 50mm 30mm; margin: 0; }
+  body * { visibility: hidden !important; }
+  .modal-overlay {
+    position: static !important;
+    inset: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  .modal-overlay [role="dialog"] {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .iot-qr-print,
+  .iot-qr-print * { visibility: visible !important; }
+  .iot-qr-print {
+    position: fixed !important;
+    inset: 0 !important;
+    display: flex !important;
+    width: 50mm !important;
+    height: 30mm !important;
+    flex-direction: row !important;
+    justify-content: center !important;
+    gap: 2mm !important;
+    padding: 2mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    text-align: left !important;
+  }
+  .iot-qr-print img { width: 18mm !important; height: 18mm !important; }
+}
+
+@media (max-width: 720px) {
+  .shell-content {
+    padding-left: 0 !important;
+  }
+
+  .modal-overlay { left: 0; }
+
+  .mobile-menu-button {
+    display: inline-flex !important;
+  }
+
+  .smart-sidebar {
+    display: none;
+    width: min(18rem, calc(100vw - 2rem)) !important;
+    z-index: 60;
+    overflow-y: auto;
+  }
+
+  .smart-sidebar.is-open {
+    display: flex;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    border: 0;
+    background: rgba(0, 0, 0, 0.45);
+  }
+}
+
+@media (min-width: 721px) {
+  .smart-sidebar {
+    display: flex;
+  }
+}

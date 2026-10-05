@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { SmartProvider, useSmart } from './store/SmartStore';
 import SmartSidebar from './components/SmartSidebar';
@@ -9,6 +10,7 @@ import Login from './pages/Login';
 import Daftar from './pages/Daftar';
 import ListIot, { DeviceDetail } from './pages/ListIot';
 import DetailInformation from './pages/DetailInformation';
+import DeviceClaim from './pages/DeviceClaim';
 import KelolaArea from './pages/KelolaArea';
 import AreaDetail from './pages/AreaDetail';
 import VPet from './pages/VPet';
@@ -23,11 +25,14 @@ import AdminAreas from './pages/admin/AdminAreas';
 import AdminVPet from './pages/admin/AdminVPet';
 import AdminPoints from './pages/admin/AdminPoints';
 import AdminDetailInformation from './pages/admin/AdminDetailInformation';
+import { IOT_SOURCE } from './services/iotApi.js';
+import Developer from './pages/Developer.jsx';
 
 // Judul halaman untuk top bar
 const TITLES = [
   { path: '/admin/pengguna', title: 'Kelola User', subtitle: 'Akun pengguna, peran, dan area tanggung jawab' },
   { path: '/admin/iot', title: 'Kelola IoT', subtitle: 'Registrasi perangkat, kalibrasi, dan QR penjelas alat' },
+  { path: '/developer', title: 'Developer', subtitle: 'API key dan pemakaian API' },
   { path: '/admin/kategori', title: 'Kategori Device', subtitle: 'Jenis alat beserta parameter dan ambang idealnya' },
   { path: '/admin/detail-informasi', title: 'Detail Information', subtitle: 'Penjelasan alat yang sama dengan yang dibaca pengguna' },
   { path: '/admin/area', title: 'Kelola Area', subtitle: 'Kolam, growbed, dan tandon yang sudah dipasangi IoT' },
@@ -65,8 +70,11 @@ function Toast() {
 }
 
 function Shell() {
-  const { role, isLoggedIn, kondisi, resetDemo } = useSmart();
+  const { role, isLoggedIn, kondisi, resetDemo, sessionStatus } = useSmart();
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const openMobileMenu = useCallback(() => setMenuOpen(true), []);
+  const closeMobileMenu = useCallback(() => setMenuOpen(false), []);
 
   // Kondisi penyimpanan yang dulu tidak pernah ditampilkan (R-27). Hanya satu
   // yang bisa terjadi di aplikasi ini: data localStorage tidak bisa dibaca
@@ -74,20 +82,23 @@ function Shell() {
   // muncul karena data awal sistem selalu terisi, jadi tidak dibuat cabang
   // mati untuknya. Saat nanti tersambung backend, keadaan memuat/gagal jaringan
   // ditambahkan di sini juga.
-  const catatanPenyimpanan =
-    kondisi === 'rusak' ? (
+  const catatanPenyimpanan = kondisi === 'rusak' ? (
       <div role="alert" className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
-        <strong className="block">Data tersimpan di browser ini tidak bisa dibaca.</strong>
-        Sistem memakai data awal agar tetap bisa dipakai. Pilih Kembalikan data demo untuk memulai ulang dari data contoh.
-        <button
-          type="button"
-          onClick={resetDemo}
-          className="ml-2 underline font-semibold"
-        >
-          Kembalikan data demo
-        </button>
+        <strong className="block">Data lokal di browser ini tidak bisa dibaca.</strong>
+        {IOT_SOURCE === 'api'
+          ? 'Fitur selain IoT memakai data contoh yang disiapkan ulang di memori.'
+          : 'Sistem memakai data contoh awal. Anda dapat memulihkan data contoh dari top bar.'}
+        {IOT_SOURCE === 'local' && <button type="button" onClick={resetDemo} className="ml-2 underline font-semibold">Pulihkan data contoh</button>}
       </div>
     ) : null;
+
+  if (location.pathname.startsWith('/d/')) {
+    return <Routes><Route path="/d/:code" element={<DeviceClaim />} /></Routes>;
+  }
+
+  if (IOT_SOURCE === 'api' && sessionStatus === 'loading' && location.pathname !== '/masuk') {
+    return <div role="status">Memeriksa sesi...</div>;
+  }
 
   // Belum masuk → hanya halaman /masuk dan /daftar yang boleh dibuka.
   if (!isLoggedIn) {
@@ -95,7 +106,7 @@ function Shell() {
       <div className="min-h-screen flex flex-col">
         <Routes>
           <Route path="/masuk" element={<Login />} />
-          <Route path="/daftar" element={<Daftar />} />
+          {IOT_SOURCE === 'local' && <Route path="/daftar" element={<Daftar />} />}
           <Route path="*" element={<Navigate to="/masuk" replace />} />
         </Routes>
         <Toast />
@@ -107,7 +118,7 @@ function Shell() {
   // (Bila dipaksa lewat alamat, langsung dialihkan ke beranda role-nya.)
   const diAreaAdmin = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   if (role === 'pengguna' && diAreaAdmin) return <Navigate to="/" replace />;
-  if (role === 'pengelola' && !diAreaAdmin && location.pathname !== '/profil') {
+  if (role === 'pengelola' && !diAreaAdmin && location.pathname !== '/profil' && location.pathname !== '/developer') {
     return <Navigate to="/admin" replace />;
   }
 
@@ -118,16 +129,17 @@ function Shell() {
 
   return (
     <div className="min-h-screen">
-      <SmartSidebar />
+      <SmartSidebar isOpen={menuOpen} onClose={closeMobileMenu} />
 
-      <div className="pl-52 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
-        <SmartTopBar title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} />
+      <div className="shell-content pl-52 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
+        <SmartTopBar title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} onMenuClick={openMobileMenu} />
 
         <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-[1500px] mx-auto pb-16">
           {catatanPenyimpanan}
           <Routes>
             {/* ── Profil: tersedia untuk kedua role ── */}
             <Route path="/profil" element={<Profil />} />
+            <Route path="/developer" element={<Developer />} />
 
             {/* ── Role Pengguna: alamat akar ── */}
             <Route path="/" element={<Dashboard />} />
@@ -157,7 +169,9 @@ function Shell() {
         </main>
 
         <footer className="px-4 sm:px-6 py-4 border-t border-outline-variant/30 text-[11px] text-on-surface-variant">
-          JagoFarm SmartDashboard Aquaponik · Data demo disimpan di browser Anda (localStorage) · Belum terhubung perangkat IoT fisik.
+          {IOT_SOURCE === 'api'
+            ? 'JagoFarm SmartDashboard Aquaponik · Fitur non-IoT menggunakan data contoh.'
+            : 'JagoFarm SmartDashboard Aquaponik · Data contoh farm tersimpan di browser. IoT contoh hanya berlaku selama sesi ini.'}
         </footer>
       </div>
 

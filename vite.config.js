@@ -1,11 +1,23 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: { proxy: { '/api': 'http://127.0.0.1:3001' } },
-  build: {
+export function developmentHostOptions(command, value) {
+  if (command !== 'serve' || !value) return {}
+  const allowedHosts = [...new Set(value.split(',').map(host => host.trim()).filter(Boolean))]
+  return allowedHosts.length ? { allowedHosts } : {}
+}
+
+export default defineConfig(({ mode, command }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  return {
+    plugins: [react()],
+    server: {
+      ...developmentHostOptions(command, env.DEV_ALLOWED_HOSTS),
+      headers: { 'Referrer-Policy': 'no-referrer' },
+      proxy: { '/api': 'http://127.0.0.1:3001', '/docs': 'http://127.0.0.1:3001' },
+    },
+    build: {
     // Aset Virtual Pet JANGAN di-inline menjadi data URI.
     //
     // Alasannya bukan pilihan gaya, tetapi bug nyata: SVG kita memakai kutip
@@ -19,6 +31,7 @@ export default defineConfig({
     //   - tidak ada masalah kutip/encoding data URI,
     //   - berkasnya bisa dibuka langsung (mis. /assets/v-pet/karakter/nila-xxxx.svg),
     //   - folder aset tetap terpisah seperti yang diminta untuk pengaturan manual.
-    assetsInlineLimit: (filePath) => (filePath.includes('v-pet') ? false : undefined),
-  },
+      assetsInlineLimit: filePath => (filePath.includes('v-pet') ? false : undefined),
+    },
+  }
 })

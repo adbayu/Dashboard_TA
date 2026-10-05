@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { Avatar, AvatarPilih, Badge, Button, Card, Field, Input, SectionTitle, StatCard, TextArea } from '../components/ui';
 import { AVATAR_PILIHAN } from '../data/seed';
+import { passwordChangeAvailable } from '../utils/frontendReview.js';
+import { IOT_SOURCE } from '../services/iotApi.js';
 
-// Halaman profil: pemilik akun dapat mengubah data dirinya sendiri + ganti password.
+// Halaman profil: pemilik akun dapat mengubah data dirinya sendiri dan password demo lokal.
 // Tombol Keluar ada di sini (bukan di sidebar) — di kartu ringkasan akun.
 export default function Profil() {
   const { currentUser, updateProfile, changePassword, areas, role, points, logout } = useSmart();
@@ -20,6 +22,7 @@ export default function Profil() {
   }));
   const [pw, setPw] = useState({ lama: '', baru: '', ulang: '' });
   const [pesanPw, setPesanPw] = useState({ tone: '', text: '' });
+  const [logoutError, setLogoutError] = useState('');
 
   if (!currentUser) {
     return (
@@ -31,8 +34,13 @@ export default function Profil() {
 
   const areaSaya = areas.filter((a) => (currentUser.areaIds || []).includes(a.id));
 
-  function keluar() {
-    logout();
+  async function keluar() {
+    setLogoutError('');
+    const result = await logout();
+    if (!result.ok) {
+      setLogoutError(result.pesan);
+      return;
+    }
     navigate('/masuk', { replace: true });
   }
 
@@ -81,7 +89,7 @@ export default function Profil() {
               <Badge tone={currentUser.status === 'aktif' ? 'ok' : 'muted'}>
                 Akun {currentUser.status}
               </Badge>
-              <Badge tone="info">Sejak {currentUser.joinedAt}</Badge>
+              {currentUser.joinedAt && <Badge tone="info">Sejak {currentUser.joinedAt}</Badge>}
             </div>
           </div>
 
@@ -95,6 +103,7 @@ export default function Profil() {
             Keluar
           </button>
         </div>
+        {logoutError && <p role="alert" className="mt-3 text-sm font-semibold text-red-800 dark:text-red-200">{logoutError}</p>}
       </Card>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
@@ -170,39 +179,44 @@ export default function Profil() {
         </form>
       </Card>
 
-      {/* Ganti password */}
       <Card>
         <SectionTitle
           eyebrow="Keamanan"
           title="Ganti password"
-          subtitle="Minimal 6 karakter. Password demo tersimpan di browser ini saja."
+          subtitle={passwordChangeAvailable(IOT_SOURCE)
+            ? 'Minimal 6 karakter. Password demo tersimpan di browser ini saja.'
+            : 'Penggantian password belum tersedia dari dashboard.'}
         />
-        <form onSubmit={gantiPassword} className="space-y-4 max-w-md">
-          <Field label="Password lama">
-            <Input type="password" value={pw.lama} onChange={(v) => setPw({ ...pw, lama: v })} required />
-          </Field>
-          <Field label="Password baru">
-            <Input type="password" value={pw.baru} onChange={(v) => setPw({ ...pw, baru: v })} required />
-          </Field>
-          <Field label="Ulangi password baru">
-            <Input type="password" value={pw.ulang} onChange={(v) => setPw({ ...pw, ulang: v })} required />
-          </Field>
+        {passwordChangeAvailable(IOT_SOURCE) ? (
+          <form onSubmit={gantiPassword} className="space-y-4 max-w-md">
+            <Field label="Password lama">
+              <Input type="password" value={pw.lama} onChange={(v) => setPw({ ...pw, lama: v })} required />
+            </Field>
+            <Field label="Password baru">
+              <Input type="password" value={pw.baru} onChange={(v) => setPw({ ...pw, baru: v })} required />
+            </Field>
+            <Field label="Ulangi password baru">
+              <Input type="password" value={pw.ulang} onChange={(v) => setPw({ ...pw, ulang: v })} required />
+            </Field>
 
-          {pesanPw.text && (
-            <p
-              role="status"
-              className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
-                pesanPw.tone === 'ok'
-                  ? 'bg-emerald-50 dark:bg-emerald-900/25 border-emerald-300/60 text-emerald-900 dark:text-emerald-100'
-                  : 'bg-red-50 dark:bg-red-900/25 border-red-300/60 text-red-800 dark:text-red-200'
-              }`}
-            >
-              {pesanPw.text}
-            </p>
-          )}
+            {pesanPw.text && (
+              <p
+                role="status"
+                className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                  pesanPw.tone === 'ok'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/25 border-emerald-300/60 text-emerald-900 dark:text-emerald-100'
+                    : 'bg-red-50 dark:bg-red-900/25 border-red-300/60 text-red-800 dark:text-red-200'
+                }`}
+              >
+                {pesanPw.text}
+              </p>
+            )}
 
-          <Button type="submit" icon="lock_reset" variant="soft">Ganti password</Button>
-        </form>
+            <Button type="submit" icon="lock_reset" variant="soft">Ganti password</Button>
+          </form>
+        ) : (
+          <p className="text-sm text-on-surface-variant">Backend belum menyediakan perubahan password dari dashboard.</p>
+        )}
       </Card>
 
       {/* Area yang diampu */}
