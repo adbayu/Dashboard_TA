@@ -1,4 +1,5 @@
 import type { FastifyRequest } from 'fastify';
+import type { Actor } from '../auth/session.js';
 
 export type V1ErrorCode =
   | 'VALIDATION_FAILED'
@@ -30,6 +31,11 @@ export const shortTextSchema = { type: 'string', minLength: 1, maxLength: 100 };
 
 export async function requireAdmin(request: FastifyRequest): Promise<void> {
   if (request.actor?.role !== 'admin') failV1(403, 'FORBIDDEN_SCOPE', 'Aksi ini hanya untuk pengelola.');
+}
+
+export function sandboxScope(actor: Actor): boolean | null {
+  if (actor.kind !== 'key') return null;
+  return actor.environment === 'test';
 }
 
 export function requireActor(request: FastifyRequest) {

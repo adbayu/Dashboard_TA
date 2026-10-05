@@ -49,6 +49,7 @@ function present(row: Record<string, any>) {
 export function registerSensorTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
   app.get('/api/v1/sensor-types', {
     schema: { tags: ['IoT'], summary: 'Daftar jenis sensor' },
+    config: { scope: 'devices:read' },
   }, async () => {
     // TODO(Q6): rentang maksimum TDS masih sementara sampai modul fisik dikonfirmasi.
     const result = await pool.query('SELECT code,name,unit,min_value,max_value,decimals,warn_low,warn_high FROM sensor_types ORDER BY code');
@@ -57,6 +58,7 @@ export function registerSensorTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
 
   app.post<{ Body: SensorInput }>('/api/v1/sensor-types', {
     schema: { body: createSchema },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async (request, reply) => {
     const body = request.body;
@@ -78,6 +80,7 @@ export function registerSensorTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
 
   app.patch<{ Params: { code: string }; Body: SensorPatch }>('/api/v1/sensor-types/:code', {
     schema: { params: v1Object({ code: sensorCodeSchema }), body: patchSchema },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async request => {
     const body = request.body;
@@ -109,6 +112,7 @@ export function registerSensorTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
 
   app.delete<{ Params: { code: string } }>('/api/v1/sensor-types/:code', {
     schema: { params: v1Object({ code: sensorCodeSchema }) },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async (request, reply) => {
     const used = await pool.query('SELECT 1 FROM device_type_sensors WHERE sensor_code=$1 LIMIT 1', [request.params.code]);

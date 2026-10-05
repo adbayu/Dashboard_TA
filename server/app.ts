@@ -6,12 +6,13 @@ import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { transaction } from './db.js';
 import { models, hash, secret, passwordHash, passwordMatches, connectionStatus, type Model } from './domain.js';
+import { authenticateApiKey, parseApiKey } from './auth/api-key.js';
+import { ApiKeyFailureLimit } from './auth/api-key-failure-limit.js';
+import { authenticateSession, sessionUser, type Actor } from './auth/session.js';
 import { failV1 } from './v1/common.js';
 import { ingestV2, type V2IngestBody } from './v1/ingest.js';
 import { registerV1Routes } from './v1/index.js';
 
-type User = { id: string; email: string; role: 'admin' | 'user' };
-declare module 'fastify' { interface FastifyRequest { actor: User | null } }
 type Options = {
   pool: pg.Pool;
   origin: string;
@@ -49,18 +50,50 @@ function fail(statusCode: number, message: string): never {
   throw Object.assign(new Error(message), { statusCode });
 }
 
+export function serializeRequestForLog(request: { method: string }) {
+  return { method: request.method };
+}
+
 export async function buildApp(options: Options) {
   const { pool } = options;
   const app = Fastify({
     bodyLimit: 4096,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
     logger: options.logger ? {
-      serializers: { req: request => ({ method: request.method }), res: response => ({ statusCode: response.statusCode }) },
-      redact: ['req.headers', 'password', 'token', 'credential', 'activationCode'],
+      serializers: { req: serializeRequestForLog, res: response => ({ statusCode: response.statusCode }) },
+      redact: ['req.headers', 'password', 'token', 'credential', 'activationCode', 'apiKey', 'secret'],
     } : false,
   });
   await app.register(cookie);
-  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  const apiKeyFailureLimit = new ApiKeyFailureLimit();
+  const cleanupTimer = setInterval(() => apiKeyFailureLimit.cleanupExpired(), 10_000);
+  cleanupTimer.unref();
+  app.addHook('onClose', async () => clearInterval(cleanupTimer));
+  const authenticateRequestApiKey = async (ip: string, parsed: NonNullable<ReturnType<typeof parseApiKey>>) => {
+    try {
+      return await authenticateApiKey(pool, parsed);
+    } catch (error) {
+      const authError = error as { statusCode?: number; apiCode?: string };
+      if (authError.statusCode === 401 && authError.apiCode === 'UNAUTHENTICATED') {
+        apiKeyFailureLimit.recordFailure(ip);
+      }
+      throw error;
+    }
+  };
+  await app.register(rateLimit, {
+    hook: 'preHandler',
+    max: request => request.actor?.kind === 'key'
+      ? request.actor.environment === 'live' ? 60 : 30
+      : 120,
+    timeWindow: '1 minute',
+    keyGenerator: request => request.actor?.kind === 'key'
+      ? 'key:' + request.actor.keyId
+      : 'ip:' + request.ip,
+    errorResponseBuilder: () => Object.assign(new Error('Batas permintaan API tercapai. Coba lagi setelah beberapa saat.'), {
+      statusCode: 429,
+      apiCode: 'RATE_LIMITED',
+    }),
+  });
   await app.register(swagger, {
     openapi: {
       openapi: '3.1.0',
@@ -69,7 +102,27 @@ export async function buildApp(options: Options) {
     },
   });
   app.decorateRequest('actor', null);
-  app.setNotFoundHandler(() => fail(404, 'Endpoint tidak ditemukan.'));
+  app.setNotFoundHandler(async request => {
+    if (request.url.startsWith('/api/v1/')) {
+      if (!request.actor) {
+        const parsed = parseApiKey(request.headers.authorization);
+        const actor = parsed
+          ? await authenticateRequestApiKey(request.ip, parsed)
+          : await authenticateSession(pool, request.cookies.pilot_session);
+        request.actor = actor;
+        if (!actor) failSessionAuth(request.cookies.pilot_session, true);
+        if (request.url.startsWith('/api/v1/keys') && actor.kind !== 'session') {
+          failV1(401, 'UNAUTHENTICATED', 'Endpoint kunci hanya dapat digunakan dengan sesi.');
+        }
+      }
+      const requiredScope = fallbackV1Scope(request.method, request.url);
+      if (requiredScope && !request.actor!.scopes.includes(requiredScope)) {
+        failV1(403, 'FORBIDDEN_SCOPE', 'Scope kredensial tidak mencukupi.');
+      }
+      failV1(404, 'NOT_FOUND', 'Endpoint tidak ditemukan.');
+    }
+    fail(404, 'Endpoint tidak ditemukan.');
+  });
   const dummyPassword = await passwordHash(secret());
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     const status = error.statusCode && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 503;
@@ -95,9 +148,20 @@ export async function buildApp(options: Options) {
     const hasSessionCookie = Boolean(request.cookies.pilot_session);
     const isV1 = request.url.startsWith('/api/v1/');
     const authorization = request.headers.authorization ?? '';
-    const hasApiKey = /^Bearer jf_(?:live|test)_[a-f0-9]{64}$/.test(authorization);
+    const parsedApiKey = parseApiKey(authorization);
+    const hasApiKey = parsedApiKey !== null;
     if (isV1 && hasSessionCookie && hasApiKey) {
       failV1(400, 'AMBIGUOUS_AUTH', 'Kirim cookie sesi atau API key, bukan keduanya.');
+    }
+    if (isV1 && parsedApiKey) {
+      const lockout = apiKeyFailureLimit.lockoutFor(request.ip);
+      if (lockout) {
+        reply.header('retry-after', lockout.retryAfter);
+        reply.header('x-ratelimit-limit', 20);
+        reply.header('x-ratelimit-remaining', 0);
+        reply.header('x-ratelimit-reset', Math.ceil(lockout.resetAt / 1000));
+        failV1(429, 'RATE_LIMITED', 'Terlalu banyak kegagalan autentikasi API key. Coba lagi setelah jendela berakhir.');
+      }
     }
     if (hasSessionCookie && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       if (request.headers.origin !== options.origin) {
@@ -110,21 +174,39 @@ export async function buildApp(options: Options) {
   app.addHook('preHandler', async request => {
     if (publicRoutes.has(request.routeOptions.url ?? '')) return;
     if (request.routeOptions.url === '/api/v1/devices' && request.method === 'GET' && typeof (request.query as { code?: unknown }).code === 'string') return;
-    const session = request.cookies.pilot_session;
-    if (!session || !/^[a-f0-9]{64}$/.test(session)) {
-      if (request.url.startsWith('/api/v1/')) failV1(401, 'UNAUTHENTICATED', 'Silakan masuk.');
-      fail(401, 'Silakan masuk.');
-    }
-    const result = await pool.query<User>(
-      'SELECT u.id, u.email, u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()',
-      [hash(session)],
-    );
-    request.actor = result.rows[0] ?? null;
+    const isV1 = request.url.startsWith('/api/v1/');
+    const parsed = isV1 ? parseApiKey(request.headers.authorization) : null;
+    request.actor = parsed
+      ? await authenticateRequestApiKey(request.ip, parsed)
+      : await authenticateSession(pool, request.cookies.pilot_session);
     if (!request.actor) {
-      if (request.url.startsWith('/api/v1/')) failV1(401, 'UNAUTHENTICATED', 'Sesi berakhir. Silakan masuk kembali.');
-      fail(401, 'Sesi berakhir. Silakan masuk kembali.');
+      failSessionAuth(request.cookies.pilot_session, isV1);
+    }
+    if (isV1 && request.routeOptions.url?.startsWith('/api/v1/keys') && request.actor.kind !== 'session') {
+      failV1(401, 'UNAUTHENTICATED', 'Endpoint kunci hanya dapat digunakan dengan sesi.');
+    }
+    if (isV1) {
+      const requiredScope = request.routeOptions.config.scope ?? fallbackV1Scope(request.method, request.url);
+      if (requiredScope && !request.actor.scopes.includes(requiredScope)) {
+        failV1(403, 'FORBIDDEN_SCOPE', 'Scope kredensial tidak mencukupi.');
+      }
     }
     if (request.routeOptions.url?.startsWith('/api/admin/') && request.actor.role !== 'admin') fail(403, 'Khusus Admin Pilot.');
+  });
+  app.addHook('onResponse', (request, reply) => {
+    const actor = request.actor;
+    const route = request.routeOptions.url;
+    if (actor?.kind !== 'key' || !actor.keyId || typeof route !== 'string') return;
+    const duration = Math.max(0, Math.round(reply.elapsedTime));
+    void pool.query(
+      `WITH logged AS (
+         INSERT INTO api_usage(key_id,route,status,duration_ms) VALUES($1,$2,$3,$4) RETURNING key_id
+       )
+       UPDATE api_keys SET last_used_at=clock_timestamp() WHERE id=$1 AND EXISTS(SELECT 1 FROM logged)`,
+      [actor.keyId, route, reply.statusCode, duration],
+    ).catch(error => {
+      request.log.error({ err: error, keyId: actor.keyId, route, status: reply.statusCode }, 'Gagal mencatat pemakaian API key.');
+    });
   });
   app.get('/docs/openapi.json', {
     schema: { tags: ['Dokumentasi'], summary: 'Skema OpenAPI untuk API IoT' },
@@ -148,7 +230,7 @@ export async function buildApp(options: Options) {
     reply.setCookie('pilot_session', session, { httpOnly: true, secure: !!options.production, sameSite: 'strict', path: '/api', maxAge: 43200 });
     return { user: { id: user.id, email: user.email, role: user.role } };
   });
-  app.get('/api/session', async request => ({ user: request.actor }));
+  app.get('/api/session', async request => ({ user: sessionUser(request.actor) }));
   app.post('/api/session/logout', async (request, reply) => {
     await pool.query('DELETE FROM sessions WHERE token_hash=$1', [hash(request.cookies.pilot_session ?? '')]);
     reply.clearCookie('pilot_session', { path: '/api' });
@@ -285,4 +367,23 @@ export async function buildApp(options: Options) {
     });
   registerV1Routes(app, pool, options.origin);
   return app;
+}
+
+function fallbackV1Scope(method: string, requestUrl: string): Actor['scopes'][number] | undefined {
+  const pathname = requestUrl.split('?', 1)[0];
+  if (method === 'GET' && (
+    /^\/api\/v1\/devices\/[^/]+\/(latest|readings)$/.test(pathname)
+    || /^\/api\/v1\/sensors\/[^/]+\/overview$/.test(pathname)
+    || pathname === '/api/v1/events'
+    || pathname === '/api/v1/stream'
+  )) return 'readings:read';
+  if (method === 'PUT' && /^\/api\/v1\/areas\/[^/]+\/thresholds$/.test(pathname)) return 'admin';
+  return undefined;
+}
+
+function failSessionAuth(token: string | undefined, isV1: boolean): never {
+  const validShape = Boolean(token && /^[a-f0-9]{64}$/.test(token));
+  const message = validShape ? 'Sesi berakhir. Silakan masuk kembali.' : 'Silakan masuk.';
+  if (isV1) failV1(401, 'UNAUTHENTICATED', message);
+  fail(401, message);
 }

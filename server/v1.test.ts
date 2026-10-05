@@ -4,7 +4,15 @@ import { test } from 'node:test';
 import pg from 'pg';
 import { migrate } from './db.js';
 import { buildApp } from './app.js';
-import { passwordHash } from './domain.js';
+import { hash, passwordHash, secret } from './domain.js';
+
+test('serializer request hanya mencatat method, bukan URL atau query', async () => {
+  const request = { method: 'GET', url: '/api/v1/devices?code=AQ-PKT-TEST&c=unit-test-token' };
+  const { serializeRequestForLog } = await import('./app.js');
+  const serialized = serializeRequestForLog(request);
+  assert.deepEqual(serialized, { method: 'GET' });
+  assert.equal(Object.hasOwn(serialized, 'url'), false);
+});
 
 test('V1 migration upgrades an existing pilot schema and backfills IoT metadata once', async () => {
   assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
@@ -78,8 +86,9 @@ test('V1 migration upgrades an existing pilot schema and backfills IoT metadata 
 
     assert.deepEqual(
       (await pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version),
-      [1, 2],
+      [1, 2, 3],
     );
+    assert.equal((await pool.query("SELECT to_regclass('api_keys_prefix_lookup') AS name")).rows[0].name, 'api_keys_prefix_lookup');
 
     const seedCounts = await pool.query(`
       SELECT
@@ -273,6 +282,419 @@ test('V1 device management contracts', async context => {
       const cookieWithoutOrigin = await app!.inject({ method: 'POST', url: '/api/v1/devices', headers: { cookie: admin }, payload: {} });
       assert.equal(cookieWithoutOrigin.statusCode, 403, cookieWithoutOrigin.body);
       assert.equal(cookieWithoutOrigin.json().error.code, 'ORIGIN_REJECTED');
+    });
+  } finally {
+    await app?.close();
+    await pool.end();
+    await control.query('DROP SCHEMA ' + schema + ' CASCADE');
+    await control.end();
+  }
+});
+
+test('V1 API key contracts and access controls', async context => {
+  assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
+  const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = 'v1_keys_test_' + randomUUID().replaceAll('-', '');
+  await control.query('CREATE SCHEMA ' + schema);
+  const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 5 });
+  const origin = 'http://localhost:5173';
+  const password = 'Farm-keys-integration-test';
+  const adminId = randomUUID();
+  const userId = randomUUID();
+  const otherUserId = randomUUID();
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  try {
+    await migrate(pool);
+    const encodedPassword = await passwordHash(password);
+    await pool.query(
+      "INSERT INTO users(id,email,password_hash,role) VALUES ($1,'admin-keys@example.test',$2,'admin'),($3,'user-keys@example.test',$2,'user'),($4,'other-keys@example.test',$2,'user')",
+      [adminId, encodedPassword, userId, otherUserId],
+    );
+    app = await buildApp({ pool, origin, sendInvite: async () => undefined });
+
+    const login = async (email: string) => {
+      const response = await app!.inject({ method: 'POST', url: '/api/session/login', headers: { origin }, payload: { email, password } });
+      assert.equal(response.statusCode, 200, response.body);
+      return String(response.headers['set-cookie']).split(';')[0];
+    };
+    const admin = await login('admin-keys@example.test');
+    const user = await login('user-keys@example.test');
+    const otherUser = await login('other-keys@example.test');
+    const request = (method: 'GET' | 'POST' | 'DELETE', url: string, cookie?: string, payload?: object, headers: Record<string, string> = {}, remoteAddress = '127.0.0.1') => app!.inject({
+      method,
+      url,
+      remoteAddress,
+      headers: { ...(cookie ? { cookie } : {}), ...(cookie && method !== 'GET' ? { origin } : {}), ...headers },
+      payload,
+    });
+    const createKey = async (cookie: string, environment: 'live' | 'test', scopes: string[], name = 'Kunci uji') => {
+      const response = await request('POST', '/api/v1/keys', cookie, { name, environment, scopes });
+      return { response, value: response.json() };
+    };
+    const fixtureDevice = async (isSandbox: boolean, ownerId: string | null, options: { activationCode?: string; code?: string } = {}) => {
+      const id = randomUUID();
+      const code = options.code ?? (isSandbox ? 'AQ-SBX-' : 'AQ-LIVE-') + id.slice(0, 8).toUpperCase();
+      const typeId = (await pool.query("SELECT id FROM device_types WHERE code='AQ-PH'")).rows[0].id;
+      const activationCode = options.activationCode;
+      await pool.query(
+        `INSERT INTO devices(id,name,model,credential_hash,allocated_to,code,type_id,is_sandbox,activation_hash,activation_expires)
+         VALUES($1,$2,NULL,NULL,$3,$4,$5,$6,$7,CASE WHEN $7::text IS NULL THEN NULL ELSE now()+interval '24 hours' END)`,
+        [id, 'Fixture ' + code, ownerId, code, typeId, isSandbox, activationCode ? hash(activationCode) : null],
+      );
+      if (!activationCode && ownerId) await pool.query('INSERT INTO ownerships(id,device_id,user_id) VALUES($1,$2,$3)', [randomUUID(), id, ownerId]);
+      return { id, code, activationCode };
+    };
+
+    await context.test('Tambahan: API key mensyaratkan minimal satu scope', async () => {
+      const emptyScopes = await createKey(user, 'test', []);
+      assert.equal(emptyScopes.response.statusCode, 400, emptyScopes.response.body);
+      assert.equal(emptyScopes.response.json().error.code, 'VALIDATION_FAILED');
+    });
+
+    await context.test('V1-09: key test tidak dapat membaca device live', async () => {
+      const liveDevice = await fixtureDevice(false, userId);
+      const key = await createKey(user, 'test', ['devices:read']);
+      assert.equal(key.response.statusCode, 201, key.response.body);
+      const response = await request('GET', '/api/v1/devices/' + liveDevice.id, undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      assert.equal(response.statusCode, 404, response.body);
+      assert.equal(response.json().error.code, 'NOT_FOUND');
+    });
+
+    await context.test('V1-10: key live tidak dapat membaca device sandbox', async () => {
+      const sandboxDevice = await fixtureDevice(true, userId);
+      const key = await createKey(admin, 'live', ['devices:read', 'admin']);
+      assert.equal(key.response.statusCode, 201, key.response.body);
+      const response = await request('GET', '/api/v1/devices/' + sandboxDevice.id, undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      assert.equal(response.statusCode, 404, response.body);
+      assert.equal(response.json().error.code, 'NOT_FOUND');
+    });
+
+    await context.test('Tambahan: key admin tidak dapat membuat QR lintas environment', async () => {
+      const sandboxActivation = secret();
+      const sandboxDevice = await fixtureDevice(true, adminId, { activationCode: sandboxActivation });
+      const liveActivation = secret();
+      const liveDevice = await fixtureDevice(false, adminId, { activationCode: liveActivation });
+      const testKey = await createKey(admin, 'test', ['admin']);
+      const liveKey = await createKey(admin, 'live', ['admin']);
+      assert.equal(testKey.response.statusCode, 201, testKey.response.body);
+      assert.equal(liveKey.response.statusCode, 201, liveKey.response.body);
+
+      const qrRequest = (deviceId: string, activationCode: string, apiSecret: string) => request(
+        'POST', '/api/v1/devices/' + deviceId + '/qr', undefined,
+        { activationCode },
+        { authorization: 'Bearer ' + apiSecret },
+      );
+      const testOwnEnvironment = await qrRequest(sandboxDevice.id, sandboxActivation, testKey.value.secret);
+      assert.equal(testOwnEnvironment.statusCode, 200, testOwnEnvironment.body);
+      const testOtherEnvironment = await qrRequest(liveDevice.id, liveActivation, testKey.value.secret);
+      assert.equal(testOtherEnvironment.statusCode, 404, testOtherEnvironment.body);
+      assert.equal(testOtherEnvironment.json().error.code, 'NOT_FOUND');
+      const liveOwnEnvironment = await qrRequest(liveDevice.id, liveActivation, liveKey.value.secret);
+      assert.equal(liveOwnEnvironment.statusCode, 200, liveOwnEnvironment.body);
+      const liveOtherEnvironment = await qrRequest(sandboxDevice.id, sandboxActivation, liveKey.value.secret);
+      assert.equal(liveOtherEnvironment.statusCode, 404, liveOtherEnvironment.body);
+      assert.equal(liveOtherEnvironment.json().error.code, 'NOT_FOUND');
+
+      for (const [device, activationCode] of [[sandboxDevice, sandboxActivation], [liveDevice, liveActivation]] as const) {
+        const sessionQr = await request('POST', '/api/v1/devices/' + device.id + '/qr', admin, { activationCode });
+        assert.equal(sessionQr.statusCode, 200, sessionQr.body);
+      }
+    });
+
+    await context.test('Tambahan: lifecycle key, prefix/hash, dan schema OpenAPI', async () => {
+      const { response, value } = await createKey(admin, 'test', ['devices:read'], 'Kunci API OpenAPI');
+      assert.equal(response.statusCode, 201, response.body);
+      assert.match(value.secret, /^jf_test_[a-f0-9]{64}$/);
+      const listed = await request('GET', '/api/v1/keys', admin);
+      assert.equal(listed.statusCode, 200, listed.body);
+      const item = listed.json().keys.find((key: { id: string }) => key.id === value.key.id);
+      assert.equal(item.prefix, value.secret.slice(0, 12));
+      assert.equal(Object.hasOwn(item, 'secret'), false);
+      assert.equal(Object.hasOwn(item, 'keyHash'), false);
+      const stored = (await pool.query('SELECT prefix,key_hash FROM api_keys WHERE id=$1', [value.key.id])).rows[0];
+      assert.equal(stored.prefix, value.secret.slice(0, 12));
+      assert.equal(stored.key_hash, hash(value.secret));
+
+      const openapi = (await request('GET', '/docs/openapi.json')).json();
+      for (const path of ['/api/v1/keys', '/api/v1/keys/{id}', '/api/v1/keys/{id}/usage']) assert.ok(openapi.paths[path], path);
+      assert.ok(openapi.paths['/api/v1/keys'].get.responses['200']);
+      assert.ok(openapi.paths['/api/v1/keys'].post.requestBody);
+      assert.ok(openapi.paths['/api/v1/keys'].post.responses['201']);
+      assert.ok(openapi.paths['/api/v1/keys/{id}'].delete.responses['204']);
+      assert.ok(openapi.paths['/api/v1/keys/{id}/usage'].get.responses['200']);
+
+      const deleted = await request('DELETE', '/api/v1/keys/' + value.key.id, admin);
+      assert.equal(deleted.statusCode, 204, deleted.body);
+      const revoked = await pool.query('SELECT revoked_at FROM api_keys WHERE id=$1', [value.key.id]);
+      assert.ok(revoked.rows[0].revoked_at);
+    });
+
+    await context.test('Tambahan: policy key Q2/Q3 dan scope admin', async () => {
+      const liveForUser = await createKey(user, 'live', ['devices:read']);
+      assert.equal(liveForUser.response.statusCode, 403, liveForUser.response.body);
+      assert.equal(liveForUser.response.json().error.code, 'FORBIDDEN_SCOPE');
+      const adminScopeForUser = await createKey(user, 'test', ['admin']);
+      assert.equal(adminScopeForUser.response.statusCode, 403, adminScopeForUser.response.body);
+      assert.equal(adminScopeForUser.response.json().error.code, 'FORBIDDEN_SCOPE');
+      const adminLive = await createKey(admin, 'live', ['devices:read', 'admin']);
+      assert.equal(adminLive.response.statusCode, 201, adminLive.response.body);
+      assert.deepEqual(adminLive.value.key.scopes, ['devices:read', 'admin']);
+    });
+
+    await context.test('V1-11: scope readings ditegakkan tanpa endpoint Minggu 3', async () => {
+      const noReadings = await createKey(user, 'test', ['devices:read']);
+      const hasReadings = await createKey(user, 'test', ['readings:read']);
+      const device = await fixtureDevice(true, userId);
+      const denied = await request('GET', '/api/v1/devices/' + device.id + '/latest', undefined, undefined, { authorization: 'Bearer ' + noReadings.value.secret });
+      assert.equal(denied.statusCode, 403, denied.body);
+      assert.equal(denied.json().error.code, 'FORBIDDEN_SCOPE');
+      const allowedButUnimplemented = await request('GET', '/api/v1/devices/' + device.id + '/latest', undefined, undefined, { authorization: 'Bearer ' + hasReadings.value.secret });
+      assert.equal(allowedButUnimplemented.statusCode, 404, allowedButUnimplemented.body);
+      assert.equal(allowedButUnimplemented.json().error.code, 'NOT_FOUND');
+    });
+
+    await context.test('V1-12: key yang dicabut ditolak sebagai UNAUTHENTICATED', async () => {
+      const created = await createKey(user, 'test', ['devices:read']);
+      assert.equal(created.response.statusCode, 201, created.response.body);
+      const deleted = await request('DELETE', '/api/v1/keys/' + created.value.key.id, user);
+      assert.equal(deleted.statusCode, 204, deleted.body);
+      const revoked = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + created.value.secret });
+      assert.equal(revoked.statusCode, 401, revoked.body);
+      assert.equal(revoked.json().error.code, 'UNAUTHENTICATED');
+    });
+
+    await context.test('Tambahan: key tidak dikenal atau format key tidak valid ditolak', async () => {
+      const unknown = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer jf_test_' + 'a'.repeat(64) });
+      assert.equal(unknown.statusCode, 401, unknown.body);
+      assert.equal(unknown.json().error.code, 'UNAUTHENTICATED');
+      const malformed = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer jf_test_not-a-key' });
+      assert.equal(malformed.statusCode, 401, malformed.body);
+      const validKey = await createKey(user, 'test', ['devices:read']);
+      assert.equal(validKey.response.statusCode, 201, validKey.response.body);
+      const secretWithMatchingPrefix = validKey.value.secret;
+      const finalHex = secretWithMatchingPrefix.at(-1) === '0' ? '1' : '0';
+      const wrongDigestSamePrefix = secretWithMatchingPrefix.slice(0, -1) + finalHex;
+      assert.equal(wrongDigestSamePrefix.slice(0, 12), secretWithMatchingPrefix.slice(0, 12));
+      const prefixMatchButWrongDigest = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + wrongDigestSamePrefix });
+      assert.equal(prefixMatchButWrongDigest.statusCode, 401, prefixMatchButWrongDigest.body);
+      assert.equal(prefixMatchButWrongDigest.json().error.code, 'UNAUTHENTICATED');
+    });
+
+    await context.test('Minggu 2: 20 kegagalan autentikasi API key mengunci IP selama satu jendela', async () => {
+      const revokedKey = await createKey(user, 'test', ['devices:read']);
+      assert.equal(revokedKey.response.statusCode, 201, revokedKey.response.body);
+      const revoked = await request('DELETE', '/api/v1/keys/' + revokedKey.value.key.id, user);
+      assert.equal(revoked.statusCode, 204, revoked.body);
+
+      const activeKey = await createKey(user, 'test', ['devices:read']);
+      assert.equal(activeKey.response.statusCode, 201, activeKey.response.body);
+      const ip = '192.0.2.20';
+      const malformed = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer jf_test_not-a-key' }, ip);
+      assert.equal(malformed.statusCode, 401, malformed.body);
+      const cookieSession = await request('GET', '/api/v1/devices', user, undefined, {}, ip);
+      assert.equal(cookieSession.statusCode, 200, cookieSession.body);
+
+      const wrongKey = 'jf_test_' + 'a'.repeat(64);
+      for (let attempt = 0; attempt < 19; attempt++) {
+        const response = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + wrongKey }, ip);
+        assert.equal(response.statusCode, 401, response.body);
+        assert.equal(response.json().error.code, 'UNAUTHENTICATED');
+      }
+
+      const validBeforeThreshold = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + activeKey.value.secret }, ip);
+      assert.equal(validBeforeThreshold.statusCode, 200, validBeforeThreshold.body);
+
+      const twentiethFailure = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + revokedKey.value.secret }, ip);
+      assert.equal(twentiethFailure.statusCode, 401, twentiethFailure.body);
+      assert.equal(twentiethFailure.json().error.code, 'UNAUTHENTICATED');
+
+      const mixed = await request('GET', '/api/v1/devices', user, undefined, { authorization: 'Bearer ' + activeKey.value.secret }, ip);
+      assert.equal(mixed.statusCode, 400, mixed.body);
+      assert.equal(mixed.json().error.code, 'AMBIGUOUS_AUTH');
+
+      const locked = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + activeKey.value.secret }, ip);
+      assert.equal(locked.statusCode, 429, locked.body);
+      assert.equal(locked.json().error.code, 'RATE_LIMITED');
+      assert.equal(locked.headers['x-ratelimit-limit'], '20');
+      assert.equal(locked.headers['x-ratelimit-remaining'], '0');
+      assert.ok(locked.headers['x-ratelimit-reset']);
+      assert.ok(locked.headers['retry-after']);
+      const separateIp = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + activeKey.value.secret }, '192.0.2.21');
+      assert.equal(separateIp.statusCode, 200, separateIp.body);
+    });
+
+    await context.test('Tambahan: filter daftar, detail, dan ownership actor', async () => {
+      const sandboxOwned = await fixtureDevice(true, userId);
+      const sandboxOther = await fixtureDevice(true, otherUserId);
+      const liveOwned = await fixtureDevice(false, userId);
+      const testKey = await createKey(user, 'test', ['devices:read']);
+      const liveKey = await createKey(admin, 'live', ['devices:read', 'admin']);
+      const testList = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + testKey.value.secret });
+      assert.equal(testList.statusCode, 200, testList.body);
+      const ownedSandboxIds = (await pool.query(
+        `SELECT d.id FROM devices d JOIN ownerships o ON o.device_id=d.id
+         WHERE d.is_sandbox=true AND o.user_id=$1 AND o.ended_at IS NULL ORDER BY d.code,d.id`,
+        [userId],
+      )).rows.map(row => row.id);
+      assert.deepEqual(testList.json().devices.map((device: { id: string }) => device.id), ownedSandboxIds);
+      assert.equal(testList.json().devices.some((device: { id: string }) => device.id === liveOwned.id || device.id === sandboxOther.id), false);
+      const readOnlyAdminKey = await createKey(admin, 'live', ['devices:read']);
+      const readOnlyAdminList = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + readOnlyAdminKey.value.secret });
+      assert.equal(readOnlyAdminList.statusCode, 200, readOnlyAdminList.body);
+      assert.deepEqual(readOnlyAdminList.json().devices, []);
+      const liveList = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + liveKey.value.secret });
+      assert.equal(liveList.statusCode, 200, liveList.body);
+      const liveIds = (await pool.query('SELECT id FROM devices WHERE is_sandbox=false ORDER BY code,id')).rows.map(row => row.id);
+      assert.deepEqual(liveList.json().devices.map((device: { id: string }) => device.id), liveIds);
+      const testDetail = await request('GET', '/api/v1/devices/' + sandboxOwned.id, undefined, undefined, { authorization: 'Bearer ' + testKey.value.secret });
+      assert.equal(testDetail.statusCode, 200, testDetail.body);
+      for (const id of [liveOwned.id, sandboxOther.id]) {
+        const hidden = await request('GET', '/api/v1/devices/' + id, undefined, undefined, { authorization: 'Bearer ' + testKey.value.secret });
+        assert.equal(hidden.statusCode, 404, hidden.body);
+        assert.equal(hidden.json().error.code, 'NOT_FOUND');
+      }
+      const liveHidden = await request('GET', '/api/v1/devices/' + sandboxOwned.id, undefined, undefined, { authorization: 'Bearer ' + liveKey.value.secret });
+      assert.equal(liveHidden.statusCode, 404, liveHidden.body);
+    });
+
+    await context.test('V1-13: cookie dan API key sekaligus ditolak', async () => {
+      const key = await createKey(user, 'test', ['devices:read']);
+      assert.equal(key.response.statusCode, 201, key.response.body);
+      const mixed = await app!.inject({
+        method: 'GET', url: '/api/v1/devices',
+        headers: { cookie: user, authorization: 'Bearer ' + key.value.secret },
+      });
+      assert.equal(mixed.statusCode, 400, mixed.body);
+      assert.equal(mixed.json().error.code, 'AMBIGUOUS_AUTH');
+    });
+
+    await context.test('V1-14: klaim dengan key test sah tanpa Origin', async () => {
+      const activation = secret();
+      const claimable = await fixtureDevice(true, userId, { activationCode: activation });
+      const writeKey = await createKey(user, 'test', ['devices:write']);
+      const keyClaim = await request('POST', '/api/v1/devices/claim', undefined, { code: claimable.code, activationCode: activation }, { authorization: 'Bearer ' + writeKey.value.secret });
+      assert.equal(keyClaim.statusCode, 200, keyClaim.body);
+      assert.equal(keyClaim.json().deviceId, claimable.id);
+    });
+
+    await context.test('V1-15: POST ber-cookie dengan Origin asing ditolak', async () => {
+      const foreignActivation = secret();
+      const foreignClaim = await fixtureDevice(true, userId, { activationCode: foreignActivation });
+      const rejected = await request(
+        'POST', '/api/v1/devices/claim', user,
+        { code: foreignClaim.code, activationCode: foreignActivation },
+        { origin: 'https://evil.example.test' },
+      );
+      assert.equal(rejected.statusCode, 403, rejected.body);
+      assert.equal(rejected.json().error.code, 'ORIGIN_REJECTED');
+    });
+
+    await context.test('V1-16: key live melewati 60 request per menit dengan 429 dan header limit', async () => {
+      const key = await createKey(admin, 'live', ['devices:read', 'admin'], 'Key live limit V1-16');
+      assert.equal(key.response.statusCode, 201, key.response.body);
+      const headers = { authorization: 'Bearer ' + key.value.secret };
+      const responses = [await request('GET', '/api/v1/devices', undefined, undefined, headers)];
+      for (let index = 0; index < 60; index++) {
+        responses.push(await request('GET', '/api/v1/devices', undefined, undefined, headers));
+      }
+      assert.equal(responses.slice(0, 60).every(response => response.statusCode === 200), true);
+      const limited = responses[60];
+      assert.equal(limited.statusCode, 429, limited.body);
+      assert.equal(limited.json().error.code, 'RATE_LIMITED');
+      assert.equal(limited.headers['x-ratelimit-limit'], '60');
+      assert.equal(limited.headers['x-ratelimit-remaining'], '0');
+      for (const header of ['x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset']) {
+        assert.ok(limited.headers[header], header);
+      }
+      assert.ok(limited.headers['retry-after']);
+    });
+
+    await context.test('Tambahan: limit key test 30 request dan usage mencatat hit 429', async () => {
+      const testKey = await createKey(user, 'test', ['devices:read']);
+      const first = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + testKey.value.secret });
+      assert.equal(first.statusCode, 200, first.body);
+      assert.equal(first.headers['x-ratelimit-limit'], '30');
+      assert.ok(first.headers['x-ratelimit-remaining'] !== undefined);
+      assert.ok(first.headers['x-ratelimit-reset'] !== undefined);
+      let limited;
+      for (let index = 1; index < 31; index++) {
+        limited = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + testKey.value.secret });
+      }
+      assert.equal(limited!.statusCode, 429, limited!.body);
+      assert.equal(limited!.json().error.code, 'RATE_LIMITED');
+      assert.equal(limited!.headers['x-ratelimit-limit'], '30');
+      assert.equal(limited!.headers['x-ratelimit-remaining'], '0');
+      assert.ok(limited!.headers['retry-after']);
+      let usageRows = 0;
+      for (let attempt = 0; attempt < 100 && usageRows < 31; attempt++) {
+        usageRows = Number((await pool.query('SELECT count(*) FROM api_usage WHERE key_id=$1', [testKey.value.key.id])).rows[0].count);
+        if (usageRows < 31) await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      assert.equal(usageRows, 31);
+      const usage = await request('GET', `/api/v1/keys/${testKey.value.key.id}/usage`, user);
+      assert.equal(usage.statusCode, 200, usage.body);
+      assert.equal(usage.json().usage.totalRequests, 31);
+      assert.equal(usage.json().usage.rateLimitedRequests, 1);
+    });
+
+    await context.test('V1-17: activation code kedaluwarsa menghasilkan VALIDATION_FAILED', async () => {
+      const activation = secret();
+      const device = await fixtureDevice(true, userId, { activationCode: activation });
+      await pool.query("UPDATE devices SET activation_expires=now()-interval '1 second' WHERE id=$1", [device.id]);
+      const response = await request('POST', '/api/v1/devices/claim', user, { code: device.code, activationCode: activation });
+      assert.equal(response.statusCode, 400, response.body);
+      assert.equal(response.json().error.code, 'VALIDATION_FAILED');
+    });
+
+    await context.test('V1-18: dua akun mengklaim device sandbox tanpa allocated_to secara bersamaan', async () => {
+      const activation = secret();
+      const device = await fixtureDevice(true, null, { activationCode: activation });
+      const unallocated = await pool.query('SELECT allocated_to FROM devices WHERE id=$1', [device.id]);
+      assert.equal(unallocated.rows[0].allocated_to, null);
+      const claims = await Promise.all([
+        request('POST', '/api/v1/devices/claim', user, { code: device.code, activationCode: activation }),
+        request('POST', '/api/v1/devices/claim', otherUser, { code: device.code, activationCode: activation }),
+      ]);
+      assert.deepEqual(claims.map(response => response.statusCode).sort(), [200, 409]);
+      const ownerships = await pool.query('SELECT user_id FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [device.id]);
+      assert.equal(ownerships.rowCount, 1);
+      assert.ok([userId, otherUserId].includes(ownerships.rows[0].user_id));
+    });
+
+    await context.test('Tambahan: usage per route, last-used, dan endpoint key khusus sesi', async () => {
+      const key = await createKey(user, 'test', ['devices:read']);
+      const ok = await request('GET', '/api/v1/devices', undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      const missing = await request('GET', '/api/v1/devices/' + randomUUID(), undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      assert.equal(ok.statusCode, 200, ok.body);
+      assert.equal(missing.statusCode, 404, missing.body);
+      const keyOnly = await request('GET', '/api/v1/keys', undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      assert.equal(keyOnly.statusCode, 401, keyOnly.body);
+      assert.equal(keyOnly.json().error.code, 'UNAUTHENTICATED');
+
+      let usageRows = 0;
+      for (let attempt = 0; attempt < 100 && usageRows < 3; attempt++) {
+        usageRows = Number((await pool.query('SELECT count(*) FROM api_usage WHERE key_id=$1', [key.value.key.id])).rows[0].count);
+        if (usageRows < 3) await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      assert.equal(usageRows, 3);
+      const usage = await request('GET', `/api/v1/keys/${key.value.key.id}/usage?days=7`, user);
+      assert.equal(usage.statusCode, 200, usage.body);
+      assert.equal(usage.json().usage.totalRequests, 3);
+      assert.equal(usage.json().usage.errorPercent, 66.67);
+      assert.equal(usage.json().usage.rateLimitedRequests, 0);
+      assert.deepEqual(usage.json().usage.topRoutes.map((item: { route: string }) => item.route).sort(), ['/api/v1/devices', '/api/v1/devices/:id', '/api/v1/keys']);
+      assert.ok(usage.json().usage.daily.length > 0);
+      const lastUsed = (await pool.query('SELECT last_used_at FROM api_keys WHERE id=$1', [key.value.key.id])).rows[0].last_used_at;
+      assert.ok(lastUsed);
+
+      const cannotCreate = await request('POST', '/api/v1/keys', undefined, { name: 'Kunci lain', environment: 'test', scopes: ['devices:read'] }, { authorization: 'Bearer ' + key.value.secret });
+      const cannotRevoke = await request('DELETE', '/api/v1/keys/' + key.value.key.id, undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      const cannotReadUsage = await request('GET', '/api/v1/keys/' + key.value.key.id + '/usage', undefined, undefined, { authorization: 'Bearer ' + key.value.secret });
+      for (const denied of [cannotCreate, cannotRevoke, cannotReadUsage]) {
+        assert.equal(denied.statusCode, 401, denied.body);
+        assert.equal(denied.json().error.code, 'UNAUTHENTICATED');
+      }
     });
   } finally {
     await app?.close();

@@ -4,7 +4,7 @@ import type pg from 'pg';
 import QRCode from 'qrcode';
 import { transaction } from '../db.js';
 import { connectionStatus, hash, secret } from '../domain.js';
-import { activationCodeSchema, codeSchema, failV1, requireAdmin, requireActor, shortTextSchema, uuidSchema, v1Object } from './common.js';
+import { activationCodeSchema, codeSchema, failV1, requireAdmin, requireActor, sandboxScope, shortTextSchema, uuidSchema, v1Object } from './common.js';
 
 type DeviceQuery = {
   type?: string;
@@ -118,15 +118,18 @@ async function allocateCode(client: pg.PoolClient, prefix: string) {
 
 function requireVisible(row: Record<string, any> | undefined, request: FastifyRequest) {
   if (!row) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
-  if (request.actor?.role !== 'admin' && row.owner_id !== request.actor?.id) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
+  const sandbox = sandboxScope(request.actor!);
+  if (sandbox !== null && Boolean(row.is_sandbox) !== sandbox) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
+  if (!request.actor?.scopes.includes('admin') && row.owner_id !== request.actor?.id) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
   return row;
 }
 
 async function getQrImage(request: FastifyRequest<{ Params: { id: string }; Querystring: { format?: 'svg' | 'png' }; Body: { activationCode: string } }>, reply: FastifyReply, pool: pg.Pool, origin: string) {
   requireAdmin(request);
+  const sandbox = sandboxScope(request.actor!);
   const device = (await pool.query(
-    'SELECT code,activation_hash,activation_expires FROM devices WHERE id=$1',
-    [request.params.id],
+    'SELECT code,activation_hash,activation_expires FROM devices WHERE id=$1 AND ($2::boolean IS NULL OR is_sandbox=$2)',
+    [request.params.id, sandbox],
   )).rows[0];
   if (!device) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
   if (!device.activation_hash || device.activation_hash !== hash(request.body.activationCode) || !device.activation_expires || new Date(device.activation_expires).getTime() <= Date.now()) {
@@ -145,6 +148,7 @@ async function getQrImage(request: FastifyRequest<{ Params: { id: string }; Quer
 export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin: string) {
   app.get<{ Querystring: DeviceQuery }>('/api/v1/devices', {
     schema: { querystring: deviceQuerySchema },
+    config: { scope: 'devices:read' },
   }, async request => {
     const query = request.query;
     if (query.code) {
@@ -170,9 +174,14 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
     }
     if (query.c) failV1(400, 'VALIDATION_FAILED', 'Kode aktivasi hanya dapat digunakan bersama kode device.');
     const actor = requireActor(request);
-    const isAdmin = actor.role === 'admin';
+    const isAdmin = actor.scopes.includes('admin');
+    const sandbox = sandboxScope(actor);
     const values: unknown[] = [isAdmin, actor.id];
     const filters = ['($1::boolean OR EXISTS(SELECT 1 FROM ownerships o WHERE o.device_id=d.id AND o.user_id=$2 AND o.ended_at IS NULL))'];
+    if (sandbox !== null) {
+      values.push(sandbox);
+      filters.push(`d.is_sandbox=$${values.length}`);
+    }
     if (query.type) {
       values.push(query.type);
       filters.push(`t.code=$${values.length}`);
@@ -199,17 +208,18 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
 
   app.get<{ Params: { id: string } }>('/api/v1/devices/:id', {
     schema: { params: v1Object({ id: uuidSchema }) },
+    config: { scope: 'devices:read' },
   }, async request => {
     const row = (await pool.query(
       `SELECT d.id,d.code,d.legacy_id,d.name,d.type_id,d.area_ref,d.firmware,d.last_rssi,d.calibrated_at,
-         t.code AS type_code,t.kind,latest.measured_at,
+         d.is_sandbox,t.code AS type_code,t.kind,latest.measured_at,
          (SELECT max(received_at) FROM readings WHERE device_id=d.id) AS last_received_at,
          o.user_id AS owner_id
        FROM devices d JOIN device_types t ON t.id=d.type_id
        LEFT JOIN LATERAL (SELECT measured_at FROM readings WHERE device_id=d.id ORDER BY measured_at DESC,message_id DESC LIMIT 1) latest ON true
        LEFT JOIN ownerships o ON o.device_id=d.id AND o.ended_at IS NULL
-       WHERE d.id=$1`,
-      [request.params.id],
+        WHERE d.id=$1 AND ($2::boolean IS NULL OR d.is_sandbox=$2)`,
+       [request.params.id, sandboxScope(requireActor(request))],
     )).rows[0];
     requireVisible(row, request);
     return { device: { ...presentDevice(row), sensors: await sensorsForDevice(pool, row.type_id, row.area_ref) } };
@@ -217,10 +227,13 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
 
   app.post<{ Body: CreateDeviceBody }>('/api/v1/devices', {
     schema: { body: createDeviceSchema },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async (request, reply) => {
     const body = request.body;
     if (!body.name.trim()) failV1(400, 'VALIDATION_FAILED', 'Nama device tidak boleh kosong.');
+    const actor = requireActor(request);
+    const sandbox = sandboxScope(actor) ?? false;
     const credential = secret();
     const activationCode = secret();
     const device = await transaction(pool, async client => {
@@ -237,9 +250,9 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
       const code = await allocateCode(client, prefix);
       const id = randomUUID();
       await client.query(
-        `INSERT INTO devices(id,name,model,credential_hash,allocated_to,activation_hash,activation_expires,code,type_id,area_ref)
-         VALUES($1,$2,NULL,$3,$4,$5,now()+interval '24 hours',$6,$7,$8)`,
-        [id, body.name.trim(), hash(credential), body.allocatedTo ?? null, hash(activationCode), code, type.id, body.areaRef ?? null],
+        `INSERT INTO devices(id,name,model,credential_hash,allocated_to,activation_hash,activation_expires,code,type_id,area_ref,is_sandbox)
+         VALUES($1,$2,NULL,$3,$4,$5,now()+interval '24 hours',$6,$7,$8,$9)`,
+        [id, body.name.trim(), hash(credential), body.allocatedTo ?? null, hash(activationCode), code, type.id, body.areaRef ?? null, sandbox],
       );
       return { id, code };
     });
@@ -248,11 +261,16 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
 
   app.post<{ Params: { id: string } }>('/api/v1/devices/:id/activation', {
     schema: { params: v1Object({ id: uuidSchema }) },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async request => {
     const activationCode = secret();
+    const sandbox = sandboxScope(requireActor(request));
     const result = await transaction(pool, async client => {
-      const device = (await client.query('SELECT id FROM devices WHERE id=$1 FOR UPDATE', [request.params.id])).rows[0];
+      const device = (await client.query(
+        'SELECT id FROM devices WHERE id=$1 AND ($2::boolean IS NULL OR is_sandbox=$2) FOR UPDATE',
+        [request.params.id, sandbox],
+      )).rows[0];
       if (!device) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
       const owner = await client.query('SELECT 1 FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [request.params.id]);
       if (owner.rowCount) failV1(409, 'CONFLICT', 'Device sudah diklaim.');
@@ -271,19 +289,25 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
       querystring: qrQuerySchema,
       body: qrBodySchema,
     },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async (request, reply) => getQrImage(request, reply, pool, origin));
 
   app.post<{ Body: { code: string; activationCode: string } }>('/api/v1/devices/claim', {
     schema: { body: claimSchema },
+    config: { scope: 'devices:write' },
   }, async request => {
     const actor = requireActor(request);
+    const sandbox = sandboxScope(actor);
     return transaction(pool, async client => {
       const device = (await client.query(
-        'SELECT id,allocated_to,activation_hash,activation_expires FROM devices WHERE code=$1 FOR UPDATE',
-        [request.body.code],
+        'SELECT id,allocated_to,activation_hash,activation_expires FROM devices WHERE code=$1 AND ($2::boolean IS NULL OR is_sandbox=$2) FOR UPDATE',
+        [request.body.code, sandbox],
       )).rows[0];
-      if (!device) failV1(400, 'VALIDATION_FAILED', 'Kode device atau aktivasi tidak valid.');
+      if (!device) {
+        if (sandbox !== null) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
+        failV1(400, 'VALIDATION_FAILED', 'Kode device atau aktivasi tidak valid.');
+      }
       const owner = await client.query('SELECT 1 FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [device.id]);
       if (owner.rowCount) failV1(409, 'CONFLICT', 'Device sudah diklaim.');
       if (device.allocated_to && device.allocated_to !== actor.id) failV1(400, 'VALIDATION_FAILED', 'Kode device atau aktivasi tidak valid.');
@@ -301,10 +325,12 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
 
   app.patch<{ Params: { id: string }; Body: DevicePatch }>('/api/v1/devices/:id', {
     schema: { params: v1Object({ id: uuidSchema }), body: patchDeviceSchema },
+    config: { scope: 'devices:write' },
   }, async request => {
     const actor = requireActor(request);
     const body = request.body;
-    const isAdmin = actor.role === 'admin';
+    const isAdmin = actor.scopes.includes('admin');
+    const sandbox = sandboxScope(actor);
     if (!Object.keys(body).length) failV1(400, 'VALIDATION_FAILED', 'Tidak ada perubahan device yang dikirim.');
     if (!isAdmin && (Object.hasOwn(body, 'firmware') || Object.hasOwn(body, 'calibratedAt'))) {
       failV1(403, 'FORBIDDEN_SCOPE', 'Hanya pengelola yang dapat mengubah metadata unit.');
@@ -312,8 +338,8 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
     const visible = await pool.query(
       `SELECT d.id FROM devices d WHERE d.id=$1 AND ($2::boolean OR EXISTS(
         SELECT 1 FROM ownerships o WHERE o.device_id=d.id AND o.user_id=$3 AND o.ended_at IS NULL
-      ))`,
-      [request.params.id, isAdmin, actor.id],
+      )) AND ($4::boolean IS NULL OR d.is_sandbox=$4)`,
+      [request.params.id, isAdmin, actor.id, sandbox],
     );
     if (!visible.rowCount) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
     const fields: Array<[keyof DevicePatch, string]> = [
@@ -334,10 +360,16 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
 
   app.post<{ Params: { id: string } }>('/api/v1/devices/:id/release', {
     schema: { params: v1Object({ id: uuidSchema }) },
+    config: { scope: 'devices:write' },
   }, async request => {
     const actor = requireActor(request);
+    const sandbox = sandboxScope(actor);
     const released = await transaction(pool, async client => {
-      await client.query('SELECT id FROM devices WHERE id=$1 FOR UPDATE', [request.params.id]);
+      const device = await client.query(
+        'SELECT id FROM devices WHERE id=$1 AND ($2::boolean IS NULL OR is_sandbox=$2) FOR UPDATE',
+        [request.params.id, sandbox],
+      );
+      if (!device.rowCount) return { rowCount: 0 };
       return client.query(
         'UPDATE ownerships SET ended_at=clock_timestamp() WHERE device_id=$1 AND user_id=$2 AND ended_at IS NULL RETURNING id',
         [request.params.id, actor.id],

@@ -66,10 +66,12 @@ async function ensureSensorsExist(client: pg.PoolClient, sensors: SensorLink[]) 
 export function registerDeviceTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
   app.get<{ Querystring: { kind?: 'satuan' | 'paket' } }>('/api/v1/device-types', {
     schema: { querystring: querySchema },
+    config: { scope: 'devices:read' },
   }, async request => ({ deviceTypes: await readTypes(pool, request.query.kind) }));
 
   app.post<{ Body: DeviceTypeInput }>('/api/v1/device-types', {
     schema: { body: createSchema },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async (request, reply) => {
     const body = request.body;
@@ -102,6 +104,7 @@ export function registerDeviceTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
 
   app.patch<{ Params: { id: string }; Body: DeviceTypePatch }>('/api/v1/device-types/:id', {
     schema: { params: v1Object({ id: { type: 'string', format: 'uuid' } }), body: patchSchema },
+    config: { scope: 'admin' },
     preHandler: requireAdmin,
   }, async request => {
     requireActor(request);
