@@ -56,7 +56,7 @@ Publik
 
 Gambarnya ada di [design/README.md](design/README.md).
 
-Menu Developer untuk sementara hanya muncul di akun pengelola. Kalau keputusan Q2 dan Q3 di PRD mengizinkan user biasa membuat key, menu ini ditambahkan ke grup Pengguna.
+Menu Developer tampil untuk pengguna dan pengelola. Pengguna hanya dapat membuat key Test tanpa scope `admin`; pengelola dapat membuat key Test atau Live. Backend tetap menjadi penegak akhir kebijakan Q2 dan Q3.
 
 ## 4. Alur utama
 
@@ -102,12 +102,13 @@ Kalau browser tidak mendukung `BarcodeDetector` (Safari dan Firefox saat dokumen
 3. Pengguna membuka grafik sensor dan melihat garis ambang serta titik saat nilai mulai keluar.
 4. Log kejadian mencatat kapan nilai keluar ambang dan kapan kembali normal.
 
-### 4.4 Developer membuat key dan mencoba sandbox
+### 4.4 Developer membuat key dan melihat pemakaian
 
-1. Buka Developer, klik Buat key, pilih environment Test dan scope.
+1. Buka Developer, klik Buat key, pilih environment dan scope yang diizinkan untuk peran akun.
 2. Modal menampilkan secret satu kali, dengan tombol salin dan peringatan bahwa secret tidak bisa dilihat lagi.
-3. Panel Sandbox di halaman yang sama menampilkan device virtual beserta pilihan skenario (Normal, pH turun, Suhu naik, Offline).
-4. Tombol "Referensi API" di top bar membuka Scalar (`/docs`) di tab baru.
+3. Pilih key untuk melihat request, persentase error, respons 429, grafik harian, dan maksimal lima route dari data usage API.
+4. Klik "Referensi API" untuk membuka dokumen OpenAPI JSON (`/docs/openapi.json`) di tab baru. Scalar tetap direncanakan untuk Minggu 4.
+5. Panel Sandbox dan contoh request belum termasuk Tahap frontend 2 dan tidak ditampilkan.
 
 ## 5. Spesifikasi layar
 
@@ -119,13 +120,15 @@ Setiap layar yang menampilkan data wajib punya empat state: loading, kosong, err
 | --- | --- |
 | Ringkasan | 4 StatCard: Total device, Terhubung, Data tertunda, Tidak terhubung |
 | Filter | Cari, Tipe (Semua, Satuan, Paket), Area, Status |
-| Daftar | Kartu device: nama, kode, badge tipe, badge status, nilai terakhir tiap sensor beserta state ambang, waktu pengukuran relatif |
+| Daftar | Kartu device: identitas, badge tipe/status, dan daftar sensor dari API. Pada Minggu 2, nilai sensor menampilkan "Belum ada data"; jangan tampilkan nilai dari screenshot sebagai pembacaan aktual. Komponen latest/readings menunggu Minggu 3 |
 | Loading | Teks "Memuat perangkat..." dengan `role="status"` |
 | Kosong (belum punya device) | "Belum ada perangkat di akun ini." + tombol "Scan QR alat" |
 | Kosong (hasil filter) | "Tidak ada device cocok" (teks yang sudah ada) |
 | Error | Pesan dari backend + tombol "Coba lagi" |
 
-Kartu IoT paket menampilkan semua sensornya dalam satu kartu. IoT satuan menampilkan satu nilai yang lebih besar.
+Kartu IoT paket menampilkan semua sensornya dalam satu kartu. IoT satuan menampilkan satu nilai sensor dengan penekanan visual; pada Minggu 2 nilainya tetap "Belum ada data".
+
+Pada Minggu 2, List IoT menampilkan identitas, status, dan sensor yang tersedia dari API, tetapi belum menampilkan pembacaan. Nilai contoh di screenshot hanya ilustrasi.
 
 Gambar: [berisi](design/screens/01-list-iot.png), [gelap](design/screens/01b-list-iot-gelap.png), [kosong](design/screens/01c-list-iot-kosong.png), [error](design/screens/01d-list-iot-error.png), [loading](design/screens/01e-list-iot-loading.png), [HP](design/screens/01f-list-iot-hp.png).
 
@@ -134,13 +137,15 @@ Gambar: [berisi](design/screens/01-list-iot.png), [gelap](design/screens/01b-lis
 | Bagian | Isi |
 | --- | --- |
 | Kepala | Nama, kode, badge tipe, badge status, tombol Lepas alat (pemilik). Tombol QR hanya untuk pengelola, jadi tidak tampil di gambar yang memakai sudut pandang pengguna |
-| Nilai sekarang | Satu SensorValue per sensor, dengan waktu ukur dan sumber ambang (area atau default) |
-| Grafik | Pilihan sensor (untuk paket) dan rentang 1 jam, 24 jam, 7 hari. Garis rata-rata dengan pita min-max dan garis ambang |
-| Kejadian | 5 kejadian terakhir + tautan "Lihat semua" ke Monitoring |
+| Nilai sekarang | Identitas sensor dari API; pembacaan menampilkan "Belum ada data". Komponen latest/readings menunggu Minggu 3; nilai di screenshot bukan pembacaan aktual |
+| Grafik | Menampilkan "Belum ada data". Komponen riwayat/grafik menunggu Minggu 3; grafik di screenshot hanya ilustrasi |
+| Kejadian | Menampilkan "Belum ada data". Komponen kejadian/events menunggu Minggu 3 |
 | Kesehatan unit | Firmware, RSSI, kalibrasi terakhir, kiriman terakhir |
 | Fungsi alat | Daftar fungsi alat, teks yang sama dengan yang tampil saat QR dipindai |
 
 Teks "Diperbarui otomatis setiap 5 detik (simulasi)" diganti menjadi "Live" saat SSE tersambung, atau "Diperbarui tiap 30 detik" saat memakai polling.
+
+Pada Minggu 2, Detail device menampilkan identitas, status, dan sensor dari API. Pembacaan, grafik, dan kejadian tetap "Belum ada data" sampai komponen latest/readings/events tersedia pada Minggu 3; jangan gunakan nilai screenshot sebagai data aktual.
 
 Gambar: [terang](design/screens/02-detail-device.png), [gelap](design/screens/02b-detail-device-gelap.png).
 
@@ -158,9 +163,11 @@ Gambar: [per paket](design/screens/03-monitoring-per-paket.png), [per sensor](de
 
 ### 5.4 Kelola IoT (`/admin/iot`), diubah jadi 3 tab
 
-Tab **Device**: tabel yang sudah ada, ditambah kolom tipe dan kolom kiriman terakhir. Aksi per baris: Label QR, Ubah, Buat ulang kode aktivasi, Catat kalibrasi, dan Nonaktifkan. Hapus device diganti dengan Nonaktifkan, karena readings terikat ke device.
+Tab **Device**: tabel device dengan kolom tipe dan kiriman terakhir. Aksi per baris: Label QR, Ubah, Buat ulang kode aktivasi, dan Catat kalibrasi. Area tidak memiliki endpoint API, sehingga `areaRef` dapat dibiarkan kosong atau diisi manual tanpa pilihan area contoh.
 
-Tab **Tipe IoT**: tabel tipe (kode, nama, jenis, sensor, jumlah device, status) dengan aksi Nonaktifkan atau Aktifkan. Tipe nonaktif tidak bisa dipakai untuk device baru. Form tambah tipe:
+Catatan implementasi Tahap frontend 2: aksi **Nonaktifkan** pada screenshot 04 tidak ditampilkan. Kontrak server belum memiliki field maupun route untuk menonaktifkan device; UI tidak membuat tombol atau operasi pengganti. Screenshot 04 tetap menjadi acuan tata letak, bukan kontrak operasi.
+
+Tab **Tipe IoT**: tabel tipe (kode, nama, jenis, sensor, jumlah device, status) dengan aksi Ubah, Nonaktifkan, atau Aktifkan. Tipe nonaktif tidak bisa dipakai untuk device baru. Form tambah tipe:
 
 - Pilihan jenis: Satuan atau Paket (radio).
 - Satuan menampilkan satu select sensor. Paket menampilkan daftar checkbox sensor dengan isian label per sensor.
@@ -185,7 +192,7 @@ Pratinjau publik hanya menampilkan nama, kode, tipe, sensor, status klaim, dan v
 
 ![Developer](design/screens/06-developer.png)
 
-Isinya tabel API key (nama, env, prefix, scope, terakhir dipakai, aksi Cabut), panel pemakaian 7 hari per key (dengan state kosong untuk key yang belum pernah dipakai), dan panel Sandbox berisi device virtual, pilihan skenario, serta contoh `curl`.
+Isinya tautan "Referensi API" yang membuka OpenAPI JSON di `/docs/openapi.json` pada tab baru, tabel API key (nama, environment, prefix, scope, terakhir dipakai, status, aksi Cabut), dan panel pemakaian 7 hari per key dari GET `/keys/:id/usage`. Key yang belum pernah dipakai menampilkan state kosong. Tautan belum membuka UI Scalar, yang tetap direncanakan pada Minggu 4. Panel Sandbox, skenario, dan contoh `curl` ditunda ke Minggu 3.
 
 Modal secret key:
 

@@ -91,9 +91,9 @@ server/
 Urutan pengecekan di hook `preHandler`:
 
 1. Route publik (`/api/health`, `/api/session/login`, `/api/invitations/accept`, `/api/ingest`, `/api/v1/devices?code=...`, `/docs/*`) dilewati. Pratinjau QR hanya mengembalikan ringkasan device yang aman.
-2. Header `Authorization` diawali `Bearer jf_` berarti API key. Hash SHA-256 dicocokkan ke `api_keys.key_hash` dengan syarat `revoked_at IS NULL`. Hasilnya `request.actor = { kind: 'key', userId, scopes, environment }`.
-3. Kalau tidak ada, cookie sesi dicek seperti sekarang. Hasilnya `request.actor = { kind: 'session', id, role }`. Sesi dianggap punya semua scope sesuai peran.
-4. Tidak ada dua-duanya berarti 401.
+2. Header yang cocok persis dengan `Bearer jf_(live|test)_<64 hex>` diproses sebagai API key. Server mencari baris dengan prefix, lalu mencocokkan `hash()` dari `domain.ts` dan memastikan key belum dicabut. Hasilnya `request.actor` membawa `kind`, `id`, `userId`, `email`, `role`, `scopes`, `environment`, dan `keyId`. Key tidak dikenal atau dicabut mendapat 401 `UNAUTHENTICATED`.
+3. Jika bukan API key, cookie sesi dicek lewat `server/auth/session.ts`. Perilaku token SHA-256, masa berlaku 12 jam, dan bentuk response sesi pilot tetap sama. Sesi `user` mendapat `devices:read`, `devices:write`, `readings:read`; sesi `admin` mendapat keempat scope.
+4. Tidak ada kredensial yang valid berarti 401. Pengelolaan key di `/api/v1/keys` hanya menerima sesi cookie, bukan API key.
 
 Pengecekan Origin (proteksi CSRF) di hook `onRequest` hanya berlaku untuk request ber-cookie. Request dengan API key tidak membawa cookie, jadi tidak rentan CSRF dan tidak boleh ditolak karena tidak mengirim `Origin`. Kalau request membawa cookie dan API key sekaligus, request ditolak 400 supaya tidak ambigu.
 
@@ -106,7 +106,9 @@ Pengecekan Origin (proteksi CSRF) di hook `onRequest` hanya berlaku untuk reques
 | `readings:read` | latest, readings, overview, events, stream |
 | `admin` | CRUD sensor-types dan device-types, registrasi device, lihat semua device. Hanya bisa dibuat oleh akun `admin` |
 
-Setiap route mendeklarasikan scope di `config.scope`. Hook `preHandler` mencocokkannya dengan `request.actor.scopes`.
+Setiap route mendeklarasikan scope di `config.scope`. Hook `preHandler` mencocokkannya dengan `request.actor.scopes`. Route readings Minggu 3 yang belum terdaftar tetap punya aturan fallback scope agar key tanpa `readings:read` menerima 403, tanpa membuat endpoint readings lebih awal.
+
+Policy pembuatan key berada di satu fungsi: role `admin` boleh membuat key `test` atau `live`, role `user` hanya boleh membuat key `test` dan tidak boleh memberi scope `admin`. Mitra sementara memakai role `user` yang sudah ada.
 
 ### 4.3 Pemetaan peran
 
@@ -114,15 +116,25 @@ UI SmartDashboard memakai nama peran `pengguna` dan `pengelola`, sedangkan backe
 
 ### 4.4 Environment live dan test
 
-- Key `test` hanya melihat baris `devices.is_sandbox = true`. Key `live` hanya melihat `is_sandbox = false`.
+- Key `test` hanya mengakses baris `devices.is_sandbox = true`. Key `live` hanya mengakses `is_sandbox = false`. Filter berlaku pada daftar dan detail device serta pemeriksaan device saat operasi.
 - Sesi cookie melihat device live. Portal punya toggle untuk melihat device sandbox milik akun sendiri.
-- Filter ini dipasang di satu fungsi query (`scopeDevices(actor)`) supaya tidak bisa lupa di salah satu route.
+- Akses tetap dibatasi ownership actor; resource yang bukan environment atau bukan milik actor mendapat 404 `NOT_FOUND`.
+
+### 4.5 API key, rate limit, dan usage
+
+Key baru dibuat melalui sesi cookie. Secret `jf_live_` atau `jf_test_` ditampilkan satu kali, sedangkan database hanya menyimpan 12 karakter prefix, hash SHA-256, scope, environment, dan metadata key. Penghapusan mengisi `revoked_at` sehingga pemakaian berikutnya langsung mendapat 401.
+
+`@fastify/rate-limit` berjalan pada `preHandler` setelah actor tersedia. Limit key `live` adalah 60 request per menit per `keyId`, key `test` 30 per menit per `keyId`; sesi dan ingest tetap 120 per menit per IP. Setiap response membawa header rate limit dan response 429 memakai `RATE_LIMITED` serta `retry-after`.
+
+Hook `onResponse` mencatat `api_usage` tanpa menunggu query selesai. Kolom `route` memakai `request.routeOptions.url`, sehingga ID resource tidak disimpan sebagai bagian URL mentah. Kegagalan tulis dicatat dengan konteks `keyId`, route, dan status, tanpa secret. Halaman usage menampilkan jumlah request, persentase error, jumlah 429, request harian, dan maksimal lima route terbanyak.
 
 ## 5. Model data
 
 ### 5.1 Migration bernomor
 
 `migrate()` membaca `server/migrations/*.sql` sesuai nomor, melewati versi yang sudah tercatat di `schema_migrations`, dan menjalankan tiap file yang belum diterapkan dalam transaksinya sendiri dengan advisory lock `90260909`. File `001_pilot.sql` adalah salinan persis dari skema pilot sebelumnya.
+
+Migration `003_api_key_prefix_lookup.sql` menambahkan indeks non-unik pada `api_keys(prefix)` untuk lookup key sebelum hash dicocokkan. Indeks `api_usage(key_id, at DESC)` dari migration 002 sudah memenuhi query usage, jadi tidak ditambahkan ulang.
 
 ### 5.2 DDL `002_iot_platform.sql`
 
@@ -338,7 +350,7 @@ Login SmartDashboard sekarang berjalan di `localStorage` (akun demo di `seed.js`
 
 ### 9.3 Proxy dev
 
-`vite.config.js` sekarang hanya mem-proxy `/api`. Tambahkan `/docs` ke proxy supaya Scalar bisa dibuka dari port 5173.
+Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0.1:3001`. Referensi API pada halaman Developer membuka `/docs/openapi.json`; tampilan Scalar tetap direncanakan untuk Minggu 4.
 
 ## 10. Konfigurasi baru
 
@@ -351,10 +363,19 @@ Login SmartDashboard sekarang berjalan di `localStorage` (akun demo di `seed.js`
 | `MAX_ACCOUNTS`, `MAX_DEVICES` | `10`, `20` | Menggantikan angka batas pilot yang sekarang di-hardcode |
 | `VITE_IOT_SOURCE` | `api` | Sumber data halaman IoT di frontend |
 
+Pembersihan tabel `api_usage` direncanakan memakai query berikut dengan parameter jumlah hari dari `USAGE_RETENTION_DAYS`:
+
+```sql
+DELETE FROM api_usage
+WHERE at < now() - ($1::integer * interval '1 day');
+```
+
+Job terjadwal untuk query retensi belum dibuat.
+
 ## 11. Keamanan
 
 - API key, credential device, dan token sesi dibuat dengan `randomBytes(32)` dan hanya disimpan dalam bentuk hash SHA-256. Ini konsisten dengan fungsi `secret()` dan `hash()` yang sudah ada.
-- Logger sudah me-redact `req.headers`. Tambahkan `apiKey` dan `secret` ke daftar redact.
+- Logger menyensor `req.headers`, `apiKey`, dan `secret`; secret API key tidak dicatat.
 - Klaim lewat QR: kalau `allocated_to` diisi admin, hanya akun itu yang bisa mengklaim (perilaku pilot). Kalau kosong, akun pertama yang memasukkan kode aktivasi valid yang mendapatkannya. Kode aktivasi sekali pakai dan kedaluwarsa 24 jam.
 - Pembuatan gambar QR hanya bisa diakses admin dan menerima kode aktivasi di body POST. Kode mentah tidak disimpan. Pratinjau publik QR hanya menampilkan kode, nama, tipe, daftar sensor, status klaim, dan hasil validasi aktivasi. Area, readings, identitas akun, credential, dan kode aktivasi tidak dikembalikan; area ditunda sampai Q4 diputuskan.
 - Device yang dipindah ke pemilik lain dirotasi credential-nya (perilaku pilot), jadi alat harus diprovisioning ulang.

@@ -230,6 +230,75 @@ e) Em dash: Ctrl+F cari `—` di halaman pilot. Harapan: 0 hasil.
 
 ---
 
+### 4.3 Uji UI-03 dan UI-04 dari HP lewat tunnel HTTPS
+
+Gunakan tunnel sementara hanya untuk uji development. Alamat LAN HTTP tetap ditolak oleh backend. Jangan longgarkan validasi `APP_ORIGIN` di `server/index.ts`, jangan tempel URL QR atau kode aktivasi di terminal, screenshot, laporan, atau dokumen. Isi QR memang membawa kode aktivasi sesuai API Contract 6.3 dan ADR-0009. Halaman klaim menghapus parameter `c` dari address bar; setelah refresh, masukkan kode secara manual.
+
+1. Pastikan backend dan Vite lama berhenti. Dari PowerShell di `C:\TA\Dashboard_TA`, jalankan Vite sementara di loopback:
+
+```powershell
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+2. Buka terminal PowerShell kedua dan mulai Quick Tunnel:
+
+```powershell
+cloudflared tunnel --url http://localhost:5173
+```
+
+Salin hostname HTTPS `*.trycloudflare.com` yang dicetak cloudflared. Tunnel perlu tetap hidup selama pengujian. Sebelum Vite dimulai ulang dengan allowlist, host tunnel dapat sementara menampilkan penolakan host.
+
+3. Buka `C:\TA\Dashboard_TA\.env.tunnel` di editor. Isi dua baris berikut dengan hostname aktual dari langkah 2, tanpa tanda kurung sudut:
+
+```dotenv
+APP_ORIGIN=https://<hostname-aktual>.trycloudflare.com
+DEV_ALLOWED_HOSTS=<hostname-aktual>.trycloudflare.com
+```
+
+File `.env.tunnel` diabaikan Git. Jangan salin nilai rahasia dari `.env` ke file ini. Nilai `DEV_ALLOWED_HOSTS` hanya mengizinkan hostname development yang disebutkan, tidak melonggarkan host untuk semua alamat.
+
+4. Hentikan Vite sementara dengan Ctrl+C, lalu jalankan ulang dari PowerShell pertama:
+
+```powershell
+npm run dev -- --mode tunnel --host 127.0.0.1 --port 5173
+```
+
+Mode `tunnel` memuat `.env.tunnel`; proxy `/api` dan `/docs` tetap menuju backend lokal port 3001. Terminal cloudflared tetap berjalan.
+
+5. Di terminal PowerShell ketiga, mulai backend dengan `.env` biasa dan override origin dari `.env.tunnel`:
+
+```powershell
+cd C:\TA\Dashboard_TA
+node --env-file-if-exists=.env --env-file-if-exists=.env.tunnel --import tsx server/index.ts
+```
+
+Urutan file penting: nilai `.env.tunnel` menimpa `APP_ORIGIN` dari `.env`. File `.env` tidak perlu diedit. Backend menerima origin HTTPS tunnel; batas HTTP loopback dan kewajiban HTTPS produksi tidak berubah.
+
+6. Dari browser desktop buka alamat HTTPS tunnel. Login sebagai admin melalui form. Di Kelola IoT, gunakan atau buat tipe paket dengan minimal dua sensor, buat device baru, lalu simpan credential dan kode aktivasi di tempat aman. Pilih Lihat label QR, buat SVG atau PNG, lalu unduh/cetak label. Jangan kirim kode atau gambar QR ke chat, screenshot, log, atau dokumen.
+
+7. Setelah `APP_ORIGIN` tunnel berubah, buat dan unduh/cetak ulang label QR. Label lama tetap mengarah ke localhost. Kode aktivasi berlaku 24 jam sejak dibuat.
+
+8. UI-03: pindai label QR dengan HP. Pastikan browser HP membuka halaman `/d/<kode-device>` pada hostname HTTPS tunnel dan menampilkan pratinjau perangkat. Parameter aktivasi akan dihapus dari address bar. Jika halaman dimuat ulang atau kamu masuk sebelum klaim, masukkan kode aktivasi secara manual saat diminta.
+
+9. UI-04: pada HP, masuk memakai akun user yang berbeda dari akun admin pembuat device. Pilih Klaim alat ini. Buka menu List IoT dan pastikan device baru muncul pada akun tersebut. Catat hanya lulus/gagal, tanpa menyertakan URL QR, kode, password, atau screenshot rahasia. UI-03/04 tetap berstatus belum diuji sampai hasil scan fisik dilaporkan.
+
+10. Setelah pengujian, hentikan backend dan Vite dengan Ctrl+C, lalu hentikan cloudflared dengan Ctrl+C. `.env` tidak diubah oleh langkah ini. Bila `.env` sudah berisi `APP_ORIGIN=http://localhost:5173`, jalankan mode biasa seperti semula. Bila nilai itu tidak ada, sebelum menjalankan API lokal atur hanya untuk sesi PowerShell tersebut:
+
+```powershell
+$env:APP_ORIGIN = 'http://localhost:5173'
+npm run api
+```
+
+Setelah API dihentikan dengan Ctrl+C, bersihkan override sesi:
+
+```powershell
+Remove-Item Env:APP_ORIGIN -ErrorAction SilentlyContinue
+```
+
+`.env.tunnel` boleh disimpan lokal, tetapi hostname Quick Tunnel dapat berubah setiap kali tunnel baru dibuat, jadi perbarui dua nilainya sebelum pengujian berikutnya.
+
+---
+
 ## Bagian 5. Uji tangan backend lewat PowerShell
 
 Semua perintah ini aman (hanya membaca, kecuali yang ditandai).

@@ -66,8 +66,11 @@ Route pilot lama (`/api/*` tanpa `v1`) tetap memakai `REQUEST_REJECTED` untuk se
 | Key `test` | 30 request per menit per key |
 | Sesi cookie | 120 request per menit per IP (batas global pilot sekarang) |
 | `POST /api/ingest` | 120 request per menit per IP (global) |
+| Gagal autentikasi API key | Usulan baru: 20 kegagalan per IP per 60 detik |
 
-Setiap response membawa header `x-ratelimit-limit`, `x-ratelimit-remaining`, dan `x-ratelimit-reset` dari `@fastify/rate-limit`. Response 429 juga membawa `retry-after`.
+Usulan gagal autentikasi hanya menghitung response 401 untuk API key dengan format `jf_(live|test)_<64 hex>` yang salah atau sudah dicabut. Setelah 20 kegagalan dalam jendela 60 detik, request dari IP tersebut yang membawa key berformat valid mendapat 429 sebelum lookup key ke database sampai jendela reset; ini juga berlaku untuk key valid. Request key valid tidak menambah penghitung. Key malformed/non-API dan sesi cookie tidak dihitung. Scope 403 dan error 5xx tidak dihitung. Konsekuensi yang diterima sementara: key valid dari IP yang sama ikut tertahan selama sisa jendela, termasuk pengguna lain di jaringan bersama seperti NAT atau kampus.
+
+Response yang dikenai rate limit membawa header `x-ratelimit-limit`, `x-ratelimit-remaining`, dan `x-ratelimit-reset`; response 429 juga membawa `retry-after`. Limit key live/test, sesi cookie, dan ingest di atas tidak berubah.
 
 ## 6. Endpoint
 
@@ -125,7 +128,7 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 
 `GET /devices/:id` mengembalikan satu device dengan bentuk yang sama, ditambah `sensors` beserta ambang efektifnya.
 
-`GET /devices?code=AQ-PH-001&c=<64 hex>` adalah pratinjau publik untuk halaman QR. Response hanya memuat `code`, `name`, `type`, `sensors`, `claimed`, dan `activationValid`. Endpoint ini tidak mengembalikan area, readings, ID pemilik, credential, atau kode aktivasi. `c` diperiksa terhadap hash aktivasi aktif dan tidak pernah dikembalikan. Kode alat tidak dikenal mendapat 404 `NOT_FOUND`.
+`GET /devices?code=AQ-PH-001&c=<64 hex>` adalah pratinjau publik untuk halaman QR. Response hanya memuat `code`, `name`, `type`, `sensors`, `claimed`, dan `activationValid`. Endpoint ini tidak mengembalikan area, readings, ID pemilik, credential, atau kode aktivasi. `c` diperiksa terhadap hash aktivasi aktif dan tidak pernah dikembalikan. Kode alat tidak dikenal mendapat 404 `NOT_FOUND`. Pengecualian URL yang memuat kode aktivasi hanya berlaku untuk isi QR dan request pratinjau ini. Halaman `/d/:code` segera menghapus `c` dari entri riwayat aktif setelah membacanya ke state, memakai `Referrer-Policy: no-referrer`, dan menyediakan input manual bila halaman dimuat ulang tanpa `c`.
 
 `GET /devices?legacyId=IOT-001` memerlukan scope `devices:read` dan mengikuti batas akses device actor.
 
@@ -230,7 +233,7 @@ Untuk browser, pakai `EventSource` dengan `withCredentials: true`. `EventSource`
 | Endpoint | Fungsi |
 | --- | --- |
 | `GET /keys` | Daftar key milik akun (tanpa secret) |
-| `POST /keys` | Buat key. Body `{ "name", "environment": "live" \| "test", "scopes": [] }`. Response memuat `secret` satu kali |
+| `POST /keys` | Buat key. Body `{ "name", "environment": "live" \| "test", "scopes": ["devices:read"] }`; `scopes` wajib berisi minimal satu scope. Response memuat `secret` satu kali |
 | `DELETE /keys/:id` | Cabut key, berlaku langsung |
 | `GET /keys/:id/usage?days=7` | Jumlah request per hari, persentase error, dan 5 route terbanyak |
 
