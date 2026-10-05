@@ -27,7 +27,7 @@ Follow-up untuk audit awal [`audit-006-2026-10-04.md`](audit-006-2026-10-04.md).
 | `npm run lint` | Berhasil, tanpa warning/error. |
 | `npm run build` | Berhasil; Vite melaporkan `✓ built in 1.69s`. |
 | `npm run test:pilot` | 16/16 lulus, 0 gagal. |
-| `npm run test:v1` | 35/35 lulus saat implementasi. Setelah perbaikan lanjutan (uji `scopes: []` dan batas gagal autentikasi API key): 37/37 lulus, 0 gagal. |
+| `npm run test:v1` | 35/35 lulus saat implementasi. Setelah perbaikan lanjutan (uji `scopes: []` dan batas gagal autentikasi API key): 37/37 lulus. Verifikasi ulang 5 Oktober 2026 di Windows: 38/38 lulus, 0 gagal. |
 | `node --test src/frontendReview.test.js src/services/*.test.js src/utils/*.test.js` | 22/22 lulus, 0 gagal. Node mencetak `ExperimentalWarning` bahwa `localStorage` tidak tersedia tanpa `--localstorage-file`; seluruh tes tetap lulus. |
 | `git diff --check` | Saat verifikasi implementasi: exit 0, tanpa output. |
 
