@@ -32,7 +32,7 @@ export default function AdminDashboard() {
           <StatCard label="Pengguna" value={users.length} icon="group" hint={`${users.filter((u) => u.status === 'aktif').length} aktif`} />
           <StatCard label="Perangkat IoT" value={devices.length} icon="devices" hint={`${devices.filter((d) => d.status === 'online').length} terhubung`} />
           <StatCard label="Area Terpasang IoT" value={areas.filter((a) => a.deviceIds.length > 0).length} unit={`/ ${areas.length}`} icon="water" hint="Kolam & growbed" />
-          <StatCard label="Ikan Mati Hari Ini" value={totalKematianHariIni()} unit="ekor" icon="heart_broken" tone={totalKematianHariIni() > 0 ? 'warn' : 'ok'} hint="Dilaporkan pengguna" />
+          <StatCard label="Ikan Mati Hari Ini" value={totalKematianHariIni()} unit="ekor" icon="heart_broken" tone={totalKematianHariIni() > 0 ? 'warn' : 'ok'} hint="Catatan manual pengguna/pengelola" />
         </div>
         <p className="mt-3 text-xs text-on-surface-variant">
           Nilai HPP sistem: <strong className="text-on-surface">{formatRupiah(totalHpp)}</strong>, akumulasi biaya yang dicatat pengguna.

@@ -232,7 +232,7 @@ export const SEED_USERS = [
 export const SEED_PET = {
   species: 'Ikan Nila',
   name: 'Nila Ku',
-  stage: 'Benih', // Benih → Nener → Nila Muda → Nila Dewasa → Nila Juara
+  stage: 'Nener', // Level 3 berada pada tahap Nener
   level: 3,
   xp: 320,
   xpNext: 500,
@@ -243,13 +243,18 @@ export const SEED_PET = {
   lastFed: null,
   lastPlayed: null,
   appliedToAreaId: 'AR-01',
-  log: [
-    { id: 'P-1', at: '2026-03-07 08:10', text: 'Pet diberi pakan pelet, nafsu makan baik.', delta: '+8 xp' },
-    { id: 'P-2', at: '2026-03-07 15:40', text: 'Air kolam Prima, kebersihan pet naik.', delta: '+5 xp' },
-  ],
+  log: [],
 };
 
-export const PET_STAGES = ['Benih', 'Nener', 'Nila Muda', 'Nila Dewasa', 'Nila Juara'];
+export const SEED_PETS = [
+  { ...SEED_PET, id: 'PET-NILA', species: 'Ikan Nila', name: 'Nila Ku', appliedToAreaId: 'AR-01' },
+  { ...SEED_PET, id: 'PET-LELE', species: 'Ikan Lele', name: 'Lele Ku', stage: 'Benih', level: 1, xp: 0, xpNext: 200, hunger: 80, happiness: 76, hygiene: 82, health: 90, appliedToAreaId: 'AR-02', log: [] },
+  { ...SEED_PET, id: 'PET-MAS', species: 'Ikan Mas', name: 'Mas Ku', stage: 'Benih', level: 1, xp: 0, xpNext: 200, hunger: 78, happiness: 82, hygiene: 80, health: 88, appliedToAreaId: null, log: [] },
+  { ...SEED_PET, id: 'PET-GURAME', species: 'Ikan Gurame', name: 'Gurame Ku', stage: 'Benih', level: 1, xp: 0, xpNext: 200, hunger: 75, happiness: 80, hygiene: 84, health: 91, appliedToAreaId: null, log: [] },
+  { ...SEED_PET, id: 'PET-UDANG', species: 'Udang Galah', name: 'Udang Ku', stage: 'Benih', level: 1, xp: 0, xpNext: 200, hunger: 82, happiness: 86, hygiene: 78, health: 89, appliedToAreaId: null, log: [] },
+];
+
+export const PET_STAGES = ['Benih', 'Nener', 'Ikan Muda', 'Ikan Dewasa', 'Ikan Juara'];
 
 // ── Sistem Point & Gamifikasi ─────────────────────────────────────────────────
 export const SEED_POINT_RULES = [

@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" role="img">
-<!-- TDS di bawah ambang. Pandangan kosong, tanda tanya kecil. -->
-<circle cx="16" cy="26" r="9" fill="#fff"/><circle cx="44" cy="26" r="9" fill="#fff"/><circle cx="16" cy="26" r="6" fill="#22303a"/><circle cx="44" cy="26" r="6" fill="#22303a"/><circle cx="13.5" cy="23" r="2" fill="#fff"/><path d="M24 44h12" stroke="#22303a" stroke-width="2.6" stroke-linecap="round"/><path d="M46 8q6 0 6 5 0 4-5 5v3" stroke="#c9a227" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="47" cy="26" r="1.8" fill="#c9a227"/>
-</svg>

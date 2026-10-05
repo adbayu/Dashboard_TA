@@ -34,38 +34,56 @@ export function arahPenyimpangan(value, ambang) {
 // 'atas' karena reaksi fisiknya memang berlawanan (dingin vs panas).
 const PESAN = {
   temp: {
-    bawah: { ekspresi: 'kedinginan', latar: 'kolam-dingin', gelembung: 'bulat',
+    bawah: { ekspresi: 'kedinginan',
       pesan: (v, unit) => `${v} ${unit} itu dingin sekali. Air sedingin ini bikin gerakku lambat.`, aksi: 'Naikkan suhu air' },
-    atas: { ekspresi: 'kepanasan', latar: 'kolam-mendidih', gelembung: 'bulat',
+    atas: { ekspresi: 'kepanasan',
       pesan: (v, unit) => `${v} ${unit} terlalu hangat. Aku sulit bernapas kalau airnya sehangat ini.`, aksi: 'Turunkan suhu air' },
   },
   ph: {
-    bawah: { ekspresi: 'asam', latar: 'kolam-air-hijau', gelembung: 'bulat',
+    bawah: { ekspresi: 'asam',
       pesan: (v) => `Airnya asam (${v}). Kulit dan insangku terasa perih.`, aksi: 'Naikkan pH' },
-    atas: { ekspresi: 'basa', latar: 'kolam-air-hijau', gelembung: 'bulat',
+    atas: { ekspresi: 'basa',
       pesan: (v) => `Airnya terlalu basa (${v}). Aku gelisah dan susah tenang.`, aksi: 'Turunkan pH' },
   },
   tds: {
-    bawah: { ekspresi: 'nutrisi-rendah', latar: 'kolam-berbusa', gelembung: 'bulat',
+    bawah: { ekspresi: 'nutrisi-rendah',
       pesan: (v, unit) => `Nutrisi tinggal ${v} ${unit}. Aku lemas, sepertinya kurang asupan.`, aksi: 'Tambah nutrisi' },
-    atas: { ekspresi: 'nutrisi-tinggi', latar: 'kolam-keruh', gelembung: 'bulat',
+    atas: { ekspresi: 'nutrisi-tinggi',
       pesan: (v, unit) => `Nutrisi ${v} ${unit} terlalu pekat. Airnya terasa berat.`, aksi: 'Kurangi nutrisi' },
   },
 };
 
+const PENJELASAN_SENSOR = {
+  temp: {
+    bawah: 'Suhu air rendah membuat pet bereaksi kedinginan.',
+    atas: 'Suhu air tinggi membuat pet bereaksi kepanasan.',
+  },
+  ph: {
+    bawah: 'pH rendah membuat air lebih asam dan pet bereaksi terhadap kondisi asam.',
+    atas: 'pH tinggi membuat air lebih basa dan pet bereaksi terhadap kondisi basa.',
+  },
+  tds: {
+    bawah: 'TDS rendah membuat reaksi pet menunjukkan nutrisi air kurang.',
+    atas: 'TDS tinggi membuat air terlalu pekat bagi pet.',
+  },
+};
+
+export function penjelasanKondisiAir({ key, value, unit = '', ambang } = {}) {
+  if (value == null) return 'Belum ada pembacaan sensor untuk parameter ini.';
+  if (!ambang) return 'Ambang ideal belum diatur untuk parameter ini.';
+
+  const rentang = `${ambang[0]}–${ambang[1]}${unit ? ` ${unit}` : ''}`;
+  const nilai = `${value}${unit ? ` ${unit}` : ''}`;
+  const arah = arahPenyimpangan(value, ambang);
+  if (arah === 'dalam') return `Nilai ${nilai} berada di dalam rentang ideal ${rentang}; parameter ini tidak membebani kondisi pet.`;
+  const posisi = arah === 'bawah' ? 'di bawah' : 'di atas';
+  const reaksi = PENJELASAN_SENSOR[key]?.[arah] || 'Nilai di luar ambang ideal dan dapat memengaruhi kondisi pet.';
+  return `Nilai ${nilai} ${posisi} ambang ideal ${rentang}. ${reaksi}`;
+}
+
 export const URUTAN_PARAMETER = ['temp', 'ph', 'tds'];
 
-// Kondisi air per parameter, lalu reaksi pet yang dipilih.
-//
-// Keluaran:
-//   parameter[]  : status tiap sensor (dipakai kartu kondisi air)
-//   ekspresi     : nama berkas di src/assets/v-pet/ekspresi/
-//   latar        : nama berkas di src/assets/v-pet/latar/
-//   gelembung    : nama berkas di src/assets/v-pet/gelembung/
-//   pesan        : kalimat reaksi yang ditampilkan di gelembung bicara
-//   aksi         : saran tindakan untuk operator
-//   tingkat      : 'aman' | 'waspada' | 'bahaya'
-//   dessert      : kode sebab (untuk ditampilkan sebagai chip kecil)
+// Reaksi menghasilkan teks dan status untuk panel sensor, bukan lapisan gambar.
 export function reaksiPet(parameter, { lapar = 0, kotor = 0, sakit = 0 } = {}) {
   const terisi = parameter.filter((p) => p.ambang && p.value != null);
   // Ambang "jauh dari ambang" = 25% dari LEBAR ambang. Angka ini dipilih supaya
@@ -104,8 +122,6 @@ export function reaksiPet(parameter, { lapar = 0, kotor = 0, sakit = 0 } = {}) {
       return {
         ...dasar,
         ekspresi: aturan.ekspresi,
-        latar: aturan.latar,
-        gelembung: aturan.gelembung,
         pesan: aturan.pesan(utama.value, utama.unit),
         aksi: aturan.aksi,
         tingkat: bermasalah.some((p) => p.tingkat === 'bahaya') ? 'bahaya' : 'waspada',
@@ -115,40 +131,20 @@ export function reaksiPet(parameter, { lapar = 0, kotor = 0, sakit = 0 } = {}) {
   }
 
   // Air aman: kondisi pet sendiri yang menentukan reaksinya.
-  if (lapar >= 70) return { ...dasar, ekspresi: 'lapar', latar: 'kolam-jernih', gelembung: 'kotak',
+  if (lapar >= 70) return { ...dasar, ekspresi: 'lapar',
     pesan: 'Aku lapar. Airnya bagus, tapi perutku kosong.', aksi: 'Beri pakan', tingkat: 'waspada', sebab: { key: 'hunger', label: 'Kenyang' } };
-  if (kotor >= 70) return { ...dasar, ekspresi: 'kotor', latar: 'kolam-berbusa', gelembung: 'kotak',
+  if (kotor >= 70) return { ...dasar, ekspresi: 'kotor',
     pesan: 'Airnya sudah bagus, tapi aku sendiri butuh dibersihkan.', aksi: 'Bersihkan kolam', tingkat: 'waspada', sebab: { key: 'hygiene', label: 'Kebersihan' } };
-  if (sakit >= 70) return { ...dasar, ekspresi: 'sakit', latar: 'kolam-jernih', gelembung: 'kotak',
+  if (sakit >= 70) return { ...dasar, ekspresi: 'sakit',
     pesan: 'Airnya aman, tapi aku sedang tidak enak badan.', aksi: 'Rawat pet', tingkat: 'waspada', sebab: { key: 'health', label: 'Kesehatan' } };
-  if (!dinilai.length) return { ...dasar, ekspresi: 'mengantuk', latar: 'kolam-jernih', gelembung: 'pikiran',
+  if (!dinilai.length) return { ...dasar, ekspresi: 'mengantuk',
     pesan: 'Belum ada sensor di area ini, jadi aku belum bisa bilang apa-apa tentang airnya.', aksi: 'Pasang sensor di area ini', tingkat: 'aman', sebab: null };
 
   const semuaAman = dinilai.every((p) => p.tingkat === 'aman');
   return { ...dasar,
     ekspresi: semuaAman ? 'senang' : 'gelisah',
-    latar: 'kolam-jernih',
-    gelembung: 'bulat',
     pesan: semuaAman ? 'Airnya nyaman sekali. Aku sehat dan aktif hari ini.' : 'Airnya masih aman, tapi ada yang bergerak mendekati batas. Ayo dipantau.',
     aksi: semuaAman ? 'Pertahankan kondisi' : 'Pantau lebih sering',
     tingkat: semuaAman ? 'aman' : 'waspada',
     sebab: null };
-}
-
-// Aksesori mengikuti level pet supaya ada alasan visual untuk naik level.
-export function aksesoriUntukLevel(level = 1) {
-  if (level >= 12) return 'mahkota';
-  if (level >= 8) return 'medali';
-  if (level >= 5) return 'daun';
-  if (level >= 3) return 'pita';
-  return 'none';
-}
-
-// Sikap (pose) dipakai untuk animasi CSS: nama ini menjadi kelas `pet-sikap-<nama>`.
-export function sikapUntukEkspresi(ekspresi) {
-  if (['senang'].includes(ekspresi)) return 'gembira';
-  if (['kedinginan', 'sakit', 'mengantuk'].includes(ekspresi)) return 'menggigil';
-  if (['kepanasan', 'gelisah'].includes(ekspresi)) return 'resah';
-  if (['lapar', 'kotor'].includes(ekspresi)) return 'lemah';
-  return 'tenang';
 }

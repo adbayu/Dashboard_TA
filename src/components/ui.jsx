@@ -279,7 +279,8 @@ export function Empty({ title, hint, icon = 'inbox', action }) {
   );
 }
 
-export function Modal({ open, onClose, title, children, wide }) {
+export function Modal({ open, onClose, title, children, wide, mobileFull = false }) {
+  const offset = mobileFull ? 'left-0 sm:left-56 md:left-64 xl:left-72' : 'left-52 sm:left-56 md:left-64 xl:left-72';
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose?.();
     if (open) document.addEventListener('keydown', onKey);
@@ -293,11 +294,14 @@ export function Modal({ open, onClose, title, children, wide }) {
     // menu sidebar tidak bisa diklik selama modal terbuka. Offset kiri
     // mengikuti lebar sidebar (pl-52 sm:pl-56 md:pl-64 xl:pl-72).
     <div
-      className="fixed inset-0 z-[60] left-52 sm:left-56 md:left-64 xl:left-72 flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto custom-scrollbar"
+      className={`fixed inset-0 z-[60] ${offset} flex items-start justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto custom-scrollbar`}
       onClick={onClose}
     >
       <div
         className={`glass-panel rounded-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} my-auto p-5 shadow-glass-elevated`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 pb-3 mb-4 border-b border-outline-variant/40">

@@ -4,17 +4,19 @@ import {
   AVATAR_PILIHAN,
   AVATAR_LAMA,
   DEMO_PASSWORD,
-  PET_STAGES,
   SEED_AREAS,
   SEED_BADGES,
   SEED_CATEGORIES,
   SEED_DEVICES,
   SEED_MISSIONS,
   SEED_POINT_RULES,
-  SEED_PET,
+  SEED_PETS,
   SEED_USERS,
   STATUS_AKUN,
 } from '../data/seed';
+import { progressPetFromCare } from '../data/petProgress';
+import { normalizeFishCount, recordDailyMortality, setFishPopulation } from '../data/fishPopulation';
+import { createPetRecord, normalizePetCollection, patchPetCollection, selectPet } from './petModel';
 
 const KEY = 'aquasmart_smart_v1';
 const SmartCtx = createContext(null);
@@ -228,7 +230,9 @@ const DEFAULT_STATE = {
   // Pencatatan ikan mati harian — diisi MANUAL dari menu Kelola Area.
   kematian: [],
   users: SEED_USERS,
-  pet: SEED_PET,
+  pets: SEED_PETS,
+  selectedPetId: SEED_PETS[0].id,
+  pet: SEED_PETS[0],
   pointRules: SEED_POINT_RULES,
   badges: SEED_BADGES,
   missions: SEED_MISSIONS,
@@ -305,6 +309,7 @@ function migrateState(parsed) {
   ];
   return {
     ...parsed,
+    ...normalizePetCollection(parsed, SEED_PETS),
     readings,
     kematian: Array.isArray(parsed.kematian) ? parsed.kematian : [],
     users: users.map((u) => {
@@ -406,6 +411,12 @@ export function SmartProvider({ children }) {
     },
     [notify, patch],
   );
+
+  const updatePet = useCallback((prev, petId, updater) => {
+    const targetId = petId || prev.selectedPetId;
+    if (!prev.pets?.some((item) => item.id === targetId)) return {};
+    return patchPetCollection(prev, targetId, updater);
+  }, []);
 
   const actions = useMemo(
     () => ({
@@ -605,6 +616,22 @@ export function SmartProvider({ children }) {
             ? prev.areas.map((a) => (a.id === area.id ? { ...a, ...area } : a))
             : [...prev.areas, { ...area, id: area.id || uid('AR'), hpp: area.hpp || [], deviceIds: area.deviceIds || [] }],
         })),
+      setAreaPopulation: (areaId, value) => {
+        const manager = state.users.find((user) => user.id === state.sessionUserId);
+        const area = state.areas.find((item) => item.id === areaId);
+        if (manager?.role !== 'pengelola' || area?.type !== 'kolam') {
+          notify('Hanya pengelola yang dapat mengatur populasi kolam.', 'warn');
+          return;
+        }
+        const population = normalizeFishCount(value);
+        patch((prev) => {
+          const currentUser = prev.users.find((user) => user.id === prev.sessionUserId);
+          const result = setFishPopulation(prev.areas, areaId, population);
+          if (currentUser?.role !== 'pengelola' || !result.changed) return {};
+          return { areas: result.areas };
+        });
+        notify(`Populasi ${area.name} diperbarui menjadi ${population} ${area.populationUnit || 'ekor'}.`);
+      },
       removeArea: (id) => {
         patch((prev) => ({
           areas: prev.areas.filter((a) => a.id !== id),
@@ -642,35 +669,36 @@ export function SmartProvider({ children }) {
       // Mengurangi populasi area adalah efek nyata dari kematian, jadi populasi
       // ikut disesuaikan (tidak pernah negatif).
       catatKematian: (areaId, jumlah, catatan) => {
-        const angka = Math.max(0, Math.round(Number(jumlah) || 0));
+        const user = state.users.find((item) => item.id === state.sessionUserId);
+        const area = state.areas.find((item) => item.id === areaId);
+        const punyaAkses = user?.role === 'pengelola' || user?.areaIds?.includes(areaId);
+        if (!area || area.type !== 'kolam' || !punyaAkses) {
+          notify('Tidak dapat mencatat kematian untuk kolam ini.', 'warn');
+          return;
+        }
+
         const tanggal = hariKey();
-        let delta = 0;
+        const input = { areaId, count: jumlah, catatan, tanggal, id: uid('MT'), at: now() };
+        const result = recordDailyMortality(state.areas, state.kematian || [], input);
+        if (!result.changed) {
+          notify('Tidak dapat mencatat kematian untuk kolam ini.', 'warn');
+          return;
+        }
+
         patch((prev) => {
-          const sebelumnya = prev.kematian.find((k) => k.areaId === areaId && k.tanggal === tanggal);
-          delta = angka - (sebelumnya ? Number(sebelumnya.jumlah) || 0 : 0);
-          const kematian = sebelumnya
-            ? prev.kematian.map((k) =>
-                k.areaId === areaId && k.tanggal === tanggal
-                  ? { ...k, jumlah: angka, catatan: catatan ?? k.catatan, at: now() }
-                  : k,
-              )
-            : [
-                { id: uid('MT'), areaId, tanggal, jumlah: angka, catatan: catatan || '', at: now() },
-                ...prev.kematian,
-              ];
-          return {
-            kematian: kematian.slice(0, 200),
-            areas: prev.areas.map((a) =>
-              a.id === areaId
-                ? { ...a, population: Math.max(0, Number(a.population || 0) - delta) }
-                : a,
-            ),
-          };
+          const currentUser = prev.users.find((item) => item.id === prev.sessionUserId);
+          const currentArea = prev.areas.find((item) => item.id === areaId);
+          const currentAccess = currentUser?.role === 'pengelola' || currentUser?.areaIds?.includes(areaId);
+          if (!currentArea || currentArea.type !== 'kolam' || !currentAccess) return {};
+          const updated = recordDailyMortality(prev.areas, prev.kematian || [], input);
+          return updated.changed ? { kematian: updated.deaths, areas: updated.areas } : {};
         });
+
+        const angka = normalizeFishCount(jumlah);
         notify(
-          delta === 0
+          result.delta === 0
             ? `Catatan kematian hari ini tidak berubah (${angka} ekor).`
-            : `Kematian hari ini dicatat ${angka} ekor (${delta > 0 ? '+' : ''}${delta} terhadap catatan sebelumnya).`,
+            : `Kematian hari ini dicatat ${angka} ekor (${result.delta > 0 ? '+' : ''}${result.delta} terhadap catatan sebelumnya).`,
           angka > 0 ? 'warn' : 'ok',
         );
       },
@@ -734,100 +762,163 @@ export function SmartProvider({ children }) {
       removeUser: (id) => patch((prev) => ({ users: prev.users.filter((u) => u.id !== id) })),
 
       // ── Virtual Pet ─────────────────────────────────────────────────────────
-      renamePet: (name) => {
-        patch((prev) => ({ pet: { ...prev.pet, name } }));
+      addPet: (settings) => {
+        const currentUser = state.users.find((user) => user.id === state.sessionUserId);
+        const area = state.areas.find((item) => item.id === settings?.appliedToAreaId);
+        const template = SEED_PETS.find((item) => item.species === settings?.species);
+        const name = settings?.name?.trim();
+        const manager = currentUser?.role === 'pengelola';
+        const operator = currentUser?.role === 'pengguna';
+        const areaAllowed = area?.type === 'kolam' && (manager || (operator && currentUser.areaIds?.includes(area.id)));
+        if ((!manager && !operator) || !template || !name || !areaAllowed) {
+          notify('Pilih nama, karakter, dan kolam yang dapat Anda kelola.', 'warn');
+          return null;
+        }
+        const newPet = createPetRecord(template, {
+          id: uid('PET'),
+          name,
+          areaId: area.id,
+          ownerUserId: manager ? null : currentUser.id,
+        });
+        patch((prev) => ({
+          pets: [...prev.pets, newPet],
+          selectedPetId: newPet.id,
+          pet: newPet,
+        }));
+        notify(manager ? `${name} ditambahkan ke koleksi pet farm.` : `${name} ditambahkan ke V-Pet Anda.`);
+        return newPet.id;
+      },
+      selectPet: (petId) => patch((prev) => selectPet(prev, petId)),
+      configurePet: (petId, settings) => {
+        patch((prev) => {
+          const targetId = petId || prev.selectedPetId;
+          if (!prev.pets.some((item) => item.id === targetId)) return {};
+          return updatePet(prev, targetId, (item) => ({
+            ...item,
+            name: settings.name?.trim() || item.name,
+            species: settings.species || item.species,
+            appliedToAreaId: settings.appliedToAreaId || null,
+          }));
+        });
+        notify('Pengaturan karakter disinkronkan ke V-Pet pengguna.');
+      },
+      renamePet: (name, petId) => {
+        patch((prev) => patchPetCollection(prev, petId || prev.selectedPetId, (pet) => ({ ...pet, name })));
         notify('Nama virtual pet diperbarui.');
       },
-      setPetSpecies: (species) => {
-        patch((prev) => ({ pet: { ...prev.pet, species } }));
-        notify(`Virtual pet diganti ke jenis ${species}.`);
-      },
-      feedPet: () => {
+      feedPet: (petId) => {
         patch((prev) => {
-          const pet = prev.pet;
+          const targetId = petId || prev.selectedPetId;
+          const pet = prev.pets.find((item) => item.id === targetId);
+          if (!pet) return {};
           const hunger = clamp(pet.hunger + 18, 0, 100);
           const health = clamp(pet.health + (hunger > 60 ? 4 : -3), 0, 100);
-          const gained = 15;
-          const { level, stage, xp, xpNext } = advancePet(pet, gained);
+          const progress = progressPetFromCare(pet, { hunger, health });
+          const timestamp = now();
           return {
-            pet: {
-              ...pet,
-              hunger,
-              health,
-              level,
-              stage,
-              xp,
-              xpNext,
-              lastFed: now(),
-              log: [{ id: uid('P'), at: now(), text: 'Pet diberi pakan pelet.', delta: '+15 xp' }, ...pet.log].slice(0, 20),
-            },
-            ...logPoints(prev, 'Pelihara virtual pet (pakan)', 10),
+            ...updatePet(prev, targetId, (item) => ({
+              ...item,
+              ...progress.updates,
+              lastFed: timestamp,
+              log: [{ id: uid('P'), at: timestamp, text: `${pet.species} diberi pakan pelet.`, delta: progress.xpGain ? `+${progress.xpGain} EXP` : 'EXP tidak bertambah' }, ...pet.log].slice(0, 20),
+            })),
+            ...logPoints(prev, `Pelihara ${pet.species} (pakan)`, 10),
           };
         });
-        notify('Virtual pet diberi pakan (+10 point).');
+        notify('EXP pakan mengikuti peningkatan kondisi ikan (+10 point farm).');
       },
-      playPet: () => {
+      playPet: (petId) => {
         patch((prev) => {
-          const pet = prev.pet;
-          const { level, stage, xp, xpNext } = advancePet(pet, 12);
+          const targetId = petId || prev.selectedPetId;
+          const pet = prev.pets.find((item) => item.id === targetId);
+          if (!pet) return {};
+          const happiness = clamp(pet.happiness + 16, 0, 100);
+          const happinessGain = happiness - pet.happiness;
+          const timestamp = now();
           return {
-            pet: {
-              ...pet,
-              happiness: clamp(pet.happiness + 16, 0, 100),
-              level,
-              stage,
-              xp,
-              xpNext,
-              lastPlayed: now(),
-              log: [{ id: uid('P'), at: now(), text: 'Pet diajak bermain arus kolam.', delta: '+12 xp' }, ...pet.log].slice(0, 20),
-            },
-            ...logPoints(prev, 'Pelihara virtual pet (main)', 10),
+            ...updatePet(prev, targetId, (item) => ({
+              ...item,
+              happiness,
+              lastPlayed: timestamp,
+              log: [{ id: uid('P'), at: timestamp, text: `${pet.species} diajak main. EXP tidak bertambah.`, delta: `+${happinessGain} kebahagiaan, 0 EXP` }, ...pet.log].slice(0, 20),
+            })),
+            ...logPoints(prev, `Pelihara ${pet.species} (main)`, 10),
           };
         });
-        notify('Virtual pet diajak bermain (+10 point).');
+        notify('Ajak main hanya menambah kebahagiaan; EXP tidak bertambah (+10 point farm).');
       },
-      cleanPet: () => {
+      cleanPet: (petId) => {
         patch((prev) => {
-          const pet = prev.pet;
-          const { level, stage, xp, xpNext } = advancePet(pet, 10);
+          const targetId = petId || prev.selectedPetId;
+          const pet = prev.pets.find((item) => item.id === targetId);
+          if (!pet) return {};
+          const hygiene = clamp(pet.hygiene + 20, 0, 100);
+          const health = clamp(pet.health + 6, 0, 100);
+          const progress = progressPetFromCare(pet, { hygiene, health });
+          const timestamp = now();
           return {
-            pet: {
-              ...pet,
-              hygiene: clamp(pet.hygiene + 20, 0, 100),
-              health: clamp(pet.health + 6, 0, 100),
-              level,
-              stage,
-              xp,
-              xpNext,
-              log: [{ id: uid('P'), at: now(), text: 'Kolam dibersihkan, kebersihan pet naik.', delta: '+10 xp' }, ...pet.log].slice(0, 20),
-            },
-            ...logPoints(prev, 'Pelihara virtual pet (bersih)', 10),
+            ...updatePet(prev, targetId, (item) => ({
+              ...item,
+              ...progress.updates,
+              log: [{ id: uid('P'), at: timestamp, text: `${pet.species} dibersihkan.`, delta: progress.xpGain ? `+${progress.xpGain} EXP` : 'EXP tidak bertambah' }, ...pet.log].slice(0, 20),
+            })),
+            ...logPoints(prev, `Pelihara ${pet.species} (bersih)`, 10),
           };
         });
-        notify('Kebersihan virtual pet dirawat (+10 point).');
+        notify('EXP kebersihan mengikuti peningkatan kondisi ikan (+10 point farm).');
       },
-      healPet: () => {
-        patch((prev) => ({ pet: { ...prev.pet, health: 100, log: [{ id: uid('P'), at: now(), text: 'Pet dirawat, kondisi kembali prima.', delta: 'heal' }, ...prev.pet.log].slice(0, 20) } }));
-        notify('Kesehatan virtual pet dipulihkan.');
+      healPet: (petId) => {
+        patch((prev) => {
+          const targetId = petId || prev.selectedPetId;
+          const pet = prev.pets.find((item) => item.id === targetId);
+          if (!pet) return {};
+          const progress = progressPetFromCare(pet, { health: 100 });
+          const timestamp = now();
+          return updatePet(prev, targetId, (item) => ({
+            ...item,
+            ...progress.updates,
+            log: [{ id: uid('P'), at: timestamp, text: `${pet.species} dirawat.`, delta: progress.xpGain ? `+${progress.xpGain} EXP` : 'EXP tidak bertambah' }, ...pet.log].slice(0, 20),
+          }));
+        });
+        notify('EXP rawat mengikuti peningkatan kesehatan ikan.');
       },
-      resetPet: () => {
-        patch(() => ({ pet: { ...SEED_PET, name: 'Nila Baru', level: 1, stage: PET_STAGES[0], xp: 0, xpNext: 200, log: [] } }));
-        notify('Virtual pet direset ke telur baru.', 'warn');
+      resetPet: (petId) => {
+        patch((prev) => {
+          const targetId = petId || prev.selectedPetId;
+          const current = prev.pets.find((item) => item.id === targetId);
+          const seed = SEED_PETS.find((item) => item.id === targetId)
+            || SEED_PETS.find((item) => item.species === current?.species)
+            || SEED_PETS[0];
+          if (!current || !seed) return {};
+          return updatePet(prev, targetId, () => ({
+            ...seed,
+            id: current.id,
+            name: current.name,
+            species: current.species,
+            appliedToAreaId: current.appliedToAreaId,
+            ownerUserId: current.ownerUserId,
+            log: [],
+          }));
+        });
+        notify('Virtual pet direset ke kondisi awal.', 'warn');
       },
-      applyPetToArea: (areaId) => {
-        patch((prev) => ({ pet: { ...prev.pet, appliedToAreaId: areaId } }));
-        notify('Virtual pet ditautkan ke area pemantauan.');
+      applyPetToArea: (areaId, petId) => {
+        patch((prev) => updatePet(prev, petId, (item) => ({ ...item, appliedToAreaId: areaId || null })));
+        notify('Lokasi virtual pet diperbarui.');
       },
-      decayPet: () => {
-        patch((prev) => ({
-          pet: {
-            ...prev.pet,
-            hunger: clamp(prev.pet.hunger - 12, 0, 100),
-            hygiene: clamp(prev.pet.hygiene - 8, 0, 100),
-            happiness: clamp(prev.pet.happiness - 6, 0, 100),
-            health: clamp(prev.pet.health - (prev.pet.hunger < 30 ? 6 : 2), 0, 100),
-          },
-        }));
+      decayPet: (petId) => {
+        patch((prev) => {
+          const targetId = petId || prev.selectedPetId;
+          const pet = prev.pets.find((item) => item.id === targetId);
+          if (!pet) return {};
+          return updatePet(prev, targetId, (item) => ({
+            ...item,
+            hunger: clamp(item.hunger - 12, 0, 100),
+            hygiene: clamp(item.hygiene - 8, 0, 100),
+            happiness: clamp(item.happiness - 6, 0, 100),
+            health: clamp(item.health - (item.hunger < 30 ? 6 : 2), 0, 100),
+          }));
+        });
         notify('Waktu berjalan: kondisi pet menurun, rawat kembali.', 'warn');
       },
 
@@ -888,7 +979,7 @@ export function SmartProvider({ children }) {
         notify('Data demo dikembalikan ke kondisi awal.', 'warn');
       },
     }),
-    [award, notify, patch, state.theme, state.users, state.sessionUserId],
+    [award, notify, patch, state.theme, state.users, state.sessionUserId, state.areas, state.kematian, updatePet],
   );
 
   // Pengguna yang sedang login (akun dari daftar users) — null bila belum masuk.
@@ -1045,19 +1136,6 @@ export function SmartProvider({ children }) {
     [state, actions, derived, role, currentUser, toast],
   );
   return <SmartCtx.Provider value={value}>{children}</SmartCtx.Provider>;
-}
-
-function advancePet(pet, gained) {
-  let xp = pet.xp + gained;
-  let xpNext = pet.xpNext;
-  let level = pet.level;
-  while (xp >= xpNext) {
-    xp -= xpNext;
-    level += 1;
-    xpNext = Math.round(xpNext * 1.35);
-  }
-  const stage = PET_STAGES[clamp(Math.floor((level - 1) / 2), 0, PET_STAGES.length - 1)];
-  return { level, stage, xp, xpNext };
 }
 
 export const metricLabel = (key, categories) => {

@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" role="img">
-<!-- pH di bawah ambang. Mulut mengerut dan ada tetes asam. -->
-<ellipse cx="16" cy="26" rx="8" ry="9" fill="#fff"/><ellipse cx="44" cy="26" rx="8" ry="9" fill="#fff"/><circle cx="17" cy="27" r="4.5" fill="#22303a"/><circle cx="45" cy="27" r="4.5" fill="#22303a"/><circle cx="15" cy="24" r="1.6" fill="#fff"/><circle cx="43" cy="24" r="1.6" fill="#fff"/><path d="M22 44q8-8 16 0" stroke="#22303a" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M8 34q6 3 8 8" stroke="#c9d94a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M30 8l4 8-6 1Z" fill="#c9d94a"/>
-</svg>

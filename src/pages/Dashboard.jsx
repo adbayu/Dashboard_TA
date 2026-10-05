@@ -239,7 +239,7 @@ export default function Dashboard() {
               );
             })}
             <p className="text-[11px] text-on-surface-variant">
-              Angka kematian ikan diisi manual dari menu Kelola Area → detail kolam, bukan berasal dari sensor.
+              Angka kematian ikan diisi manual melalui Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
             </p>
           </div>
         )}
@@ -331,8 +331,8 @@ export default function Dashboard() {
             })}
             <p className="text-[11px] text-on-surface-variant">
               Rentang hari ini = nilai terendah–tertinggi sepanjang hari itu. Statusnya memakai ambang
-              ideal yang sama dengan kartu statistik di atas. Angka kematian diisi manual dari menu
-              Kelola Area, bukan dari sensor.
+              ideal yang sama dengan kartu statistik di atas. Angka kematian diisi manual melalui
+              Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
             </p>
           </div>
         )}

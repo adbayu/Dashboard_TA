@@ -167,7 +167,7 @@ tidak ada geser horizontal di semua kombinasi.
 | `/detail-informasi` | Detail Information (QR) | **Pindai QR alat** pakai kamera → penjelasan lengkap alat: jenis, fungsi, parameter + ambang ideal, pembacaan saat ini, arti tiap status, dan catatan perawatan. Bisa juga lewat input manual kode alat |
 | `/area` | Kelola Area | Daftar area produksi (kolam/growbed/tandon) + HPP tercatat |
 | `/area/:id` | Detail Area | **Input item HPP** (perhitungan total & per unit otomatis), **statistik harian sensor**, **catat ikan mati harian** (kolam saja, populasi ikut disesuaikan), **pemantauan kolam** (pH, suhu, TDS, catatan), **catat panen** + margin untung/rugi, daftar device di area |
-| `/v-pet` | V-Pet | Karakter 2D (mirip hewan arcade) yang **bereaksi terhadap sensor IoT area tertaut**: suhu terlalu dingin/panas, pH asam/basa, TDS kurang/pekat masing-masing memicu ekspresi, latar kolam, sikap gerak, dan kalimat sendiri; ditambah pakan, bermain, bersihkan, rawat; level, tahap evolusi, dan aksesori yang ikut naik level |
+| `/v-pet` | V-Pet | Kartu pet terpisah; detail perawatan, sensor, jumlah ikan tersisa, dan ikan mati hari ini dari kolam yang ditautkan (hanya lihat). Karakter kiriman pengguna dipilih menurut spesies dan level; gambar level khusus mengungguli gambar dasar, spesies tanpa aset tetap placeholder. EXP bertambah 1 tiap 2 poin peningkatan bersih pada Kenyang, Kebersihan, atau Kesehatan (dibulatkan ke atas); Ajak main hanya menaikkan Kebahagiaan |
 | `/gamifikasi` | Gamifikasi | Misi harian, koleksi badge, papan peringkat, riwayat perolehan poin |
 | `/chatbot` | Chatbot Aquaponik | Tanya-jawab seputar aquaponik (ikan & sayur) berbasis basis pengetahuan lokal, menyertakan pembacaan sensor area terpilih |
 
@@ -181,7 +181,7 @@ tidak ada geser horizontal di semua kombinasi.
 | `/admin/detail-informasi` | Detail Information (pengelola) | **Penjelasan alat yang SAMA dengan yang dibaca pengguna**: tempel isi QR atau pilih alat dari daftar, lalu lihat fungsi, parameter + ambang, pembacaan, arti status, dan catatan perawatan persis seperti tampilan pengguna |
 | `/admin/kategori` | Kategori Device | Jenis alat: nama, ikon, warna, deskripsi, dan daftar **parameter + ambang ideal** (min–max) |
 | `/admin/area` | Kelola Area | Area (kolam yang sudah dipasangi IoT): tipe, lokasi, volume, komoditas, populasi, **ambang ideal khusus area** (opsional), pemilihan device, penanggung jawab |
-| `/admin/v-pet` | Kelola Virtual Pet | Nama & jenis pet, area pemantauan tertaut, kondisi (kenyang/kebahagiaan/kebersihan/kesehatan), jalur evolusi, reset pet, pratinjau seluruh ekspresi aset, dan karakter yang sama dengan tampilan pengguna (reaksi sensor terlihat dari sisi pengelola) |
+| `/admin/v-pet` | Kelola Virtual Pet | Tambah pet bersama, atur nama, spesies, kolam, dan jumlah ikan hidup; catat atau koreksi ikan mati harian. Populasi dan catatan kematian memakai data kolam yang sama dengan role pengguna. Preview karakter mengikuti level pet dan hanya memakai gambar kiriman pengguna |
 | `/admin/point` | Sistem Point | Aturan perolehan poin (aktivitas, poin, batas harian, aktif/nonaktif), badge (ikon + ambang poin), saldo & penyesuaian poin pengguna, audit riwayat poin |
 
 **QR alat**: berisi URL halaman perangkat (`/iot/:id`). Saat dipindai, yang muncul adalah

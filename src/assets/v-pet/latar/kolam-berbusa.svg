@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" preserveAspectRatio="none" role="img">
-<!-- Air berbusa, dipakai saat kebersihan pet rendah. -->
-<defs><linearGradient id="air" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6f1f7"/><stop offset="1" stop-color="#93b6c9"/></linearGradient></defs>
-<rect width="480" height="260" fill="url(#air)"/>
-<circle cx="60" cy="60" r="18" fill="#fff" opacity=".7"/><circle cx="120" cy="46" r="12" fill="#fff" opacity=".6"/>
-<circle cx="300" cy="66" r="16" fill="#fff" opacity=".65"/><circle cx="380" cy="50" r="20" fill="#fff" opacity=".6"/><circle cx="90" cy="70" r="7" fill="#fff" opacity=".5"/><circle cx="104" cy="52" r="4" fill="#fff" opacity=".4"/>
-<circle cx="330" cy="96" r="6" fill="#fff" opacity=".45"/><circle cx="345" cy="80" r="3.5" fill="#fff" opacity=".4"/>
-</svg>

@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 110" role="img">
-<!-- Gelembung awan standar. -->
-<!-- Teks TIDAK disimpan di berkas ini; React menumpuk tulisan di atasnya supaya
-     kalimat reaksi bisa berubah tanpa menyentuh aset. -->
-<rect x="4" y="8" width="192" height="74" rx="26" fill="#fff" stroke="#0f5238" stroke-width="3"/><path d="M86 82l-12 18 30-16Z" fill="#fff" stroke="#0f5238" stroke-width="3" stroke-linejoin="round"/>
-</svg>

@@ -1,29 +1,14 @@
-"""Periksa aset Virtual Pet sebelum build.
-
-Alasan berkas ini ada: seluruh 40 SVG pernah terkirim TANPA penutup `</svg>`,
-sehingga XML-nya rusak dan browser tidak menggambar apa pun. Build tetap hijau,
-`background-image` tetap terisi, dan halaman tidak melempar galat — jadi bug ini
-tidak terlihat oleh uji biasa. Skrip ini menangkapnya lebih awal.
-
-Jalankan: npm run cek:aset   (atau: python scripts/cek-aset.py)
-Keluar dengan kode 1 kalau ada berkas bermasalah, supaya bisa dipakai di CI.
-"""
+"""Validate user-supplied pet PNGs and sensor icons."""
+import re
 import sys
 import xml.dom.minidom as minidom
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "src" / "assets" / "v-pet"
-
-# Ukuran kanvas yang disepakati per folder. Perubahan ukuran tidak otomatis
-# salah, tetapi harus disengaja: kalau angkanya berbeda, skrip melaporkannya.
-KANVAS = {
-    "karakter": (240, 160),
-    "ekspresi": (60, 60),
-    "aksesori": (60, 60),
-    "gelembung": (200, 110),
-    "latar": (480, 260),
-    "ikon-sensor": (24, 24),
-}
+SENSOR_KEYS = ("aman", "bahaya", "ph", "tds", "temp", "waspada")
+USER_IMAGE = "karakter-arcade/nila/body.png"
+PNG_SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
+LEVEL_IMAGE_PATTERN = re.compile(r"karakter-level/[a-z0-9-]+/level-(\d+)(?:-(\d+))?(?:__[a-z0-9-]+)?\.png$")
 
 
 def main() -> int:
@@ -31,72 +16,61 @@ def main() -> int:
         print(f"GAGAL: folder aset tidak ditemukan: {ROOT}")
         return 1
 
-    berkas = sorted(ROOT.rglob("*.svg"))
-    masalah = []
-    ringkas = {}
+    issues = []
+    svg_files = sorted(ROOT.rglob("*.svg"))
+    png_files = sorted(ROOT.rglob("*.png"))
 
-    for f in berkas:
-        teks = f.read_text(encoding="utf-8")
-        folder = f.parent.name
-        nama = f.relative_to(ROOT).as_posix()
-        ringkas.setdefault(folder, 0)
-        ringkas[folder] += 1
-
-        if not teks.lstrip().startswith("<svg"):
-            masalah.append((nama, "tidak diawali <svg"))
-            continue
-        if not teks.rstrip().endswith("</svg>"):
-            masalah.append((nama, "tidak diakhiri </svg> (XML rusak, tidak akan digambar browser)"))
+    for path in svg_files:
+        relative = path.relative_to(ROOT).as_posix()
+        if not relative.startswith("ikon-sensor/"):
+            issues.append((relative, "SVG karakter/dekorasi lama tidak diizinkan"))
             continue
         try:
-            dok = minidom.parseString(teks)
-        except Exception as e:
-            masalah.append((nama, f"XML tidak valid: {str(e)[:90]}"))
+            document = minidom.parseString(path.read_text(encoding="utf-8"))
+        except Exception as error:
+            issues.append((relative, f"XML tidak valid: {str(error)[:90]}"))
             continue
+        root = document.documentElement
+        if root.tagName != "svg" or root.getAttribute("viewBox") != "0 0 24 24":
+            issues.append((relative, "ikon sensor harus berupa SVG dengan viewBox 0 0 24 24"))
 
-        svg = dok.documentElement
-        if svg.tagName != "svg":
-            masalah.append((nama, f"akar bukan <svg> melainkan <{svg.tagName}>"))
+    for path in png_files:
+        relative = path.relative_to(ROOT).as_posix()
+        parts = path.relative_to(ROOT).parts
+        is_base_art = len(parts) == 3 and parts[0] == "karakter-arcade" and parts[2] == "body.png"
+        level_match = LEVEL_IMAGE_PATTERN.fullmatch(relative)
+        if not is_base_art and not level_match:
+            issues.append((relative, "gambar hanya boleh berupa body.png atau PNG level yang dikirim pengguna"))
+        if level_match:
+            min_level = int(level_match.group(1))
+            max_level = int(level_match.group(2) or level_match.group(1))
+            if min_level < 1 or max_level < min_level:
+                issues.append((relative, "rentang level gambar harus positif dan tidak terbalik"))
+
+        data = path.read_bytes()
+        if len(data) < 26 or data[:8] != PNG_SIGNATURE or data[12:16] != b"IHDR":
+            issues.append((relative, "header PNG tidak valid"))
             continue
-        if not svg.getAttribute("viewBox"):
-            masalah.append((nama, "tanpa viewBox (skala tidak bisa diprediksi)"))
+        width = int.from_bytes(data[16:20], "big")
+        height = int.from_bytes(data[20:24], "big")
+        if width < 1 or height < 1:
+            issues.append((relative, f"dimensi PNG tidak valid: {width}x{height}"))
+        if relative == USER_IMAGE and (width, height) != (1536, 1024):
+            issues.append((relative, f"ukuran {width}x{height}; sumber pengguna seharusnya 1536x1024"))
 
-        harap = KANVAS.get(folder)
-        if harap:
-            kotak = svg.getAttribute("viewBox").split()
-            if len(kotak) != 4:
-                masalah.append((nama, f"viewBox tidak lengkap: '{svg.getAttribute('viewBox')}'"))
-            else:
-                _, _, w, h = kotak
-                if not (abs(float(w) - harap[0]) < 0.5 and abs(float(h) - harap[1]) < 0.5):
-                    masalah.append((nama, f"kanvas {w}x{h}, seharusnya {harap[0]}x{harap[1]} untuk folder {folder}"))
+    required = [USER_IMAGE, *[f"ikon-sensor/{key}.svg" for key in SENSOR_KEYS]]
+    for relative in required:
+        if not (ROOT / relative).is_file():
+            issues.append((relative, "aset wajib tidak ditemukan"))
 
-    print("Aset Virtual Pet:", len(berkas), "berkas di", ROOT)
-    for folder in sorted(ringkas):
-        ukuran = KANVAS.get(folder)
-        tanda = f"kanvas {ukuran[0]}x{ukuran[1]}" if ukuran else "kanvas bebas"
-        print(f"  {folder:14s} {ringkas[folder]:3d} berkas   ({tanda})")
-
-    # Berkas yang wajib ada, karena nama-namanya dipanggil dari kode/data.
-    wajib = [
-        "karakter/nila.svg",
-        "ekspresi/netral.svg",
-        "aksesori/none.svg",
-        "gelembung/bulat.svg",
-        "latar/kolam-jernih.svg",
-        "ikon-sensor/aman.svg",
-    ]
-    hilang = [w for w in wajib if not (ROOT / w).exists()]
-    for h in hilang:
-        masalah.append((h, "berkas wajib tidak ada (dipakai sebagai nilai bawaan di kode)"))
-
-    if masalah:
-        print(f"\nDITEMUKAN {len(masalah)} MASALAH:")
-        for nama, pesan in masalah:
-            print(f"  - {nama}: {pesan}")
+    print(f"Memeriksa {len(svg_files)} ikon SVG dan {len(png_files)} gambar karakter di {ROOT}")
+    if issues:
+        print(f"\nDITEMUKAN {len(issues)} MASALAH:")
+        for relative, message in issues:
+            print(f"  - {relative}: {message}")
         return 1
 
-    print("\nSemua aset valid: XML sehat, viewBox sesuai, berkas wajib lengkap.")
+    print("Aset valid: gambar Nila pengguna tetap utuh, ikon sensor tersedia, dan tidak ada ilustrasi tambahan.")
     return 0
 
 
