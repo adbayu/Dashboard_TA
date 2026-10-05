@@ -4,6 +4,7 @@ Semua perubahan pada `/api/v1` dan payload `POST /api/ingest` dicatat di sini, y
 
 ## Belum dirilis
 
+- Minggu 2 frontend: pemindai QR di aplikasi kini membaca QR di mode development. Loop deteksi sebelumnya berhenti permanen setelah effect dijalankan ulang oleh React StrictMode.
 - Minggu 2 frontend: halaman `/d/:code` menghapus parameter `c` dari address bar setelah dibaca, dan halaman dikirim dengan `Referrer-Policy: no-referrer`. Isi QR tetap `/d/<code>?c=<kode aktivasi>` sesuai API Contract 6.3. Dev server Vite menerima host tunnel HTTPS lewat `DEV_ALLOWED_HOSTS` khusus development; validasi `APP_ORIGIN` di backend tidak berubah.
 - Minggu 2: usulan limit gagal autentikasi API key 20 per IP per 60 detik untuk key berformat valid yang salah atau dicabut. Setelah penuh, key berformat valid dari IP tersebut mendapat `429 RATE_LIMITED` sebelum lookup sampai jendela reset; key valid tidak menambah penghitung tetapi ikut tertahan, termasuk pengguna lain di jaringan NAT atau kampus. Key malformed/non-API, sesi cookie, scope 403, dan error 5xx tidak menambah penghitung. Limit API lama tidak berubah.
 - Minggu 2: pembuatan API key mensyaratkan minimal satu scope; request dengan `scopes: []` ditolak sebagai `400 VALIDATION_FAILED`.

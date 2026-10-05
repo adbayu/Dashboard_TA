@@ -44,6 +44,12 @@ Rasio kontras yang tercatat pada audit awal: putih pada `#0f5238` 9.19:1; `#191c
 - **UI-03/04:** pemindaian QR memakai HP fisik belum diuji. Alur URL dan klaim di browser telah lulus, tetapi tidak menggantikan uji scan fisik.
 - Playwright E2E UI-01 form login admin/user **PASS**. UI-02/05/06/08/09 juga **PASS**; hanya pemindaian fisik UI-03/04 yang masih pending. Karena itu gate Minggu 2 belum lulus penuh. Status keseluruhan **FAIL/belum lulus gate penuh**, bukan PASS.
 
+## Uji HP 5 Oktober 2026
+
+- UI-03 **PASS** dan UI-04 **PASS** dengan HP Android fisik lewat tunnel HTTPS. Device `AQ-PKT-001` diklaim akun `user` dan tampil di List IoT akun tersebut.
+- Temuan saat uji: pemindai QR di aplikasi menampilkan kamera tetapi tidak pernah membaca QR. Penyebabnya, cleanup effect di `QrScanner.jsx` menyetel `berhentiRef` ke `true` dan nilai itu tidak di-reset saat effect berjalan lagi (React StrictMode menjalankan effect dua kali di development). Perbaikan: `berhentiRef` dan `kandidatRef` di-reset di awal effect. Lint lulus dan uji ulang di HP berhasil.
+- Gate Minggu 2 kini **PASS**.
+
 ## Batas perubahan
 
 Kriteria gate pada bagian 7 Test Plan tidak diubah. Follow-up lama telah digabungkan ke dokumen ini dan dihapus sebagai duplikat; audit awal tidak diubah. Perbaikan lanjutan setelah follow-up ini memperbarui API Contract bagian 5 (batas gagal autentikasi API key) dan 6.8 (minimal satu scope), changelog, serta status Minggu 2 di Test Plan bagian 7.
