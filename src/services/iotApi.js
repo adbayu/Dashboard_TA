@@ -163,6 +163,59 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     };
   }
 
+  async function getDeviceLatest(id) {
+    if (source === 'local') {
+      const device = localDevice(id);
+      if (!device) throw failedRequest('Device tidak ditemukan.');
+      return {
+        measuredAt: null,
+        readings: device.sensors.map(sensor => ({
+          sensor: sensor.code,
+          value: null,
+          unit: sensor.unit,
+          state: 'unknown',
+          threshold: sensor.threshold || null,
+        })),
+        source,
+        label: DATA_CONTOH,
+      };
+    }
+    return { ...(await request(`/v1/devices/${encodeURIComponent(id)}/latest`)), source, label: null };
+  }
+
+  async function getDeviceReadings(id, { sensor, from, to, bucket = '5m' } = {}) {
+    if (source === 'local') {
+      const device = localDevice(id);
+      if (!device) throw failedRequest('Device tidak ditemukan.');
+      const selected = device.sensors.find(item => item.code === sensor);
+      return {
+        sensor,
+        bucket,
+        points: [],
+        threshold: selected?.threshold || null,
+        nextCursor: null,
+        source,
+        label: DATA_CONTOH,
+      };
+    }
+    const query = new URLSearchParams({ sensor, from, to, bucket });
+    return {
+      ...(await request(`/v1/devices/${encodeURIComponent(id)}/readings?${query.toString()}`)),
+      source,
+      label: null,
+    };
+  }
+
+  async function getDeviceEvents(id, { limit = 50, cursor } = {}) {
+    if (source === 'local') {
+      if (!localDevice(id)) throw failedRequest('Device tidak ditemukan.');
+      return { events: [], nextCursor: null, source, label: DATA_CONTOH };
+    }
+    const query = new URLSearchParams({ deviceId: id, limit: String(limit) });
+    if (cursor) query.set('cursor', cursor);
+    return { ...(await request(`/v1/events?${query.toString()}`)), source, label: null };
+  }
+
   async function getDeviceTypes() {
     if (source === 'local') {
       return { deviceTypes: [{ code: 'AQ-CONTOH', name: 'Sensor contoh', kind: 'satuan', sensors: [{ code: 'ph', label: 'Probe pH' }] }], source, label: DATA_CONTOH };
@@ -249,6 +302,7 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
   const createDevice = body => write('/v1/devices', { method: 'POST', body });
   const patchDevice = (id, body) => write(`/v1/devices/${encodeURIComponent(id)}`, { method: 'PATCH', body });
   const reissueActivationCode = id => write(`/v1/devices/${encodeURIComponent(id)}/activation`, { method: 'POST' });
+  const rotateDeviceCredential = id => write(`/v1/devices/${encodeURIComponent(id)}/credentials/rotate`, { method: 'POST' });
   const createDeviceType = body => write('/v1/device-types', { method: 'POST', body });
   const patchDeviceType = (id, body) => write(`/v1/device-types/${encodeURIComponent(id)}`, { method: 'PATCH', body });
   const createSensorType = body => write('/v1/sensor-types', { method: 'POST', body });
@@ -263,6 +317,9 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     canWrite: source === 'api',
     getDevices,
     getDevice,
+    getDeviceLatest,
+    getDeviceReadings,
+    getDeviceEvents,
     getDeviceTypes,
     getSensorTypes,
     getQrPreview,
@@ -270,6 +327,7 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     createDevice,
     patchDevice,
     reissueActivationCode,
+    rotateDeviceCredential,
     getQrImage,
     createDeviceType,
     patchDeviceType,

@@ -118,6 +118,72 @@ test('adapter API menjalankan CRUD sesuai route yang tersedia dan mengirim kode 
   assert.equal(api.canWrite, true);
 });
 
+test('adapter API membaca latest, histori, kejadian, dan merotasi credential sesuai kontrak', async () => {
+  const calls = [];
+  const responses = new Map([
+    ['/v1/devices/device%2Fid/latest', { measuredAt: '2026-10-06T08:00:00.000Z', readings: [{ sensor: 'ph', value: 7.1, state: 'normal', threshold: { low: 6.2, high: 7.6, source: 'area' } }] }],
+    ['/v1/devices/device%2Fid/readings?sensor=water_temperature&from=2026-10-05T08%3A00%3A00.000Z&to=2026-10-06T08%3A00%3A00.000Z&bucket=5m', { sensor: 'water_temperature', bucket: '5m', points: [], threshold: { low: 23.5, high: 30.5, source: 'default' } }],
+    ['/v1/events?deviceId=device%2Fid&limit=10&cursor=abc%2F123', { events: [{ id: '12', deviceId: 'device/id', type: 'online', at: '2026-10-06T08:00:00.000Z' }], nextCursor: null }],
+    ['/v1/devices/device%2Fid/credentials/rotate', { credential: 'a'.repeat(64), credentialSince: '2026-10-06T08:05:00.000Z' }],
+  ]);
+  const request = async (path, options) => {
+    calls.push({ path, options });
+    if (!responses.has(path)) throw new Error(`Route tak dikenal: ${path}`);
+    return responses.get(path);
+  };
+  const api = createIotApi({ source: 'api', request });
+
+  const latest = await api.getDeviceLatest('device/id');
+  const history = await api.getDeviceReadings('device/id', {
+    sensor: 'water_temperature',
+    from: '2026-10-05T08:00:00.000Z',
+    to: '2026-10-06T08:00:00.000Z',
+  });
+  const events = await api.getDeviceEvents('device/id', { limit: 10, cursor: 'abc/123' });
+  const rotation = await api.rotateDeviceCredential('device/id');
+
+  assert.deepEqual(latest.readings[0].threshold, { low: 6.2, high: 7.6, source: 'area' });
+  assert.deepEqual(history.points, []);
+  assert.equal(events.events[0].type, 'online');
+  assert.equal(rotation.credential, 'a'.repeat(64));
+  assert.deepEqual(calls, [
+    { path: '/v1/devices/device%2Fid/latest', options: undefined },
+    { path: '/v1/devices/device%2Fid/readings?sensor=water_temperature&from=2026-10-05T08%3A00%3A00.000Z&to=2026-10-06T08%3A00%3A00.000Z&bucket=5m', options: undefined },
+    { path: '/v1/events?deviceId=device%2Fid&limit=10&cursor=abc%2F123', options: undefined },
+    { path: '/v1/devices/device%2Fid/credentials/rotate', options: { method: 'POST' } },
+  ]);
+});
+
+test('mode local tidak membuat telemetri atau credential dan menolak rotasi', async () => {
+  const api = createIotApi({ source: 'local' });
+  const latest = await api.getDeviceLatest('contoh-device-01');
+  const history = await api.getDeviceReadings('contoh-device-01', {
+    sensor: 'ph',
+    from: '2026-10-05T08:00:00.000Z',
+    to: '2026-10-06T08:00:00.000Z',
+  });
+  const events = await api.getDeviceEvents('contoh-device-01');
+
+  assert.equal(latest.measuredAt, null);
+  assert.equal(latest.readings[0].value, null);
+  assert.deepEqual(history.points, []);
+  assert.deepEqual(events.events, []);
+  assert.throws(() => api.rotateDeviceCredential('contoh-device-01'), /mode API/);
+});
+
+test('adapter mempertahankan status dan pesan error server saat rotasi credential gagal', async () => {
+  for (const [status, message] of [[409, 'Device belum diprovisioning.'], [404, 'Device tidak ditemukan.']]) {
+    const failure = Object.assign(new Error(message), { status });
+    const api = createIotApi({ source: 'api', request: async () => { throw failure; } });
+
+    await assert.rejects(api.rotateDeviceCredential('device-1'), error => {
+      assert.equal(error.status, status);
+      assert.equal(error.message, message);
+      return true;
+    });
+  }
+});
+
 test('mode local hanya menyediakan data contoh baca-saja untuk Kelola IoT', async () => {
   const api = createIotApi({ source: 'local' });
 

@@ -71,6 +71,7 @@ function presentDevice(row: Record<string, any>) {
     id: row.id,
     code: row.code,
     isSandbox: Boolean(row.is_sandbox),
+    credentialProvisioned: Boolean(row.credential_provisioned),
     legacyId: row.legacy_id,
     name: row.name,
     type: { code: row.type_code, kind: row.kind },
@@ -200,7 +201,8 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
       filters.push(`d.legacy_id=$${values.length}`);
     }
     const rows = await pool.query(
-      `SELECT d.id,d.code,d.legacy_id,d.name,d.is_sandbox,d.area_ref,d.firmware,d.last_rssi,d.calibrated_at,
+       `SELECT d.id,d.code,d.legacy_id,d.name,d.is_sandbox,d.credential_hash IS NOT NULL AS credential_provisioned,
+          d.area_ref,d.firmware,d.last_rssi,d.calibrated_at,
          t.code AS type_code,t.kind,latest.measured_at,
          (SELECT max(received_at) FROM readings WHERE device_id=d.id) AS last_received_at
        FROM devices d JOIN device_types t ON t.id=d.type_id
@@ -216,7 +218,8 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
     config: { scope: 'devices:read' },
   }, async request => {
     const row = (await pool.query(
-      `SELECT d.id,d.code,d.legacy_id,d.name,d.type_id,d.area_ref,d.firmware,d.last_rssi,d.calibrated_at,
+       `SELECT d.id,d.code,d.legacy_id,d.name,d.type_id,d.area_ref,d.firmware,d.last_rssi,d.calibrated_at,
+          d.credential_hash IS NOT NULL AS credential_provisioned,
          d.is_sandbox,t.code AS type_code,t.kind,latest.measured_at,
          (SELECT max(received_at) FROM readings WHERE device_id=d.id) AS last_received_at,
          o.user_id AS owner_id

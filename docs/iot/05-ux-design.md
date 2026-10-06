@@ -120,15 +120,13 @@ Setiap layar yang menampilkan data wajib punya empat state: loading, kosong, err
 | --- | --- |
 | Ringkasan | 4 StatCard: Total device, Terhubung, Data tertunda, Tidak terhubung |
 | Filter | Cari, Tipe (Semua, Satuan, Paket), Area, Status |
-| Daftar | Kartu device: identitas, badge tipe/status, dan daftar sensor dari API. Pada Minggu 2, nilai sensor menampilkan "Belum ada data"; jangan tampilkan nilai dari screenshot sebagai pembacaan aktual. Komponen latest/readings menunggu Minggu 3 |
+| Daftar | Kartu device menampilkan identitas, badge tipe/status, dan pembacaan tiap sensor dari `GET /devices/:id/latest`, termasuk state serta ambang efektif. Nilai `null` ditampilkan sebagai "Belum ada data"; nilai ilustrasi screenshot tidak pernah dipakai sebagai telemetry. Di mode API, pembacaan diperbarui lewat SSE; mode local tetap menandai "Data contoh" dan tidak mengarang nilai |
 | Loading | Teks "Memuat perangkat..." dengan `role="status"` |
 | Kosong (belum punya device) | "Belum ada perangkat di akun ini." + tombol "Scan QR alat" |
 | Kosong (hasil filter) | "Tidak ada device cocok" (teks yang sudah ada) |
 | Error | Pesan dari backend + tombol "Coba lagi" |
 
-Kartu IoT paket menampilkan semua sensornya dalam satu kartu. IoT satuan menampilkan satu nilai sensor dengan penekanan visual; pada Minggu 2 nilainya tetap "Belum ada data".
-
-Pada Minggu 2, List IoT menampilkan identitas, status, dan sensor yang tersedia dari API, tetapi belum menampilkan pembacaan. Nilai contoh di screenshot hanya ilustrasi.
+Kartu IoT paket menampilkan semua sensornya dalam satu kartu. IoT satuan menampilkan nilai sensor dengan penekanan visual. Kegagalan memuat pembacaan ditampilkan di area pembacaan tanpa mengganti data device atau nilai sebelumnya dengan data contoh.
 
 Gambar: [berisi](design/screens/01-list-iot.png), [gelap](design/screens/01b-list-iot-gelap.png), [kosong](design/screens/01c-list-iot-kosong.png), [error](design/screens/01d-list-iot-error.png), [loading](design/screens/01e-list-iot-loading.png), [HP](design/screens/01f-list-iot-hp.png).
 
@@ -137,15 +135,13 @@ Gambar: [berisi](design/screens/01-list-iot.png), [gelap](design/screens/01b-lis
 | Bagian | Isi |
 | --- | --- |
 | Kepala | Nama, kode, badge tipe, badge status, tombol Lepas alat (pemilik). Tombol QR hanya untuk pengelola, jadi tidak tampil di gambar yang memakai sudut pandang pengguna |
-| Nilai sekarang | Identitas sensor dari API; pembacaan menampilkan "Belum ada data". Komponen latest/readings menunggu Minggu 3; nilai di screenshot bukan pembacaan aktual |
-| Grafik | Menampilkan "Belum ada data". Komponen riwayat/grafik menunggu Minggu 3; grafik di screenshot hanya ilustrasi |
-| Kejadian | Menampilkan "Belum ada data". Komponen kejadian/events menunggu Minggu 3 |
+| Nilai sekarang | Nilai terbaru, state, waktu ukur, dan ambang efektif dari API. Ambang `/latest` adalah acuan; pembacaan `null` menampilkan "Belum ada data" |
+| Grafik | Riwayat 24 jam untuk sensor terpilih, diringkas per 5 menit dengan rata-rata, rentang minimum-maksimum, dan ambang efektif. Error riwayat ditampilkan di bagian grafik |
+| Kejadian | Maksimal 10 perubahan ambang dan koneksi terbaru dari API. Error kejadian ditampilkan di bagian ini |
 | Kesehatan unit | Firmware, RSSI, kalibrasi terakhir, kiriman terakhir |
 | Fungsi alat | Daftar fungsi alat, teks yang sama dengan yang tampil saat QR dipindai |
 
-Teks "Diperbarui otomatis setiap 5 detik (simulasi)" diganti menjadi "Live" saat SSE tersambung, atau "Diperbarui tiap 30 detik" saat memakai polling.
-
-Pada Minggu 2, Detail device menampilkan identitas, status, dan sensor dari API. Pembacaan, grafik, dan kejadian tetap "Belum ada data" sampai komponen latest/readings/events tersedia pada Minggu 3; jangan gunakan nilai screenshot sebagai data aktual.
+Status koneksi menunjukkan "Live" saat SSE tersambung, "Menyambung ulang..." saat stream yang sempat aktif terputus, atau "Diperbarui tiap 30 detik" saat polling. Jika koneksi awal atau percobaan reconnect gagal, UI beralih ke polling 30 detik; kegagalan awal termasuk respons non-200 seperti 429 tidak memicu percobaan stream berulang. Reconnect setelah stream aktif dilakukan berurutan dengan `Last-Event-ID`.
 
 Gambar: [terang](design/screens/02-detail-device.png), [gelap](design/screens/02b-detail-device-gelap.png).
 
@@ -163,7 +159,7 @@ Gambar: [per paket](design/screens/03-monitoring-per-paket.png), [per sensor](de
 
 ### 5.4 Kelola IoT (`/admin/iot`), diubah jadi 3 tab
 
-Tab **Device**: tabel device dengan kolom tipe dan kiriman terakhir. Aksi per baris: Label QR, Ubah, Buat ulang kode aktivasi, dan Catat kalibrasi. Area tidak memiliki endpoint API, sehingga `areaRef` dapat dibiarkan kosong atau diisi manual tanpa pilihan area contoh.
+Tab **Device**: tabel device dengan kolom tipe dan kiriman terakhir. Aksi per baris: Label QR, Ubah, Buat ulang kode aktivasi, Catat kalibrasi, dan rotasi credential jika memenuhi syarat. Aksi rotasi hanya tampil untuk device live dengan `credentialProvisioned: true`; aksi disembunyikan untuk sandbox dan device yang belum diprovisikan. `credentialProvisioned` berasal dari `credential_hash IS NOT NULL`, tidak mengungkap hash atau secret. Rotasi memakai `POST /devices/:id/credentials/rotate`; secret hasil rotasi ditampilkan satu kali dan dialog baru boleh ditutup setelah secret disalin atau pengguna menyatakan sudah menyimpannya. Area tidak memiliki endpoint API, sehingga `areaRef` dapat dibiarkan kosong atau diisi manual tanpa pilihan area contoh.
 
 Catatan implementasi Tahap frontend 2: aksi **Nonaktifkan** pada screenshot 04 tidak ditampilkan. Kontrak server belum memiliki field maupun route untuk menonaktifkan device; UI tidak membuat tombol atau operasi pengganti. Screenshot 04 tetap menjadi acuan tata letak, bukan kontrak operasi.
 

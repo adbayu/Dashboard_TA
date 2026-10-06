@@ -404,6 +404,30 @@ test('V1 API key contracts and access controls', async context => {
       return { id, code, activationCode };
     };
 
+    await context.test('Device list and detail expose provisioning status without exposing credential data', async () => {
+      const unprovisioned = await fixtureDevice(false, null);
+      const provisioned = await fixtureDevice(false, null);
+      const sandbox = await fixtureDevice(true, null);
+      await pool.query('UPDATE devices SET credential_hash=$2 WHERE id=$1', [provisioned.id, hash(secret())]);
+
+      const list = await request('GET', '/api/v1/devices', admin);
+      assert.equal(list.statusCode, 200, list.body);
+      const listDevices = new Map(list.json().devices.map((device: { id: string }) => [device.id, device]));
+      for (const [device, expected] of [[unprovisioned, false], [provisioned, true], [sandbox, false]] as const) {
+        const summary = listDevices.get(device.id) as Record<string, unknown> | undefined;
+        assert.ok(summary, `missing ${device.code} in list`);
+        assert.equal(summary.credentialProvisioned, expected);
+        assert.equal(Object.hasOwn(summary, 'credential'), false);
+        assert.equal(Object.hasOwn(summary, 'credentialHash'), false);
+
+        const detail = await request('GET', `/api/v1/devices/${device.id}`, admin);
+        assert.equal(detail.statusCode, 200, detail.body);
+        assert.equal(detail.json().device.credentialProvisioned, expected);
+        assert.equal(Object.hasOwn(detail.json().device, 'credential'), false);
+        assert.equal(Object.hasOwn(detail.json().device, 'credentialHash'), false);
+      }
+    });
+
     await context.test('Tambahan: API key mensyaratkan minimal satu scope', async () => {
       const emptyScopes = await createKey(user, 'test', []);
       assert.equal(emptyScopes.response.statusCode, 400, emptyScopes.response.body);

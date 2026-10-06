@@ -78,6 +78,9 @@ Semua uji yang sudah ada di `pilot.test.ts` wajib tetap hijau setelah migration 
 | UI-11 | Ulangi UI-01 sampai UI-10 di mode gelap | Semua teks terbaca, tidak ada elemen hilang |
 | UI-12 | Lebar 360 px dan 841 px | Tidak ada scroll horizontal |
 | UI-13 | Jalankan seluruh alur hanya dengan keyboard | Semua aksi bisa dicapai, fokus terlihat, Escape menutup modal |
+| UI-14 | Buka List IoT dan Detail device dengan telemetry, lalu putuskan SSE setelah tersambung | Nilai terbaru, riwayat 24 jam, dan kejadian berasal dari API; status menunjukkan "Menyambung ulang...", lalu polling menampilkan "Diperbarui tiap 30 detik" bila reconnect gagal |
+| UI-15 | Kelola IoT: bandingkan device live terprovisioning, live belum terprovisioning, dan sandbox | Rotasi hanya tampil untuk device live dengan `credentialProvisioned: true`. Modal memindahkan fokus ke dalam, mengunci Tab/Shift+Tab, Escape menutup dan memulihkan fokus; secret tampil sekali dan dialog meminta salin atau pengakuan penyimpanan sebelum ditutup |
+| UI-16 | Buat request awal SSE menerima respons non-200, termasuk 429 | Stream tidak dicoba ulang dan UI melanjutkan polling dengan label "Diperbarui tiap 30 detik" |
 
 ## 5. Uji bench alat
 
@@ -133,4 +136,6 @@ Pembaruan status Minggu 2 pada 5 Oktober 2026: masih **FAIL/belum lulus gate pen
 
 Status akhir Minggu 2 pada 5 Oktober 2026: **PASS**. UI-03 dan UI-04 diuji dengan HP Android fisik lewat tunnel HTTPS (`docs/panduan-uji-manual.md` bagian 4.3) memakai database uji terpisah dan akun uji sementara. UI-03: label QR device paket `AQ-PKT-001` terbaca oleh pemindai di aplikasi dan membuka `/d/AQ-PKT-001`. UI-04: akun `user` mengklaim device tersebut, device tampil di List IoT akun itu, dan tabel `ownerships` mencatat akun `user` sebagai pemilik. Pengujian ini menemukan bug pemindai QR: loop deteksi berhenti permanen saat effect dijalankan ulang (React StrictMode di development), sehingga kamera tampil tetapi QR tidak pernah terbaca. Bug diperbaiki di `src/components/QrScanner.jsx` sebelum UI-03 dan UI-04 dinyatakan lulus. Semua kriteria gate Minggu 2 terpenuhi; kriteria di atas tidak diubah.
 
-Status verifikasi A-D backend pada 6 Oktober 2026: `test:pilot` 16/16, `test:v1` 57/57, typecheck, lint, dan build lulus. HW-08: **belum diuji**, menunggu alat asli. Kriteria gate mingguan di bagian 7 tidak diubah.
+Status verifikasi A-D backend pada 6 Oktober 2026: `test:pilot` 16/16, `test:v1` 58/58, typecheck, lint, dan build lulus. HW-08: **belum diuji**, menunggu alat asli. Kriteria gate mingguan di bagian 7 tidak diubah.
+
+Status verifikasi E1 pada 6 Oktober 2026: unit frontend 44/44, typecheck, lint, dan build lulus. Click-through headless Chrome memakai fixture API terkontrol pada lebar 360, 841, dan 1280 px; mencakup loading/empty/error/retry List IoT, latest dan polling 429, tema terang/gelap, navigasi Detail, pembacaan dan kejadian live, reconnect berurutan dengan `Last-Event-ID`, seleksi sensor grafik, error riwayat/kejadian, konfirmasi rotasi, Escape dan pemulihan fokus, penolakan 409 yang bisa dicoba ulang, salin credential satu kali, dan penghapusan secret dari state saat dialog ditutup. Tidak ada overflow horizontal atau error console/runtime. Kontrak dan persistensi backend diverifikasi terpisah dengan PostgreSQL asli pada `test:pilot` dan `test:v1`. Kriteria gate mingguan di bagian 7 tidak diubah.

@@ -21,7 +21,7 @@ export const UKURAN = {
 };
 
 const FOKUS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-transparent';
 
 // ── Kartu dasar bergaya kaca (tema Lumina Aqua) ───────────────────────────────
 // min-w-0 wajib: tanpa ini kartu menolak menyusut di dalam CSS grid dan tabel di
@@ -113,7 +113,7 @@ export function Badge({ children, tone = 'muted', icon, className = '' }) {
     <span
       className={`inline-flex items-center gap-1 h-6 rounded-full border px-2.5 text-[11px] font-semibold whitespace-nowrap ${TONES[tone] || TONES.muted} ${className}`}
     >
-      {icon && <span className="material-symbols-outlined text-[13px]">{icon}</span>}
+      {icon && <span className="material-symbols-outlined text-[13px]" aria-hidden="true">{icon}</span>}
       {children}
     </span>
   );
@@ -191,9 +191,9 @@ export function IconButton({ icon, onClick, title, tone = 'brand', size = 'md', 
       ? 'text-red-600 hover:bg-red-500/10'
       : tone === 'warn'
         ? 'text-amber-600 hover:bg-amber-500/10'
-        : tone === 'netral'
-          ? 'text-on-surface-variant hover:text-primary'
-          : 'text-primary hover:bg-primary/10';
+      : tone === 'netral'
+        ? 'text-on-surface-variant hover:text-primary dark:hover:text-inverse-primary'
+        : 'text-primary hover:bg-primary/10 dark:text-inverse-primary dark:hover:bg-inverse-primary/10';
   return (
     <button
       type="button"

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AksiBaris, Badge, Button, Card, Empty, Field, IconButton, Input, Modal, NumberInput, SectionTitle, Select, Table } from '../../components/ui';
 import { iotApi } from '../../services/iotApi.js';
-import { performActivationLabelAction } from '../../utils/adminIotActions.js';
+import { canRotateDeviceCredential, credentialRevealCanClose, performActivationLabelAction } from '../../utils/adminIotActions.js';
 
 const EMPTY_DEVICE = { typeCode: '', name: '', areaRef: '', firmware: '' };
 const EMPTY_TYPE = { code: '', name: '', kind: 'satuan', description: '', sensors: [] };
@@ -59,6 +59,12 @@ export default function AdminIotPage() {
   const [labelUrls, setLabelUrls] = useState({});
   const [labelConfirmation, setLabelConfirmation] = useState(null);
   const labelUrlsRef = useRef(new Set());
+  const [rotationConfirmation, setRotationConfirmation] = useState(null);
+  const [rotationReveal, setRotationReveal] = useState(null);
+  const [rotationBusy, setRotationBusy] = useState(false);
+  const [rotationError, setRotationError] = useState('');
+  const [rotationCopied, setRotationCopied] = useState(false);
+  const [rotationSaved, setRotationSaved] = useState(false);
 
   const [calibrationDevice, setCalibrationDevice] = useState(null);
   const [typeOpen, setTypeOpen] = useState(false);
@@ -220,6 +226,42 @@ export default function AdminIotPage() {
     onConfirmationChange: setLabelConfirmation,
     renewActivationCode: startActivationRenewal,
   });
+
+  const openRotationConfirmation = device => {
+    setRotationError('');
+    setActionError('');
+    setRotationConfirmation(device);
+  };
+
+  const cancelRotationConfirmation = () => {
+    if (!rotationBusy) setRotationConfirmation(null);
+  };
+
+  const rotateCredential = async () => {
+    if (!rotationConfirmation || rotationBusy) return;
+    const device = rotationConfirmation;
+    setRotationBusy(true);
+    setRotationError('');
+    try {
+      const result = await iotApi.rotateDeviceCredential(device.id);
+      setRotationConfirmation(null);
+      setRotationCopied(false);
+      setRotationSaved(false);
+      setRotationReveal({ code: device.code, credential: result.credential, credentialSince: result.credentialSince });
+    } catch (error) {
+      setRotationError(error.message || 'Credential tidak dapat dirotasi.');
+    } finally {
+      setRotationBusy(false);
+    }
+  };
+
+  const closeRotationReveal = () => {
+    if (!credentialRevealCanClose({ credential: rotationReveal?.credential, copied: rotationCopied, saved: rotationSaved })) return;
+    setRotationReveal(null);
+    setRotationCopied(false);
+    setRotationSaved(false);
+    setRotationError('');
+  };
 
   const generateLabel = async format => {
     if (!provision?.activationCode) return;
@@ -412,7 +454,7 @@ export default function AdminIotPage() {
               type="button"
               aria-pressed={tab === key}
               onClick={() => setTab(key)}
-              className={`min-h-10 shrink-0 rounded-xl px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${tab === key ? 'bg-primary text-white' : 'text-on-surface hover:bg-primary/10'}`}
+              className={`min-h-10 shrink-0 rounded-xl px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${tab === key ? 'bg-primary text-white' : 'text-on-surface hover:bg-primary/10'}`}
             >
               {label} <span className="ml-1 text-xs opacity-80">{count}</span>
             </button>
@@ -457,6 +499,7 @@ export default function AdminIotPage() {
                             <IconButton icon="qr_code_2" size="sm" onClick={() => openLabelForDevice(device)} title={`Buat label QR ${device.code}`} />
                             <IconButton icon="edit" size="sm" onClick={() => openEditDevice(device)} title={`Ubah ${device.code}`} />
                             <IconButton icon="autorenew" size="sm" onClick={() => startActivationRenewal(device)} title={`Buat ulang kode aktivasi ${device.code}`} />
+                            {canRotateDeviceCredential(device) && <IconButton icon="key" size="lg" onClick={() => openRotationConfirmation(device)} title={`Rotasi credential ${device.code}`} />}
                             <IconButton icon="build_circle" size="sm" onClick={() => setCalibrationDevice(device)} title={`Catat kalibrasi ${device.code}`} />
                           </AksiBaris>
                         ) : <span className="text-xs text-on-surface-variant">Hanya-baca</span>}
@@ -576,6 +619,58 @@ export default function AdminIotPage() {
       </Modal>
 
       <Modal
+        open={Boolean(rotationConfirmation)}
+        onClose={cancelRotationConfirmation}
+        title="Rotasi credential device"
+        closeDisabled={rotationBusy}
+      >
+        {rotationConfirmation && <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-on-surface-variant">
+            Credential lama untuk <strong className="text-on-surface">{rotationConfirmation.code}</strong> langsung tidak berlaku setelah rotasi. Perangkat harus diprovisioning ulang dengan credential baru.
+          </p>
+          {rotationError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{rotationError}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button size="lg" variant="ghost" disabled={rotationBusy} onClick={cancelRotationConfirmation}>Batal</Button>
+            <Button size="lg" icon="key" disabled={rotationBusy} onClick={rotateCredential}>{rotationBusy ? 'Merotasi...' : 'Rotasi credential'}</Button>
+          </div>
+        </div>}
+      </Modal>
+
+      <Modal
+        open={Boolean(rotationReveal)}
+        onClose={closeRotationReveal}
+        title={`Credential baru ${rotationReveal?.code || ''}`}
+        closeDisabled={!credentialRevealCanClose({ credential: rotationReveal?.credential, copied: rotationCopied, saved: rotationSaved })}
+      >
+        {rotationReveal && <div className="space-y-4">
+          <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100">
+            Credential ini hanya tampil sekali. Credential lama sudah tidak berlaku. Perangkat perlu diprovisioning ulang sebelum mengirim data.
+          </p>
+          <div>
+            <label htmlFor="rotated-device-credential" className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Credential device</label>
+            <div className="flex min-w-0 flex-wrap gap-2">
+              <Input id="rotated-device-credential" readOnly value={rotationReveal.credential} className="min-w-0 flex-1 font-mono text-xs" />
+              <Button size="lg" variant="ghost" icon={rotationCopied ? 'check' : 'content_copy'} onClick={() => copyText(rotationReveal.credential).then(() => { setRotationCopied(true); setRotationError(''); }).catch(error => setRotationError(error.message))}>
+                {rotationCopied ? 'Tersalin' : 'Salin'}
+              </Button>
+            </div>
+            <p role="status" aria-live="polite" className="sr-only">{rotationCopied ? 'Credential tersalin.' : ''}</p>
+            {rotationReveal.credentialSince && <p className="mt-1 text-xs text-on-surface-variant">Berlaku sejak {new Date(rotationReveal.credentialSince).toLocaleString('id-ID')}.</p>}
+          </div>
+          <label className="flex min-h-11 items-center gap-2 text-sm text-on-surface">
+            <input type="checkbox" checked={rotationSaved} onChange={event => setRotationSaved(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary" />
+            Sudah saya simpan di tempat aman
+          </label>
+          {rotationError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{rotationError}</p>}
+          <div className="flex justify-end">
+            <Button size="lg" disabled={!credentialRevealCanClose({ credential: rotationReveal.credential, copied: rotationCopied, saved: rotationSaved })} onClick={closeRotationReveal}>
+              {credentialRevealCanClose({ credential: rotationReveal.credential, copied: rotationCopied, saved: rotationSaved }) ? 'Tutup' : 'Salin atau tandai sudah disimpan'}
+            </Button>
+          </div>
+        </div>}
+      </Modal>
+
+      <Modal
         open={Boolean(provision)}
         onClose={closeProvision}
         title={labelView ? 'Label QR' : provision?.credential ? `Device ${provision.code} dibuat` : `Kode aktivasi ${provision?.code || ''}`}
@@ -596,8 +691,8 @@ export default function AdminIotPage() {
             {provision.expiresAt && <p className="text-sm text-on-surface-variant">Kode berlaku sampai {new Date(provision.expiresAt).toLocaleString('id-ID')}.</p>}
             {actionError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{actionError}</p>}
             <div className="flex flex-wrap justify-end gap-2">
-              {labelUrls.svg ? <a className="inline-flex h-10 items-center rounded-xl border border-outline-variant/50 px-3 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" href={labelUrls.svg} download={`${provision.code}.svg`}>Unduh SVG</a> : <Button variant="ghost" icon="image" disabled={busy} onClick={() => generateLabel('svg')}>Buat label SVG</Button>}
-              {labelUrls.png ? <a className="inline-flex h-10 items-center rounded-xl border border-outline-variant/50 px-3 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" href={labelUrls.png} download={`${provision.code}.png`}>Unduh PNG</a> : <Button variant="ghost" icon="image" disabled={busy} onClick={() => generateLabel('png')}>Buat label PNG</Button>}
+              {labelUrls.svg ? <a className="inline-flex h-10 items-center rounded-xl border border-outline-variant/50 px-3 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary" href={labelUrls.svg} download={`${provision.code}.svg`}>Unduh SVG</a> : <Button variant="ghost" icon="image" disabled={busy} onClick={() => generateLabel('svg')}>Buat label SVG</Button>}
+              {labelUrls.png ? <a className="inline-flex h-10 items-center rounded-xl border border-outline-variant/50 px-3 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary" href={labelUrls.png} download={`${provision.code}.png`}>Unduh PNG</a> : <Button variant="ghost" icon="image" disabled={busy} onClick={() => generateLabel('png')}>Buat label PNG</Button>}
               <Button variant="ghost" icon="print" onClick={() => window.print()}>Cetak label</Button>
               <Button variant="soft" onClick={() => setLabelView(false)}>Kembali</Button>
             </div>
@@ -621,7 +716,7 @@ export default function AdminIotPage() {
               <p className="mt-1 text-xs text-on-surface-variant">Kode aktivasi berlaku 24 jam.</p>
             </div>
             <label className="flex min-h-10 items-center gap-2 text-sm text-on-surface">
-              <input type="checkbox" checked={provisionSaved} onChange={event => setProvisionSaved(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+              <input type="checkbox" checked={provisionSaved} onChange={event => setProvisionSaved(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary" />
               Sudah saya simpan di tempat aman
             </label>
             {actionError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{actionError}</p>}
@@ -652,7 +747,7 @@ export default function AdminIotPage() {
             {!typeEditing && <fieldset className="min-w-0">
               <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Jenis tipe</legend>
               <div className="flex min-h-10 flex-wrap items-center gap-4">
-                {['satuan', 'paket'].map(kind => <label key={kind} className="inline-flex items-center gap-2 text-sm text-on-surface"><input type="radio" name="iot-type-kind" value={kind} checked={typeForm.kind === kind} onChange={() => setTypeForm(current => ({ ...current, kind, sensors: kind === 'satuan' ? current.sensors.slice(0, 1) : current.sensors }))} className="accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />{kind === 'satuan' ? 'Satuan' : 'Paket'}</label>)}
+                {['satuan', 'paket'].map(kind => <label key={kind} className="inline-flex items-center gap-2 text-sm text-on-surface"><input type="radio" name="iot-type-kind" value={kind} checked={typeForm.kind === kind} onChange={() => setTypeForm(current => ({ ...current, kind, sensors: kind === 'satuan' ? current.sensors.slice(0, 1) : current.sensors }))} className="accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary" />{kind === 'satuan' ? 'Satuan' : 'Paket'}</label>)}
               </div>
             </fieldset>}
             <Field label="Deskripsi"><Input value={typeForm.description} onChange={value => setTypeForm(current => ({ ...current, description: value }))} maxLength={500} /></Field>
@@ -672,7 +767,7 @@ export default function AdminIotPage() {
                 const selected = typeForm.sensors.some(item => item.code === sensor.code);
                 const link = typeForm.sensors.find(item => item.code === sensor.code);
                 return <div key={sensor.code} className="grid min-w-0 gap-2 rounded-xl border border-outline-variant/40 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                  <label className="flex min-h-10 items-center gap-2 text-sm text-on-surface"><input type="checkbox" checked={selected} onChange={() => toggleTypeSensor(sensor)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />{sensor.name} ({sensor.unit})</label>
+                  <label className="flex min-h-10 items-center gap-2 text-sm text-on-surface"><input type="checkbox" checked={selected} onChange={() => toggleTypeSensor(sensor)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary" />{sensor.name} ({sensor.unit})</label>
                   {selected && <Field label={`Label ${sensor.name}`}><Input value={link?.label || ''} onChange={value => setTypeForm(current => ({ ...current, sensors: current.sensors.map(item => item.code === sensor.code ? { ...item, label: value } : item) }))} maxLength={100} required /></Field>}
                 </div>;
               })}

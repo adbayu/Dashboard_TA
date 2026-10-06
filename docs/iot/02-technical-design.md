@@ -348,13 +348,18 @@ Login SmartDashboard sekarang berjalan di `localStorage` (akun demo di `seed.js`
 ### 9.2 Adapter
 
 - Modul baru `src/services/iotApi.js` dibangun di atas pola `pilotApi.js` yang sudah ada: `credentials: 'same-origin'`, timeout 15 detik, dan tidak memakai data contoh sebagai pengganti saat backend mati.
-- Fungsi adapter memetakan bentuk API ke bentuk yang sekarang dipakai halaman (`id`, `code`, `name`, `areaId`, `status`, `metric`), supaya `ListIot.jsx`, `AdminIot.jsx`, dan `DetailInformation.jsx` cukup diganti sumber datanya.
-- Pemetaan status: `online` jadi `online`, `stale` jadi `warning` dengan label "Data tertunda", `offline` jadi `offline`. Status `maintenance` di UI sekarang tidak punya padanan di backend, jadi diturunkan dari `calibrated_at` yang lewat jatuh tempo.
-- Variabel `VITE_IOT_SOURCE` (`api` atau `local`) dipakai selama transisi. Nilai bawaan di branch ini `api`. `local` hanya untuk demo tanpa backend dan wajib menampilkan label "Data contoh".
+- Adapter menyediakan operasi device, latest, riwayat, kejadian, dan rotasi credential yang dipakai halaman IoT. Response daftar dan detail device membawa `credentialProvisioned`, hasil `credential_hash IS NOT NULL`; hash dan secret tidak pernah menjadi field response.
+- `VITE_IOT_SOURCE` (`api` atau `local`) dipakai selama transisi. Nilai bawaan di branch ini `api`. `local` hanya untuk demo tanpa backend, wajib menampilkan label "Data contoh", dan tidak mengarang pembacaan telemetry.
 
 ### 9.3 Proxy dev
 
 Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0.1:3001`. Referensi API pada halaman Developer membuka `/docs/openapi.json`; tampilan Scalar tetap direncanakan untuk Minggu 4.
+
+### 9.4 Telemetry live dan rotasi credential
+
+- List IoT mengambil pembacaan terkini per device. Detail mengambil `/latest`, riwayat 24 jam dengan bucket `5m` per sensor, dan maksimal 10 kejadian. Ambang dari `/latest` adalah sumber otoritatif; pembacaan SSE digabung memakai ambang efektif tersebut. Error latest, riwayat, dan kejadian ditampilkan pada bagiannya masing-masing.
+- Kedua layar berbagi fetch-based SSE client supaya status HTTP saat pembukaan/reconnect bisa diperiksa. Kegagalan koneksi awal non-200, termasuk 429, menghentikan percobaan stream dan beralih ke polling tiap 30 detik. Jika stream yang sudah aktif terputus, UI menampilkan "Menyambung ulang..." dan reconnect berurutan dengan `Last-Event-ID`; kegagalan reconnect mengalihkan ke polling 30 detik. Subscription dan timer dibersihkan saat layar dilepas.
+- Kelola IoT menampilkan aksi rotasi hanya untuk device live yang bukan sandbox dan memiliki `credentialProvisioned: true`. Aksi memakai `POST /devices/:id/credentials/rotate`; response memuat credential baru sekali, dan dialog tetap terbuka sampai pengguna menyalinnya atau mengakui bahwa credential sudah disimpan.
 
 ## 10. Konfigurasi baru
 

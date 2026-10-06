@@ -117,7 +117,7 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 
 ```json
 { "devices": [
-  { "id": "5e0a...", "code": "AQ-PH-001", "legacyId": "IOT-001", "name": "Sensor pH Kolam Nila A", "isSandbox": false,
+  { "id": "5e0a...", "code": "AQ-PH-001", "legacyId": "IOT-001", "name": "Sensor pH Kolam Nila A", "isSandbox": false, "credentialProvisioned": true,
     "type": { "code": "AQ-PH", "kind": "satuan" }, "areaRef": "AR-01",
     "status": "online", "lastMeasuredAt": "2026-10-10T08:00:00.000Z", "lastReceivedAt": "2026-10-10T08:00:01.120Z",
     "firmware": "0.3.0", "rssi": -58, "calibratedAt": "2026-10-08T03:00:00.000Z" }
@@ -125,6 +125,8 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 ```
 
 `status` bernilai `online`, `stale`, atau `offline`.
+
+`credentialProvisioned` adalah boolean non-secret yang selalu disertakan pada response daftar `GET /devices` dan detail `GET /devices/:id`. Untuk device live, nilainya `true` jika `credential_hash IS NOT NULL` dan `false` jika belum diprovisikan; untuk baris sandbox nilainya selalu `false`. Response tidak menyertakan hash atau credential. UI pengelola hanya menampilkan aksi rotasi untuk device live dengan `credentialProvisioned: true`; aksi tidak ditampilkan untuk sandbox atau device yang belum diprovisikan.
 
 `GET /devices/:id` mengembalikan satu device dengan bentuk yang sama, ditambah `sensors` beserta ambang efektifnya.
 
@@ -157,7 +159,7 @@ Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan un
 
 `POST /devices/:id/release` (scope `devices:write`) melepas kepemilikan. Riwayat tetap milik pemilik lama.
 
-`POST /devices/:id/credentials/rotate` (scope `admin`, sesi admin atau key live admin) merotasi credential device live yang sudah diprovisioning. **Penyimpangan path:** prompt awal menyebut `/credential/rotate` (singular); kontrak memakai `/credentials/rotate` sebagai subresource rotasi credential, dengan `credentials` sebagai namespace operasi di bawah device. Adapter frontend harus memakai path kontrak ini secara persis. Response `200` menampilkan credential baru satu kali:
+`POST /devices/:id/credentials/rotate` (scope `admin`, sesi admin atau key live admin) merotasi credential device live yang sudah diprovisioning (`credentialProvisioned: true`). **Penyimpangan path:** prompt awal menyebut `/credential/rotate` (singular); kontrak memakai `/credentials/rotate` sebagai subresource rotasi credential, dengan `credentials` sebagai namespace operasi di bawah device. Adapter frontend harus memakai path kontrak ini secara persis. Response `200` menampilkan credential baru satu kali:
 
 ```json
 { "credential": "<64 hex, hanya ditampilkan sekali>", "credentialSince": "2026-10-05T14:00:00.000Z" }
