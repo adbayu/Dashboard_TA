@@ -12,9 +12,11 @@ import {
   mergeEventPages,
   summarizeAreaPoints,
   AREA_HISTORY_LABEL,
+  AREA_HISTORY_BUDGET_LIMIT,
   AREA_HISTORY_MAX_REQUESTS,
   AREA_HISTORY_REFRESH_MS,
   API_SESSION_REQUEST_LIMIT,
+  API_SESSION_WINDOW_MS,
 } from '../utils/monitoring.js';
 import {
   formatEventMessage,
@@ -85,7 +87,7 @@ function EventLogPanel({
   eventState,
   eventError,
   loadingMoreEvents,
-  liveDevices,
+  devices,
   sensorTypes,
   deviceById,
   onDeviceChange,
@@ -99,7 +101,7 @@ function EventLogPanel({
     <Card pad="sm" className="space-y-4">
       <SectionTitle title="Log kejadian" subtitle="Filter kejadian perangkat dan buka halaman sebelumnya." />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-        <Field label="Perangkat"><Select value={eventDeviceId} onChange={onDeviceChange} options={liveDevices.map(device => ({ value: device.id, label: `${device.name} · ${device.code}` }))} placeholder="Semua perangkat" /></Field>
+        <Field label="Perangkat"><Select value={eventDeviceId} onChange={onDeviceChange} options={devices.map(device => ({ value: device.id, label: `${device.name} · ${device.code}${device.isSandbox || device.is_sandbox ? ' · Sandbox' : ''}` }))} placeholder="Semua perangkat" /></Field>
         <Field label="Jenis kejadian"><Select value={eventType} onChange={onTypeChange} options={EVENT_TYPES} placeholder="Semua kejadian" /></Field>
       </div>
       <p className="text-xs text-on-surface-variant">Halaman mengikuti ID kejadian menurun. Waktu memakai nilai `at` dari API.</p>
@@ -110,7 +112,9 @@ function EventLogPanel({
       {eventState === 'ready' && events.length > 0 && <div className="space-y-2">{events.map(event => <Card key={event.id} pad="sm" className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words font-semibold text-on-surface">{formatEventMessage(event, sensorNames)}</p>
-          <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{deviceById.get(event.deviceId)?.code || event.deviceId} · ID {event.id}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-2 break-all font-mono text-xs text-on-surface-variant">{deviceById.get(event.deviceId)?.code || event.deviceId} · ID {event.id}
+            {(event.isSandbox || event.is_sandbox || deviceById.get(event.deviceId)?.isSandbox || deviceById.get(event.deviceId)?.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
+          </p>
         </div>
         <time className="shrink-0 text-xs text-on-surface-variant" dateTime={event.at}>{dateLabel(event.at)}</time>
       </Card>)}</div>}
@@ -251,25 +255,25 @@ export default function Monitoring() {
   const [areaState, setAreaState] = useState('idle');
   const [areaError, setAreaError] = useState('');
   const [areaRows, setAreaRows] = useState([]);
-  const [areaCounters, setAreaCounters] = useState({ started: 0, total: 0, used: 0, remaining: API_SESSION_REQUEST_LIMIT });
+  const [areaCounters, setAreaCounters] = useState({ started: 0, total: 0, used: 0, remaining: AREA_HISTORY_BUDGET_LIMIT });
 
   const latestRef = useRef({});
   const devicesRef = useRef([]);
   const eventFiltersRef = useRef({ deviceId: '', type: '' });
   const refreshLatestRef = useRef(null);
-  const lastAreaRefreshAt = useRef(0);
   const areaRefreshActionRef = useRef(null);
-  const latestRunner = useRef(createBoundedBatchRunner({ concurrency: 4, maxRequests: 20 }));
+  const latestRunner = useRef(createBoundedBatchRunner({ concurrency: 4, maxRequests: 21 }));
   const packageRunner = useRef(createBoundedBatchRunner({ concurrency: 4, maxRequests: API_SESSION_REQUEST_LIMIT }));
   const comparisonRunner = useRef(createBoundedBatchRunner({ concurrency: 3, maxRequests: 3 }));
-  const [areaBudget] = useState(() => createSlidingWindowBudget());
+  const [areaBudget] = useState(() => createSlidingWindowBudget({ limit: AREA_HISTORY_BUDGET_LIMIT, windowMs: API_SESSION_WINDOW_MS }));
   const [areaRunner] = useState(() => createBoundedBatchRunner({ budget: areaBudget, concurrency: 4, maxRequests: AREA_HISTORY_MAX_REQUESTS }));
   const areaController = useRef(null);
 
-  const liveDevices = useMemo(() => devices.filter(device => !device.isSandbox && !device.is_sandbox), [devices]);
-  const packageDevices = useMemo(() => liveDevices.filter(device => device.type?.kind === 'paket'), [liveDevices]);
+  const displayDevices = devices;
+  const liveDevices = useMemo(() => displayDevices.filter(device => !device.isSandbox && !device.is_sandbox), [displayDevices]);
+  const packageDevices = useMemo(() => displayDevices.filter(device => device.type?.kind === 'paket'), [displayDevices]);
   const packageSensors = useMemo(() => packageDevices.flatMap(device => deviceSensors(device).map(sensor => ({ device, sensor }))), [packageDevices]);
-  const deviceById = useMemo(() => new Map(liveDevices.map(device => [device.id, device])), [liveDevices]);
+  const deviceById = useMemo(() => new Map(displayDevices.map(device => [device.id, device])), [displayDevices]);
   const sensorOptions = useMemo(() => sensorTypes.map(sensor => ({ value: sensor.code, label: `${sensor.name || sensor.code}${sensor.unit ? ` (${sensor.unit})` : ''}` })), [sensorTypes]);
   const selectedSensorType = sensorTypes.find(sensor => sensor.code === selectedSensor) || null;
   const catalogRequestKey = `${currentUser?.id || ''}:${catalogAttempt}`;
@@ -279,7 +283,7 @@ export default function Monitoring() {
   const catalogError = catalogResult.key === catalogRequestKey ? catalogResult.error : '';
 
   useEffect(() => { latestRef.current = latestByDevice; }, [latestByDevice]);
-  useEffect(() => { devicesRef.current = liveDevices; }, [liveDevices]);
+  useEffect(() => { devicesRef.current = displayDevices; }, [displayDevices]);
   useEffect(() => { eventFiltersRef.current = { deviceId: eventDeviceId, type: eventType }; }, [eventDeviceId, eventType]);
 
   useEffect(() => {
@@ -288,7 +292,7 @@ export default function Monitoring() {
     const controller = new AbortController();
     iotApi.getDevices({ userId: currentUser?.id, signal: controller.signal }).then(result => {
       if (!active) return;
-      setDevices((result.devices || []).filter(device => !device.isSandbox && !device.is_sandbox));
+      setDevices(result.devices || []);
       setSensorTypes(result.sensorTypes || []);
       setSelectedSensor(current => current || result.sensorTypes?.[0]?.code || '');
       setCatalogResult({ key: catalogRequestKey, state: 'ready', error: '' });
@@ -576,41 +580,18 @@ export default function Monitoring() {
     if (catalogState !== 'ready' || activeTab !== 'area') return undefined;
     let active = true;
     let interval = null;
-    let deferred = null;
     const refresh = () => {
       if (!active || document.visibilityState !== 'visible') return;
       if (areaRunner.isRunning()) {
         setAreaState('waiting');
         setAreaError('');
-        if (deferred === null) {
-          deferred = setTimeout(() => {
-            deferred = null;
-            refresh();
-          }, 250);
-        }
         return;
       }
-      const now = Date.now();
-      const waitMs = lastAreaRefreshAt.current
-        ? AREA_HISTORY_REFRESH_MS - (now - lastAreaRefreshAt.current)
-        : 0;
-      if (waitMs > 0) {
-        setAreaState('waiting');
-        setAreaError('');
-        if (deferred === null) {
-          deferred = setTimeout(() => {
-            deferred = null;
-            refresh();
-          }, waitMs);
-        }
-        return;
-      }
-      if (deferred !== null) clearTimeout(deferred);
-      deferred = null;
-      lastAreaRefreshAt.current = now;
       const controller = new AbortController();
       areaController.current = controller;
-      void refreshArea({ signal: controller.signal, active: () => active });
+      void refreshArea({ signal: controller.signal, active: () => active }).finally(() => {
+        if (areaController.current === controller) areaController.current = null;
+      });
     };
     areaRefreshActionRef.current = refresh;
     const stopWhenHidden = () => {
@@ -620,8 +601,6 @@ export default function Monitoring() {
       } else {
         if (interval !== null) clearInterval(interval);
         interval = null;
-        if (deferred !== null) clearTimeout(deferred);
-        deferred = null;
         areaController.current?.abort();
         areaController.current = null;
       }
@@ -631,7 +610,6 @@ export default function Monitoring() {
     return () => {
       active = false;
       if (interval !== null) clearInterval(interval);
-      if (deferred !== null) clearTimeout(deferred);
       areaController.current?.abort();
       areaController.current = null;
       areaRefreshActionRef.current = null;
@@ -717,6 +695,7 @@ export default function Monitoring() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="break-words text-base font-bold text-on-surface">{device.name}</h3>
+              {(device.isSandbox || device.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
               <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{device.code} · {device.type?.name || device.type?.code}</p>
               {device.areaRef && <p className="mt-1 text-xs text-on-surface-variant">Area: {device.areaRef}</p>}
             </div>
@@ -776,6 +755,7 @@ export default function Monitoring() {
                       return <tr key={item.deviceId}>
                         <td className="px-3 py-3">
                           <Link to={`/iot/${encodeURIComponent(item.deviceId)}`} className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">{item.device?.name || item.deviceCode}</Link>
+                          {(item.device?.isSandbox || item.device?.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
                           <span className="mt-1 block break-all font-mono text-[11px] text-on-surface-variant">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</span>
                         </td>
                         <td className="px-3 py-3 text-on-surface-variant">{item.areaRef || 'Area belum diatur'}</td>
@@ -817,16 +797,18 @@ export default function Monitoring() {
 
   function renderAreaTab() {
     const areas = [...new Set(liveDevices.map(device => device.areaRef?.trim()).filter(Boolean))];
-    if (areaState === 'loading' || areaState === 'idle') return <div className="space-y-3"><p role="status" className="text-sm text-on-surface-variant">Memuat ringkasan pembacaan hari ini...</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
-    if (areaState === 'waiting') return <div className="space-y-3"><p role="status" className="text-sm text-on-surface-variant">Menunggu batas refresh berikutnya untuk ringkasan area.</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
-    if (areaState === 'error') return <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />;
-    if (!areas.length) return <Empty title="Belum ada area dengan perangkat live" hint="Area terisi akan muncul setelah perangkat memiliki areaRef." icon="water" />;
+    const reloadAction = <div className="flex justify-end"><Button variant="ghost" icon="refresh" onClick={() => areaRefreshActionRef.current?.()}>Muat ulang</Button></div>;
+    if (areaState === 'loading' || areaState === 'idle') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-on-surface-variant">Memuat ringkasan pembacaan hari ini...</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
+    if (areaState === 'waiting') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-on-surface-variant">Menunggu permintaan ringkasan area sebelumnya selesai.</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
+    if (areaState === 'error') return <div className="space-y-3">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;
+    if (!areas.length) return <div className="space-y-3">{reloadAction}<Empty title="Belum ada area dengan perangkat live" hint="Area terisi akan muncul setelah perangkat memiliki areaRef." icon="water" /></div>;
     return <div className="space-y-4">
+      {reloadAction}
       <Card pad="sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h3 className="font-semibold text-on-surface">Ringkasan pembacaan area</h3><p className="mt-1 text-sm text-on-surface-variant">{AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel.</p></div>
         </div>
-        <p className="mt-3 text-xs tabular-nums text-on-surface-variant">Request batch: {areaCounters.started}/{areaCounters.total} · Anggaran jendela 60 detik: {areaCounters.remaining}/{API_SESSION_REQUEST_LIMIT}</p>
+        <p className="mt-3 text-xs tabular-nums text-on-surface-variant">Request batch: {areaCounters.started}/{areaCounters.total} · Anggaran Per area 60 detik: {areaCounters.remaining}/{AREA_HISTORY_BUDGET_LIMIT}</p>
       </Card>
       {areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}
       {areaRows.length === 0 ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="query_stats" />
@@ -895,7 +877,7 @@ export default function Monitoring() {
             eventState={eventState === 'idle' ? 'loading' : eventState}
             eventError={eventError}
             loadingMoreEvents={loadingMoreEvents}
-            liveDevices={liveDevices}
+            devices={displayDevices}
             sensorTypes={sensorTypes}
             deviceById={deviceById}
             onDeviceChange={changeEventDevice}

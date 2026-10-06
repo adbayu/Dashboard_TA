@@ -357,7 +357,7 @@ test('Monitoring retains a filterable, paginated event panel with four request s
     eventState: 'loading',
     eventError: '',
     loadingMoreEvents: false,
-    liveDevices: [{ id: 'device-1', name: 'Kolam', code: 'AQ-PH-001' }],
+    devices: [{ id: 'device-1', name: 'Kolam', code: 'AQ-PH-001' }],
     sensorTypes: [],
     deviceById: new Map(),
     onDeviceChange() {},
@@ -378,6 +378,54 @@ test('Monitoring retains a filterable, paginated event panel with four request s
   assert.match(render({ eventState: 'ready' }), /Perangkat/);
   assert.match(render({ eventState: 'ready' }), /Jenis kejadian/);
   assert.match(render({ eventState: 'ready', eventCursor: 'cursor-1' }), /Muat kejadian sebelumnya/);
+
+  const sandboxDevice = { id: 'sandbox-1', name: 'Kolam uji', code: 'AQ-SANDBOX-001', isSandbox: true };
+  const sandboxMarkup = render({
+    eventState: 'ready',
+    eventCursor: 'cursor-2',
+    devices: [sandboxDevice],
+    deviceById: new Map([[sandboxDevice.id, sandboxDevice]]),
+    events: [{ id: '71', deviceId: sandboxDevice.id, type: 'offline', at: '2026-10-06T00:00:00Z' }],
+  });
+  assert.match(sandboxMarkup, /Sandbox/);
+  assert.match(sandboxMarkup, /AQ-SANDBOX-001/);
+  assert.match(sandboxMarkup, /ID 71/);
+  assert.match(sandboxMarkup, /value="sandbox-1"/);
+});
+
+test('Sandbox is visibly labeled in Monitoring package/sensor/events and device detail', async () => {
+  const monitoringSource = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const detailSource = await readFile(new URL('./pages/ListIot.jsx', import.meta.url), 'utf8');
+  const packageStart = monitoringSource.indexOf('function renderPackageTab()');
+  const sensorStart = monitoringSource.indexOf('function renderSensorTab()');
+  const areaStart = monitoringSource.indexOf('function renderAreaTab()');
+  const eventStart = monitoringSource.indexOf('function EventLogPanel(');
+  const deviceStatusStart = monitoringSource.indexOf('function DeviceStatus(');
+  const detailStart = detailSource.indexOf('export function DeviceDetail()');
+
+  assert.ok(packageStart >= 0 && sensorStart > packageStart && areaStart > sensorStart);
+  assert.ok(eventStart >= 0 && deviceStatusStart > eventStart && detailStart >= 0);
+  assert.match(monitoringSource.slice(packageStart, sensorStart), /device\.isSandbox\s*\|\|\s*device\.is_sandbox[\s\S]*?>Sandbox<\/Badge>/);
+  assert.match(monitoringSource.slice(sensorStart, areaStart), /item\.device\?\.isSandbox\s*\|\|\s*item\.device\?\.is_sandbox[\s\S]*?>Sandbox<\/Badge>/);
+  assert.match(monitoringSource.slice(eventStart, deviceStatusStart), /deviceById\.get\(event\.deviceId\)[\s\S]*?>Sandbox<\/Badge>/);
+  assert.match(detailSource.slice(detailStart), /device\.isSandbox\s*\|\|\s*device\.is_sandbox[\s\S]*?>Sandbox<\/Badge>/);
+});
+
+test('Monitoring keeps authorized sandbox snapshots visible but excludes them from area data', async () => {
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+
+  assert.ok(source.includes('setDevices(result.devices || [])'));
+  assert.ok(source.includes('const displayDevices = devices;'));
+  assert.ok(source.includes('devicesRef.current = displayDevices'));
+  assert.ok(source.includes('const liveDevices = useMemo(() => displayDevices.filter(device => !device.isSandbox && !device.is_sandbox), [displayDevices])'));
+  assert.ok(source.includes('const sensors = liveDevices.flatMap(device => deviceSensors(device)'));
+});
+
+test('latest snapshot batch allows 20 live devices plus one sandbox without widening area batch', async () => {
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+
+  assert.match(source, /const latestRunner = useRef\(createBoundedBatchRunner\(\{ concurrency: 4, maxRequests: 21 \}\)\);/);
+  assert.match(source, /const \[areaRunner\] = useState\(\(\) => createBoundedBatchRunner\(\{ budget: areaBudget, concurrency: 4, maxRequests: AREA_HISTORY_MAX_REQUESTS \}\)\);/);
 });
 
 test('Monitoring error panel exposes and invokes its retry action', async t => {
@@ -421,9 +469,26 @@ test('Monitoring recovery views wire bounded retries for latest, comparison, and
   assert.ok(source.includes('latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />'));
   assert.ok(source.includes('comparisonRunner.current.isRunning()'));
   assert.ok(source.includes('onClick={retryComparison}>Coba lagi</Button>'));
-  assert.ok(source.includes("if (areaState === 'error') return <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />;"));
+  assert.ok(source.includes("if (areaState === 'error') return <div className=\"space-y-3\">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;"));
   assert.ok(source.includes('{areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}'));
-  assert.ok(source.includes('AREA_HISTORY_REFRESH_MS - (now - lastAreaRefreshAt.current)'));
+  assert.ok(source.includes('areaRefreshActionRef.current = refresh'));
+});
+
+test('Per area exposes a manual refresh and keeps the visible-only timer guarded and abortable', async () => {
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+
+  assert.match(source, /Muat ulang/);
+  assert.match(source, /onClick=\{\(\) => areaRefreshActionRef\.current\?\.\(\)\}/);
+  assert.match(source, /areaRefreshActionRef\.current = refresh/);
+  assert.match(source, /areaRunner\.isRunning\(\)/);
+  assert.match(source, /areaRunner\.run\(tasks\)/);
+  assert.match(source, /createSlidingWindowBudget\(\{ limit: AREA_HISTORY_BUDGET_LIMIT, windowMs: API_SESSION_WINDOW_MS \}\)/);
+  assert.match(source, /if \(document\.visibilityState === 'visible'\)[\s\S]*setInterval\(refresh, AREA_HISTORY_REFRESH_MS\)/);
+  assert.match(source, /areaController\.current\?\.abort\(\)/);
+  assert.match(source, /clearInterval\(interval\)/);
+  assert.match(source, /document\.addEventListener\('visibilitychange', stopWhenHidden\)/);
+  assert.match(source, /Anggaran Per area 60 detik/);
+  assert.match(source, /AREA_HISTORY_BUDGET_LIMIT/);
 });
 
 test('comparison chart uses statically discoverable token classes for all three series', async t => {

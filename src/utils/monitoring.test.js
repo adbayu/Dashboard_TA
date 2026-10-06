@@ -112,10 +112,10 @@ test('scheduler membatasi konkurensi, menolak batch berlebih, dan tidak overlap'
   assert.equal(budget.remaining(), 120);
 });
 
-test('batch area untuk 20 device standar memakai 58 route, concurrency maksimal 4, dan anggaran 120/menit', async () => {
+test('batch area untuk 20 device standar memakai 58 route dan anggaran khusus 60/menit', async () => {
   let active = 0;
   let maxActive = 0;
-  const budget = createSlidingWindowBudget();
+  const budget = createSlidingWindowBudget({ limit: 60, windowMs: 60_000 });
   const runner = createBoundedBatchRunner({ budget, concurrency: 4, maxRequests: 60 });
   const tasks = Array.from({ length: 58 }, () => async () => {
     active += 1;
@@ -130,9 +130,24 @@ test('batch area untuk 20 device standar memakai 58 route, concurrency maksimal 
   assert.equal(result.counters.maxActive, 4);
   assert.equal(maxActive, 4);
   assert.equal(budget.used(), 58);
-  assert.equal(AREA_HISTORY_REFRESH_MS, 60_000);
+  assert.equal(budget.remaining(), 2);
+  await assert.rejects(runner.run(Array.from({ length: 58 }, () => async () => undefined)), /Anggaran sesi tidak cukup/);
+  assert.equal(budget.used(), 58);
+});
 
-  await runner.run(Array.from({ length: 58 }, () => async () => undefined));
-  assert.equal(budget.used(), 116);
-  await assert.rejects(runner.run(Array.from({ length: 5 }, () => async () => undefined)), /Anggaran sesi tidak cukup/);
+test('Monitoring area memakai cadence lima menit dan batas sub-anggaran 60 request', async () => {
+  const monitoring = await import('./monitoring.js');
+
+  assert.equal(monitoring.AREA_HISTORY_REFRESH_MS, 300_000);
+  assert.equal(monitoring.AREA_HISTORY_BUDGET_LIMIT, 60);
+  assert.equal(AREA_HISTORY_REFRESH_MS, 300_000);
+});
+
+test('badge perhatian tidak menghitung sandbox meski offline atau memiliki alert low/high', () => {
+  assert.equal(countAttentionDevices([
+    { id: 'sandbox-offline', status: 'offline', isSandbox: true },
+    { id: 'sandbox-reading', status: 'online', is_sandbox: true },
+  ], {
+    'sandbox-reading': { readings: [{ state: 'low' }, { state: 'high' }] },
+  }), 0);
 });

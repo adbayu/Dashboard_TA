@@ -477,6 +477,7 @@ export function DeviceDetail() {
             <p className="text-xs font-bold uppercase tracking-wider text-primary dark:text-inverse-primary">
               {device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {device.type?.name || device.type?.code}
             </p>
+            {(device.isSandbox || device.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
             <h2 className="mt-1 text-2xl font-extrabold text-on-surface break-words">{device.name}</h2>
             <p className="mt-1 font-mono text-sm text-on-surface-variant break-all">{device.code}</p>
           </div>
