@@ -28,8 +28,11 @@ export async function passwordMatches(password: string, stored: string) {
   const expected = Buffer.from(encoded, 'hex');
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
+export const DEVICE_STALE_AFTER_MS = 90_000;
+export const DEVICE_OFFLINE_AFTER_MS = 180_000;
+
 export function connectionStatus(measuredAt: string | null, receivedAt: string | null, now = Date.now()) {
-  if (!receivedAt || now - new Date(receivedAt).getTime() >= 180_000) return 'offline';
-  if (!measuredAt || now - new Date(measuredAt).getTime() >= 90_000) return 'stale';
+  if (!receivedAt || now - new Date(receivedAt).getTime() >= DEVICE_OFFLINE_AFTER_MS) return 'offline';
+  if (!measuredAt || now - new Date(measuredAt).getTime() >= DEVICE_STALE_AFTER_MS) return 'stale';
   return 'online';
 }

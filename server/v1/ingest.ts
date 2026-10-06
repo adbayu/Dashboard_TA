@@ -2,6 +2,8 @@ import type pg from 'pg';
 import { transaction } from '../db.js';
 import { hash } from '../domain.js';
 import { failV1 } from './common.js';
+import { recordReadingEvents } from './monitoring-state.js';
+import type { DeviceEvent } from './events.js';
 
 export type V2IngestBody = {
   version: 2;
@@ -13,18 +15,37 @@ export type V2IngestBody = {
   meta?: { rssi?: number; fw?: string };
 };
 
-export async function ingestV2(pool: pg.Pool, body: V2IngestBody, credential: string) {
+export type IngestPublisher = {
+  publishReading: (deviceId: string, data: { measuredAt: string; readings: Record<string, number> }) => Promise<void>;
+  publishDeviceEvents: (events: DeviceEvent[]) => Promise<void>;
+};
+
+export async function ingestV2(pool: pg.Pool, body: V2IngestBody, credential: string, publisher?: IngestPublisher) {
+  return ingestV2Core(pool, body, credential, publisher, false);
+}
+
+export async function ingestSandboxV2(pool: pg.Pool, body: V2IngestBody, publisher?: IngestPublisher) {
+  return ingestV2Core(pool, body, null, publisher, true);
+}
+
+async function ingestV2Core(
+  pool: pg.Pool,
+  body: V2IngestBody,
+  credential: string | null,
+  publisher: IngestPublisher | undefined,
+  sandboxOnly: boolean,
+) {
   const measuredTime = Date.parse(body.measuredAt);
   if (measuredTime > Date.now() + 60_000) failV1(400, 'VALIDATION_FAILED', 'Waktu pengukuran lebih dari 60 detik di masa depan.');
   const meta = body.meta ?? {};
 
-  return transaction(pool, async client => {
+  const result = await transaction(pool, async client => {
     const device = (await client.query(
-      `SELECT d.id,d.type_id,d.credential_since,t.code AS type_code
+      `SELECT d.id,d.type_id,d.area_ref,d.credential_since,t.code AS type_code
        FROM devices d JOIN device_types t ON t.id=d.type_id
-       WHERE d.id=$1 AND d.credential_hash=$2
+       WHERE d.id=$1 AND ($3::boolean OR d.credential_hash=$2) AND (NOT $3::boolean OR d.is_sandbox=true)
        FOR UPDATE OF d`,
-      [body.deviceId, hash(credential)],
+      [body.deviceId, credential === null ? null : hash(credential), sandboxOnly],
     )).rows[0];
     if (!device) failV1(401, 'UNAUTHENTICATED', 'Credential device salah atau sudah dirotasi.');
     if (measuredTime < new Date(device.credential_since).getTime()) {
@@ -55,7 +76,7 @@ export async function ingestV2(pool: pg.Pool, body: V2IngestBody, credential: st
     )).rows[0];
     if (prior) {
       if (!prior.matches) failV1(409, 'CONFLICT', 'ID kiriman sudah dipakai untuk payload berbeda.');
-      return { accepted: true, duplicate: true };
+      return { duplicate: true, events: [] as DeviceEvent[] };
     }
 
     const owner = (await client.query(
@@ -77,6 +98,12 @@ export async function ingestV2(pool: pg.Pool, body: V2IngestBody, credential: st
        WHERE id=$1`,
       [body.deviceId, meta.rssi ?? null, meta.fw ?? null],
     );
-    return { accepted: true, duplicate: false };
+    const events = await recordReadingEvents(client, body.deviceId, device.type_id, device.area_ref, body.readings, body.messageId, body.measuredAt);
+    return { duplicate: false, events };
   });
+  if (!result.duplicate && publisher) {
+    await publisher.publishReading(body.deviceId, { measuredAt: body.measuredAt, readings: body.readings });
+    if (result.events.length) await publisher.publishDeviceEvents(result.events);
+  }
+  return { accepted: true, duplicate: result.duplicate };
 }
