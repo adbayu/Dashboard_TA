@@ -5,13 +5,22 @@ import pg from 'pg';
 import { migrate } from './db.js';
 import { buildApp } from './app.js';
 import { hash, passwordHash, secret } from './domain.js';
+import { authenticateApiKey, parseApiKey } from './auth/api-key.js';
+import { authenticateSession } from './auth/session.js';
+import { HEARTBEAT_INTERVAL_MS, StreamHub, type StreamClock } from './v1/stream.js';
 
-test('serializer request hanya mencatat method, bukan URL atau query', async () => {
-  const request = { method: 'GET', url: '/api/v1/devices?code=AQ-PKT-TEST&c=unit-test-token' };
+test('serializer request hanya mencatat method, bukan URL, body, atau header', async () => {
+  const request = {
+    method: 'POST',
+    url: '/api/v1/devices/rotation?c=one-time-token',
+    body: { credential: 'one-time-credential' },
+    headers: { authorization: 'Bearer one-time-credential' },
+  };
   const { serializeRequestForLog } = await import('./app.js');
   const serialized = serializeRequestForLog(request);
-  assert.deepEqual(serialized, { method: 'GET' });
+  assert.deepEqual(serialized, { method: 'POST' });
   assert.equal(Object.hasOwn(serialized, 'url'), false);
+  assert.doesNotMatch(JSON.stringify(serialized), /one-time-credential|one-time-token/);
 });
 
 test('V1 migration upgrades an existing pilot schema and backfills IoT metadata once', async () => {
@@ -86,9 +95,13 @@ test('V1 migration upgrades an existing pilot schema and backfills IoT metadata 
 
     assert.deepEqual(
       (await pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version),
-      [1, 2, 3],
+      [1, 2, 3, 4, 5],
     );
     assert.equal((await pool.query("SELECT to_regclass('api_keys_prefix_lookup') AS name")).rows[0].name, 'api_keys_prefix_lookup');
+    assert.equal((await pool.query("SELECT to_regclass('device_events_state_lookup') AS name")).rows[0].name, 'device_events_state_lookup');
+    assert.match((await pool.query('SELECT indexdef FROM pg_indexes WHERE indexname=$1', ['device_events_state_lookup'])).rows[0].indexdef, /device_id, sensor_code, id DESC/);
+    assert.equal((await pool.query('SELECT sandbox_scenario FROM devices WHERE id=$1', [waterId])).rows[0].sandbox_scenario, 'normal');
+    await assert.rejects(pool.query("UPDATE devices SET sandbox_scenario='invalid' WHERE id=$1", [waterId]), { code: '23514' });
 
     const seedCounts = await pool.query(`
       SELECT
@@ -181,6 +194,17 @@ test('V1 device management contracts', async context => {
       assert.equal(spec.openapi, '3.1.0');
       assert.ok(spec.paths['/api/v1/sensor-types']);
       assert.ok(spec.paths['/api/v1/devices']);
+      for (const path of [
+        '/api/v1/devices/{id}/credentials/rotate',
+        '/api/v1/devices/{id}/latest',
+        '/api/v1/devices/{id}/readings',
+        '/api/v1/sensors/{code}/overview',
+        '/api/v1/events',
+        '/api/v1/areas/{ref}/thresholds',
+        '/api/v1/stream',
+        '/api/v1/sandbox/devices',
+        '/api/v1/sandbox/devices/{id}/scenario',
+      ]) assert.ok(spec.paths[path], path);
     });
 
     await context.test('V1-02 rejects a single type with two sensors', async () => {
@@ -283,6 +307,33 @@ test('V1 device management contracts', async context => {
       assert.equal(cookieWithoutOrigin.statusCode, 403, cookieWithoutOrigin.body);
       assert.equal(cookieWithoutOrigin.json().error.code, 'ORIGIN_REJECTED');
     });
+
+    await context.test('Sandbox devices do not consume the v1 pilot limit of 20 live units', async () => {
+      const typeId = (await pool.query("SELECT id FROM device_types WHERE code='AQ-PH'")).rows[0].id;
+      for (let index = 1; index <= 5; index++) {
+        await pool.query(
+          `INSERT INTO devices(id,name,code,type_id,is_sandbox)
+           VALUES($1,$2,$3,$4,true)`,
+          [randomUUID(), 'Sandbox capacity ' + index, `AQ-SBX-CAP-${String(index).padStart(3, '0')}`, typeId],
+        );
+      }
+      let liveCount = Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=false')).rows[0].count);
+      while (liveCount < 19) {
+        await pool.query('INSERT INTO devices(id,name,is_sandbox) VALUES($1,$2,false)', [randomUUID(), 'Live capacity ' + liveCount]);
+        liveCount++;
+      }
+      const lastLive = await request('POST', '/api/v1/devices', admin, {
+        typeCode: 'AQ-PH', name: 'Unit live ke-20', areaRef: null, allocatedTo: null,
+      });
+      assert.equal(lastLive.statusCode, 201, lastLive.body);
+      const overLimit = await request('POST', '/api/v1/devices', admin, {
+        typeCode: 'AQ-PH', name: 'Unit live ke-21', areaRef: null, allocatedTo: null,
+      });
+      assert.equal(overLimit.statusCode, 409, overLimit.body);
+      assert.equal(overLimit.json().error.code, 'CONFLICT');
+      assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=false')).rows[0].count), 20);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=true')).rows[0].count), 5);
+    });
   } finally {
     await app?.close();
     await pool.end();
@@ -302,16 +353,22 @@ test('V1 API key contracts and access controls', async context => {
   const adminId = randomUUID();
   const userId = randomUUID();
   const otherUserId = randomUUID();
+  const noKeyUserId = randomUUID();
   let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+  const sandboxHub = new StreamHub(pool);
+  let userSandboxId = '';
+  let otherSandboxId = '';
+  let adminSandboxId = '';
+  let existingTestKey = '';
 
   try {
     await migrate(pool);
     const encodedPassword = await passwordHash(password);
     await pool.query(
-      "INSERT INTO users(id,email,password_hash,role) VALUES ($1,'admin-keys@example.test',$2,'admin'),($3,'user-keys@example.test',$2,'user'),($4,'other-keys@example.test',$2,'user')",
-      [adminId, encodedPassword, userId, otherUserId],
+      "INSERT INTO users(id,email,password_hash,role) VALUES ($1,'admin-keys@example.test',$2,'admin'),($3,'user-keys@example.test',$2,'user'),($4,'other-keys@example.test',$2,'user'),($5,'no-key-sandbox@example.test',$2,'user')",
+      [adminId, encodedPassword, userId, otherUserId, noKeyUserId],
     );
-    app = await buildApp({ pool, origin, sendInvite: async () => undefined });
+    app = await buildApp({ pool, origin, sendInvite: async () => undefined, streamHub: sandboxHub });
 
     const login = async (email: string) => {
       const response = await app!.inject({ method: 'POST', url: '/api/session/login', headers: { origin }, payload: { email, password } });
@@ -321,7 +378,8 @@ test('V1 API key contracts and access controls', async context => {
     const admin = await login('admin-keys@example.test');
     const user = await login('user-keys@example.test');
     const otherUser = await login('other-keys@example.test');
-    const request = (method: 'GET' | 'POST' | 'DELETE', url: string, cookie?: string, payload?: object, headers: Record<string, string> = {}, remoteAddress = '127.0.0.1') => app!.inject({
+    const noKeyUser = await login('no-key-sandbox@example.test');
+    const request = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, cookie?: string, payload?: object, headers: Record<string, string> = {}, remoteAddress = '127.0.0.1') => app!.inject({
       method,
       url,
       remoteAddress,
@@ -352,6 +410,276 @@ test('V1 API key contracts and access controls', async context => {
       assert.equal(emptyScopes.response.json().error.code, 'VALIDATION_FAILED');
     });
 
+    await context.test('Sandbox: dua POST key test paralel membuat satu device; panel memprovisikan key lama dengan kode global', async () => {
+      const [firstKey, secondKey] = await Promise.all([
+        createKey(user, 'test', ['devices:read'], 'Sandbox race A'),
+        createKey(user, 'test', ['devices:write'], 'Sandbox race B'),
+      ]);
+      assert.equal(firstKey.response.statusCode, 201, firstKey.response.body);
+      assert.equal(secondKey.response.statusCode, 201, secondKey.response.body);
+      const provisioned = await pool.query(
+        `SELECT d.id,d.code FROM devices d JOIN ownerships o ON o.device_id=d.id
+         WHERE d.is_sandbox=true AND o.user_id=$1 AND o.ended_at IS NULL`,
+        [userId],
+      );
+      assert.equal(provisioned.rowCount, 1);
+      userSandboxId = provisioned.rows[0].id;
+      assert.match(provisioned.rows[0].code, /^AQ-SBX-[0-9]{3,}$/);
+
+      existingTestKey = 'jf_test_' + secret();
+      await pool.query(
+        'INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment) VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [randomUUID(), otherUserId, 'Key test lama', existingTestKey.slice(0, 12), hash(existingTestKey), ['devices:read'], 'test'],
+      );
+      const panel = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, { authorization: 'Bearer ' + existingTestKey });
+      assert.equal(panel.statusCode, 200, panel.body);
+      assert.equal(panel.json().devices.length, 1);
+      otherSandboxId = panel.json().devices[0].id;
+      assert.notEqual(panel.json().devices[0].code, provisioned.rows[0].code);
+      const reopened = await request('GET', '/api/v1/sandbox/devices', otherUser);
+      assert.equal(reopened.statusCode, 200, reopened.body);
+      assert.equal(reopened.json().devices.length, 1);
+      assert.equal(reopened.json().devices[0].id, otherSandboxId);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=true AND allocated_to=$1', [otherUserId])).rows[0].count), 1);
+    });
+
+    await context.test('V1-33: sesi tanpa key test memprovisikan satu sandbox saat membuka daftar', async () => {
+      assert.equal(Number((await pool.query("SELECT count(*) FROM api_keys WHERE user_id=$1 AND environment='test'", [noKeyUserId])).rows[0].count), 0);
+      const response = await request('GET', '/api/v1/sandbox/devices', noKeyUser);
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(response.json().devices.length, 1);
+      assert.match(response.json().devices[0].code, /^AQ-SBX-[0-9]{3,}$/);
+      const mapped = await pool.query(
+        `SELECT d.id FROM sandbox_accounts s
+         JOIN devices d ON d.id=s.device_id AND d.is_sandbox=true
+         JOIN ownerships o ON o.device_id=d.id AND o.user_id=s.user_id AND o.ended_at IS NULL
+         WHERE s.user_id=$1`,
+        [noKeyUserId],
+      );
+      assert.equal(mapped.rowCount, 1);
+      assert.equal(mapped.rows[0].id, response.json().devices[0].id);
+    });
+
+    await context.test('Sandbox scenario hanya mengubah device milik actor; ph_turun melewati batas efektif dalam satu siklus', async () => {
+      const userDevice = await pool.query('SELECT id FROM devices WHERE id=$1 AND is_sandbox=true', [userSandboxId]);
+      assert.equal(userDevice.rowCount, 1);
+      const liveDevice = await fixtureDevice(false, userId);
+      const nonSandbox = await request('PUT', `/api/v1/sandbox/devices/${liveDevice.id}/scenario`, user, { scenario: 'ph_turun' });
+      assert.equal(nonSandbox.statusCode, 404, nonSandbox.body);
+      assert.equal(nonSandbox.json().error.code, 'NOT_FOUND');
+      const foreignSandbox = await request('PUT', `/api/v1/sandbox/devices/${otherSandboxId}/scenario`, user, { scenario: 'ph_turun' });
+      assert.equal(foreignSandbox.statusCode, 404, foreignSandbox.body);
+      assert.equal(foreignSandbox.json().error.code, 'NOT_FOUND');
+
+      const adminSandboxList = await request('GET', '/api/v1/sandbox/devices', admin);
+      assert.equal(adminSandboxList.statusCode, 200, adminSandboxList.body);
+      adminSandboxId = adminSandboxList.json().devices[0].id as string;
+      const liveKey = await createKey(admin, 'live', ['devices:read']);
+      assert.equal(liveKey.response.statusCode, 201, liveKey.response.body);
+      const liveKeyScenario = await request('PUT', `/api/v1/sandbox/devices/${adminSandboxId}/scenario`, undefined, { scenario: 'ph_turun' }, { authorization: 'Bearer ' + liveKey.value.secret });
+      assert.equal(liveKeyScenario.statusCode, 404, liveKeyScenario.body);
+      assert.equal(liveKeyScenario.json().error.code, 'NOT_FOUND');
+
+      const scenario = await request('PUT', `/api/v1/sandbox/devices/${userSandboxId}/scenario`, user, { scenario: 'ph_turun' });
+      assert.equal(scenario.statusCode, 200, scenario.body);
+      const { runSandboxCycle } = await import('./sandbox/runner.js');
+      await runSandboxCycle(pool, sandboxHub, new Date());
+      const sample = (await pool.query(
+        `SELECT (r.readings->>'ph')::double precision AS ph,
+           COALESCE(at.warn_low,st.warn_low) AS low
+         FROM readings r JOIN devices d ON d.id=r.device_id
+         JOIN device_type_sensors dts ON dts.type_id=d.type_id AND dts.sensor_code='ph'
+         JOIN sensor_types st ON st.code=dts.sensor_code
+         LEFT JOIN area_thresholds at ON at.area_ref=d.area_ref AND at.sensor_code=st.code
+         WHERE r.device_id=$1 ORDER BY r.measured_at DESC,r.message_id DESC LIMIT 1`,
+        [userSandboxId],
+      )).rows[0];
+      assert.ok(Number(sample.ph) < Number(sample.low), `pH ${sample.ph} must be below effective low ${sample.low}`);
+      assert.equal(Number((await pool.query("SELECT count(*) FROM device_events WHERE device_id=$1 AND sensor_code='ph' AND type='threshold_low'", [userSandboxId])).rows[0].count), 1);
+    });
+
+    await context.test('V1-32: retensi menjaga event state terakhir sandbox dan tidak menyentuh readings/events live', async () => {
+      const { cleanupSandboxRetention, runSandboxCycle } = await import('./sandbox/runner.js');
+      const sandboxDevice = await fixtureDevice(true, userId);
+      const liveDevice = await fixtureDevice(false, userId);
+      await pool.query("UPDATE devices SET sandbox_scenario='ph_turun' WHERE id=$1", [sandboxDevice.id]);
+      const sandboxOwnership = (await pool.query('SELECT id FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [sandboxDevice.id])).rows[0].id;
+      const liveOwnership = (await pool.query('SELECT id FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [liveDevice.id])).rows[0].id;
+      const oldAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+      const sandboxMessageId = randomUUID();
+      const liveMessageId = randomUUID();
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         VALUES($1,$2,$3,$4,$4,'{"ph":6.0}'::jsonb,2,'AQ-PH','{}'::jsonb),
+               ($5,$6,$7,$4,$4,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb)`,
+        [sandboxDevice.id, sandboxMessageId, sandboxOwnership, oldAt, liveDevice.id, liveMessageId, liveOwnership],
+      );
+      const priorLow = (await pool.query("INSERT INTO device_events(device_id,type,sensor_code,at) VALUES($1,'threshold_low','ph',$2) RETURNING id", [sandboxDevice.id, oldAt])).rows[0].id;
+      const cleared = (await pool.query("INSERT INTO device_events(device_id,type,sensor_code,at) VALUES($1,'threshold_clear','ph',$2) RETURNING id", [sandboxDevice.id, oldAt])).rows[0].id;
+      const retainedLow = (await pool.query("INSERT INTO device_events(device_id,type,sensor_code,at) VALUES($1,'threshold_low','ph',$2) RETURNING id", [sandboxDevice.id, oldAt])).rows[0].id;
+      const priorOffline = (await pool.query("INSERT INTO device_events(device_id,type,at) VALUES($1,'offline',$2) RETURNING id", [sandboxDevice.id, oldAt])).rows[0].id;
+      const retainedOnline = (await pool.query("INSERT INTO device_events(device_id,type,at) VALUES($1,'online',$2) RETURNING id", [sandboxDevice.id, oldAt])).rows[0].id;
+      const liveEventId = (await pool.query("INSERT INTO device_events(device_id,type,at) VALUES($1,'offline',$2) RETURNING id", [liveDevice.id, oldAt])).rows[0].id;
+      const result = await cleanupSandboxRetention(pool, 7, new Date());
+      assert.equal(result.readingsDeleted, 1);
+      assert.equal(result.eventsDeleted, 3);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM readings WHERE device_id=$1 AND message_id=$2', [sandboxDevice.id, sandboxMessageId])).rows[0].count), 0);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM device_events WHERE id=ANY($1::bigint[])', [[priorLow, cleared, priorOffline]])).rows[0].count), 0);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM device_events WHERE id=ANY($1::bigint[])', [[retainedLow, retainedOnline]])).rows[0].count), 2);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM readings WHERE device_id=$1 AND message_id=$2', [liveDevice.id, liveMessageId])).rows[0].count), 1);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM device_events WHERE id=$1', [liveEventId])).rows[0].count), 1);
+      await runSandboxCycle(pool, sandboxHub, new Date());
+      assert.equal(Number((await pool.query("SELECT count(*) FROM device_events WHERE device_id=$1 AND sensor_code='ph' AND type='threshold_low'", [sandboxDevice.id])).rows[0].count), 1);
+    });
+
+    await context.test('Sandbox runner tidak overlap; app.close membersihkan timer siklus dan retensi', async () => {
+      const { createNonOverlappingTask, SANDBOX_CYCLE_INTERVAL_MS, SANDBOX_RETENTION_INTERVAL_MS } = await import('./sandbox/runner.js');
+      let runs = 0;
+      let unblock!: () => void;
+      const gate = new Promise<void>(resolve => { unblock = resolve; });
+      const guarded = createNonOverlappingTask(async () => { runs++; await gate; });
+      const first = guarded.run();
+      const overlapping = guarded.run();
+      await Promise.resolve();
+      assert.equal(runs, 1);
+      unblock();
+      await Promise.all([first, overlapping]);
+      await guarded.run();
+      assert.equal(runs, 2);
+
+      const timers: Array<{ callback: () => void; delayMs: number; cancelled: boolean }> = [];
+      const scheduler = {
+        every(callback: () => void, delayMs: number) {
+          const timer = { callback, delayMs, cancelled: false };
+          timers.push(timer);
+          return () => { timer.cancelled = true; };
+        },
+      };
+      const lifecycleOptions = {
+        pool,
+        origin,
+        sendInvite: async () => undefined,
+        streamHub: sandboxHub,
+        enableSandbox: true,
+        sandboxRetentionDays: 7,
+        sandboxScheduler: scheduler,
+      };
+      const lifecycleApp = await buildApp(lifecycleOptions);
+      try {
+        assert.equal(timers.length, 2);
+        assert.deepEqual(timers.map(timer => timer.delayMs).sort((a, b) => a - b), [SANDBOX_CYCLE_INTERVAL_MS, SANDBOX_RETENTION_INTERVAL_MS].sort((a, b) => a - b));
+      } finally {
+        await lifecycleApp.close();
+      }
+      assert.equal(timers.every(timer => timer.cancelled), true);
+
+      const retentionTimers: Array<{ callback: () => void; delayMs: number; cancelled: boolean }> = [];
+      const retentionScheduler = {
+        every(callback: () => void, delayMs: number) {
+          const timer = { callback, delayMs, cancelled: false };
+          retentionTimers.push(timer);
+          return () => { timer.cancelled = true; };
+        },
+      };
+      const disabledOptions = { ...lifecycleOptions, enableSandbox: false, sandboxScheduler: retentionScheduler };
+      const disabledApp = await buildApp(disabledOptions);
+      try {
+        assert.equal(retentionTimers.length, 1);
+        assert.equal(retentionTimers[0].delayMs, SANDBOX_RETENTION_INTERVAL_MS);
+      } finally {
+        await disabledApp.close();
+      }
+      assert.equal(retentionTimers[0].cancelled, true);
+    });
+
+    await context.test('V1-31: rotasi credential dibatasi admin, memotong credential lama, dan terserialisasi dengan ingest', async () => {
+      const created = await request('POST', '/api/v1/devices', admin, {
+        typeCode: 'AQ-PH', name: 'Device credential rotation', areaRef: null, allocatedTo: userId,
+      });
+      assert.equal(created.statusCode, 201);
+      const { device, credential: originalCredential, activationCode } = created.json();
+      const claim = await request('POST', '/api/v1/devices/claim', user, { code: device.code, activationCode });
+      assert.equal(claim.statusCode, 200);
+      await pool.query("UPDATE devices SET credential_since=clock_timestamp()-interval '10 minutes' WHERE id=$1", [device.id]);
+      await pool.query("UPDATE ownerships SET started_at=clock_timestamp()-interval '10 minutes' WHERE device_id=$1 AND ended_at IS NULL", [device.id]);
+
+      const rotatePath = `/api/v1/devices/${device.id}/credentials/rotate`;
+      const deniedUser = await request('POST', rotatePath, user);
+      assert.equal(deniedUser.statusCode, 403);
+      assert.equal(deniedUser.json().error.code, 'FORBIDDEN_SCOPE');
+      const readOnlyAdminKey = await createKey(admin, 'live', ['devices:read']);
+      const deniedScope = await request('POST', rotatePath, undefined, undefined, { authorization: 'Bearer ' + readOnlyAdminKey.value.secret });
+      assert.equal(deniedScope.statusCode, 403);
+      assert.equal(deniedScope.json().error.code, 'FORBIDDEN_SCOPE');
+      const adminKey = await createKey(admin, 'live', ['admin']);
+      const rotated = await request('POST', rotatePath, undefined, undefined, { authorization: 'Bearer ' + adminKey.value.secret });
+      assert.equal(rotated.statusCode, 200);
+      const firstCredential = rotated.json().credential as string;
+      assert.match(firstCredential, /^[a-f0-9]{64}$/);
+      assert.notEqual(firstCredential, originalCredential);
+      assert.equal(typeof rotated.json().credentialSince, 'string');
+      const firstSince = Date.parse(rotated.json().credentialSince);
+      assert.ok(Number.isFinite(firstSince));
+      const firstStored = (await pool.query('SELECT credential_hash,credential_since FROM devices WHERE id=$1', [device.id])).rows[0];
+      assert.equal(firstStored.credential_hash, hash(firstCredential));
+      assert.equal(new Date(firstStored.credential_since).toISOString(), rotated.json().credentialSince);
+
+      const ingest = (deviceCredential: string, messageId: string) => app!.inject({
+        method: 'POST', url: '/api/ingest',
+        headers: { authorization: 'Bearer ' + deviceCredential },
+        payload: {
+          version: 2, deviceId: device.id, type: 'AQ-PH', messageId,
+          measuredAt: new Date(Date.now() + 30_000).toISOString(), readings: { ph: 7.0 },
+        },
+      });
+      const oldCredential = await ingest(originalCredential, randomUUID());
+      assert.equal(oldCredential.statusCode, 401);
+      assert.equal(oldCredential.json().error.code, 'UNAUTHENTICATED');
+      const newCredential = await ingest(firstCredential, randomUUID());
+      assert.equal(newCredential.statusCode, 200);
+
+      const lockHolder = await pool.connect();
+      await lockHolder.query('BEGIN');
+      await lockHolder.query('SELECT id FROM devices WHERE id=$1 FOR UPDATE', [device.id]);
+      const concurrentRotation = request('POST', rotatePath, undefined, undefined, { authorization: 'Bearer ' + adminKey.value.secret });
+      const concurrentIngest = ingest(firstCredential, randomUUID());
+      let lockWaiters = 0;
+      const lockDeadline = Date.now() + 3000;
+      try {
+        while (Date.now() < lockDeadline && lockWaiters < 2) {
+          lockWaiters = Number((await pool.query(
+            "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock'",
+          )).rows[0].count);
+          if (lockWaiters < 2) await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      } finally {
+        await lockHolder.query('ROLLBACK');
+        lockHolder.release();
+      }
+      const [rotatedAgain, racedIngest] = await Promise.all([concurrentRotation, concurrentIngest]);
+      assert.ok(lockWaiters >= 2, `Expected both requests to wait on the device row lock, saw ${lockWaiters}`);
+      assert.equal(rotatedAgain.statusCode, 200);
+      const secondCredential = rotatedAgain.json().credential as string;
+      assert.match(secondCredential, /^[a-f0-9]{64}$/);
+      assert.notEqual(secondCredential, firstCredential);
+      assert.ok(racedIngest.statusCode === 200 || racedIngest.statusCode === 401);
+      if (racedIngest.statusCode === 401) assert.equal(racedIngest.json().error.code, 'UNAUTHENTICATED');
+      const oldAfterRace = await ingest(firstCredential, randomUUID());
+      assert.equal(oldAfterRace.statusCode, 401);
+      assert.equal(oldAfterRace.json().error.code, 'UNAUTHENTICATED');
+      const currentCredential = await ingest(secondCredential, randomUUID());
+      assert.equal(currentCredential.statusCode, 200);
+      const finalStored = (await pool.query('SELECT credential_hash,credential_since FROM devices WHERE id=$1', [device.id])).rows[0];
+      assert.equal(finalStored.credential_hash, hash(secondCredential));
+      assert.equal(new Date(finalStored.credential_since).toISOString(), rotatedAgain.json().credentialSince);
+
+      const visibleDevice = await request('GET', `/api/v1/devices/${device.id}`, user);
+      assert.equal(visibleDevice.statusCode, 200);
+      assert.equal(visibleDevice.json().device.isSandbox, false);
+      assert.equal(Object.hasOwn(visibleDevice.json().device, 'credential'), false);
+      assert.equal(Object.hasOwn(visibleDevice.json().device, 'credentialHash'), false);
+    });
+
     await context.test('V1-09: key test tidak dapat membaca device live', async () => {
       const liveDevice = await fixtureDevice(false, userId);
       const key = await createKey(user, 'test', ['devices:read']);
@@ -370,7 +698,39 @@ test('V1 API key contracts and access controls', async context => {
       assert.equal(response.json().error.code, 'NOT_FOUND');
     });
 
-    await context.test('Tambahan: key admin tidak dapat membuat QR lintas environment', async () => {
+    await context.test('V1-30: sandbox menolak rotasi, release, klaim, aktivasi, QR, dan preview dengan 404', async () => {
+      const activationCode = secret();
+      const sandboxDevice = await fixtureDevice(true, adminId, { activationCode });
+      await pool.query('INSERT INTO ownerships(id,device_id,user_id) VALUES($1,$2,$3)', [randomUUID(), sandboxDevice.id, adminId]);
+      const listing = await request('GET', '/api/v1/devices', admin);
+      assert.equal(listing.statusCode, 200);
+      assert.equal(listing.json().devices.find((item: { id: string }) => item.id === sandboxDevice.id)?.isSandbox, true);
+
+      const rotate = await request('POST', `/api/v1/devices/${sandboxDevice.id}/credentials/rotate`, admin);
+      assert.equal(rotate.statusCode, 404);
+      assert.equal(rotate.json().error.code, 'NOT_FOUND');
+      const release = await request('POST', `/api/v1/devices/${sandboxDevice.id}/release`, admin);
+      assert.equal(release.statusCode, 404);
+      assert.equal(release.json().error.code, 'NOT_FOUND');
+      const claim = await request('POST', '/api/v1/devices/claim', admin, { code: sandboxDevice.code, activationCode });
+      assert.equal(claim.statusCode, 404);
+      assert.equal(claim.json().error.code, 'NOT_FOUND');
+      const activation = await request('POST', `/api/v1/devices/${sandboxDevice.id}/activation`, admin);
+      assert.equal(activation.statusCode, 404);
+      assert.equal(activation.json().error.code, 'NOT_FOUND');
+      const qr = await request('POST', `/api/v1/devices/${sandboxDevice.id}/qr`, admin, { activationCode });
+      assert.equal(qr.statusCode, 404);
+      assert.equal(qr.json().error.code, 'NOT_FOUND');
+      const preview = await request('GET', `/api/v1/devices?code=${sandboxDevice.code}&c=${activationCode}`);
+      assert.equal(preview.statusCode, 404);
+      assert.equal(preview.json().error.code, 'NOT_FOUND');
+      const unchanged = (await pool.query('SELECT credential_hash,activation_hash FROM devices WHERE id=$1', [sandboxDevice.id])).rows[0];
+      assert.equal(unchanged.credential_hash, null);
+      assert.equal(unchanged.activation_hash, hash(activationCode));
+      assert.equal(Number((await pool.query('SELECT count(*) FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [sandboxDevice.id])).rows[0].count), 1);
+    });
+
+    await context.test('Tambahan: key admin tidak dapat membuat QR lintas environment; sandbox tidak menerima QR', async () => {
       const sandboxActivation = secret();
       const sandboxDevice = await fixtureDevice(true, adminId, { activationCode: sandboxActivation });
       const liveActivation = secret();
@@ -386,20 +746,22 @@ test('V1 API key contracts and access controls', async context => {
         { authorization: 'Bearer ' + apiSecret },
       );
       const testOwnEnvironment = await qrRequest(sandboxDevice.id, sandboxActivation, testKey.value.secret);
-      assert.equal(testOwnEnvironment.statusCode, 200, testOwnEnvironment.body);
+      assert.equal(testOwnEnvironment.statusCode, 404);
+      assert.equal(testOwnEnvironment.json().error.code, 'NOT_FOUND');
       const testOtherEnvironment = await qrRequest(liveDevice.id, liveActivation, testKey.value.secret);
-      assert.equal(testOtherEnvironment.statusCode, 404, testOtherEnvironment.body);
+      assert.equal(testOtherEnvironment.statusCode, 404);
       assert.equal(testOtherEnvironment.json().error.code, 'NOT_FOUND');
       const liveOwnEnvironment = await qrRequest(liveDevice.id, liveActivation, liveKey.value.secret);
-      assert.equal(liveOwnEnvironment.statusCode, 200, liveOwnEnvironment.body);
+      assert.equal(liveOwnEnvironment.statusCode, 200);
       const liveOtherEnvironment = await qrRequest(sandboxDevice.id, sandboxActivation, liveKey.value.secret);
-      assert.equal(liveOtherEnvironment.statusCode, 404, liveOtherEnvironment.body);
+      assert.equal(liveOtherEnvironment.statusCode, 404);
       assert.equal(liveOtherEnvironment.json().error.code, 'NOT_FOUND');
 
-      for (const [device, activationCode] of [[sandboxDevice, sandboxActivation], [liveDevice, liveActivation]] as const) {
-        const sessionQr = await request('POST', '/api/v1/devices/' + device.id + '/qr', admin, { activationCode });
-        assert.equal(sessionQr.statusCode, 200, sessionQr.body);
-      }
+      const sessionSandboxQr = await request('POST', '/api/v1/devices/' + sandboxDevice.id + '/qr', admin, { activationCode: sandboxActivation });
+      assert.equal(sessionSandboxQr.statusCode, 404);
+      assert.equal(sessionSandboxQr.json().error.code, 'NOT_FOUND');
+      const sessionLiveQr = await request('POST', '/api/v1/devices/' + liveDevice.id + '/qr', admin, { activationCode: liveActivation });
+      assert.equal(sessionLiveQr.statusCode, 200);
     });
 
     await context.test('Tambahan: lifecycle key, prefix/hash, dan schema OpenAPI', async () => {
@@ -449,9 +811,10 @@ test('V1 API key contracts and access controls', async context => {
       const denied = await request('GET', '/api/v1/devices/' + device.id + '/latest', undefined, undefined, { authorization: 'Bearer ' + noReadings.value.secret });
       assert.equal(denied.statusCode, 403, denied.body);
       assert.equal(denied.json().error.code, 'FORBIDDEN_SCOPE');
-      const allowedButUnimplemented = await request('GET', '/api/v1/devices/' + device.id + '/latest', undefined, undefined, { authorization: 'Bearer ' + hasReadings.value.secret });
-      assert.equal(allowedButUnimplemented.statusCode, 404, allowedButUnimplemented.body);
-      assert.equal(allowedButUnimplemented.json().error.code, 'NOT_FOUND');
+      const latest = await request('GET', '/api/v1/devices/' + device.id + '/latest', undefined, undefined, { authorization: 'Bearer ' + hasReadings.value.secret });
+      assert.equal(latest.statusCode, 200, latest.body);
+      assert.equal(latest.json().measuredAt, null);
+      assert.equal(latest.json().readings[0].state, 'unknown');
     });
 
     await context.test('V1-12: key yang dicabut ditolak sebagai UNAUTHENTICATED', async () => {
@@ -569,13 +932,13 @@ test('V1 API key contracts and access controls', async context => {
       assert.equal(mixed.json().error.code, 'AMBIGUOUS_AUTH');
     });
 
-    await context.test('V1-14: klaim dengan key test sah tanpa Origin', async () => {
+    await context.test('V1-14: klaim sandbox dengan key test tanpa Origin ditolak sebagai resource tersembunyi', async () => {
       const activation = secret();
       const claimable = await fixtureDevice(true, userId, { activationCode: activation });
       const writeKey = await createKey(user, 'test', ['devices:write']);
       const keyClaim = await request('POST', '/api/v1/devices/claim', undefined, { code: claimable.code, activationCode: activation }, { authorization: 'Bearer ' + writeKey.value.secret });
-      assert.equal(keyClaim.statusCode, 200, keyClaim.body);
-      assert.equal(keyClaim.json().deviceId, claimable.id);
+      assert.equal(keyClaim.statusCode, 404);
+      assert.equal(keyClaim.json().error.code, 'NOT_FOUND');
     });
 
     await context.test('V1-15: POST ber-cookie dengan Origin asing ditolak', async () => {
@@ -640,16 +1003,16 @@ test('V1 API key contracts and access controls', async context => {
 
     await context.test('V1-17: activation code kedaluwarsa menghasilkan VALIDATION_FAILED', async () => {
       const activation = secret();
-      const device = await fixtureDevice(true, userId, { activationCode: activation });
+      const device = await fixtureDevice(false, userId, { activationCode: activation });
       await pool.query("UPDATE devices SET activation_expires=now()-interval '1 second' WHERE id=$1", [device.id]);
       const response = await request('POST', '/api/v1/devices/claim', user, { code: device.code, activationCode: activation });
       assert.equal(response.statusCode, 400, response.body);
       assert.equal(response.json().error.code, 'VALIDATION_FAILED');
     });
 
-    await context.test('V1-18: dua akun mengklaim device sandbox tanpa allocated_to secara bersamaan', async () => {
+    await context.test('V1-18: dua akun mengklaim device live tanpa allocated_to secara bersamaan', async () => {
       const activation = secret();
-      const device = await fixtureDevice(true, null, { activationCode: activation });
+      const device = await fixtureDevice(false, null, { activationCode: activation });
       const unallocated = await pool.query('SELECT allocated_to FROM devices WHERE id=$1', [device.id]);
       assert.equal(unallocated.rows[0].allocated_to, null);
       const claims = await Promise.all([
@@ -874,6 +1237,555 @@ test('V1 ingest validates v2 readings and continues accepting pilot v1', async c
       assert.deepEqual(accepted.json(), { accepted: true, duplicate: false });
       const saved = await pool.query('SELECT ingest_version,ingest_type,ingest_meta FROM readings WHERE device_id=$1 AND message_id=$2', [device.deviceId, message.messageId]);
       assert.deepEqual(saved.rows[0], { ingest_version: 1, ingest_type: 'water-v1', ingest_meta: {} });
+    });
+  } finally {
+    await app?.close();
+    await pool.end();
+    await control.query('DROP SCHEMA ' + schema + ' CASCADE');
+    await control.end();
+  }
+});
+
+test('V1 readings, ambang, kejadian, dan deteksi offline memakai PostgreSQL', async context => {
+  assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
+  const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = 'v1_monitoring_test_' + randomUUID().replaceAll('-', '');
+  await control.query('CREATE SCHEMA ' + schema);
+  const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 8 });
+  const origin = 'http://localhost:5173';
+  const password = 'Farm-monitoring-integration-test';
+  const adminId = randomUUID();
+  const userId = randomUUID();
+  const otherUserId = randomUUID();
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+  let adminCookie = '';
+  let userCookie = '';
+  let otherCookie = '';
+  let thresholdDeviceId = '';
+  let thresholdDeviceCredential = '';
+  const heartbeatTimers: Array<{ callback: () => void; delayMs: number; cancelled: boolean }> = [];
+  const streamClock: StreamClock = {
+    every(callback, delayMs) {
+      const timer = { callback, delayMs, cancelled: false };
+      heartbeatTimers.push(timer);
+      return () => { timer.cancelled = true; };
+    },
+  };
+  const streamHub = new StreamHub(pool, { clock: streamClock });
+
+  try {
+    await migrate(pool);
+    const encodedPassword = await passwordHash(password);
+    await pool.query(
+      "INSERT INTO users(id,email,password_hash,role) VALUES ($1,'admin-monitoring@example.test',$2,'admin'),($3,'user-monitoring@example.test',$2,'user'),($4,'other-monitoring@example.test',$2,'user')",
+      [adminId, encodedPassword, userId, otherUserId],
+    );
+    app = await buildApp({ pool, origin, sendInvite: async () => undefined, enableOfflineDetection: false, streamHub });
+
+    const login = async (email: string) => {
+      const response = await app!.inject({ method: 'POST', url: '/api/session/login', headers: { origin }, payload: { email, password } });
+      assert.equal(response.statusCode, 200, response.body);
+      return String(response.headers['set-cookie']).split(';')[0];
+    };
+    adminCookie = await login('admin-monitoring@example.test');
+    userCookie = await login('user-monitoring@example.test');
+    otherCookie = await login('other-monitoring@example.test');
+    const request = (method: 'GET' | 'POST' | 'PUT', url: string, cookie?: string, payload?: object) => app!.inject({
+      method,
+      url,
+      headers: { ...(cookie ? { cookie } : {}), ...(cookie && method !== 'GET' ? { origin } : {}) },
+      payload,
+    });
+    const createAndClaim = async (areaRef: string | null = 'AR-01', ownerCookie = userCookie) => {
+      const created = await request('POST', '/api/v1/devices', adminCookie, {
+        typeCode: 'AQ-PH', name: 'Sensor monitoring ' + randomUUID().slice(0, 8), areaRef, allocatedTo: null,
+      });
+      assert.equal(created.statusCode, 201, created.body);
+      const value = created.json();
+      const claim = await request('POST', '/api/v1/devices/claim', ownerCookie, {
+        code: value.device.code, activationCode: value.activationCode,
+      });
+      assert.equal(claim.statusCode, 200, claim.body);
+      await pool.query("UPDATE devices SET credential_since=clock_timestamp()-interval '1 hour' WHERE id=$1", [value.device.id]);
+      await pool.query("UPDATE ownerships SET started_at=clock_timestamp()-interval '1 hour' WHERE device_id=$1 AND ended_at IS NULL", [value.device.id]);
+      const ownershipId = (await pool.query('SELECT id FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [value.device.id])).rows[0].id;
+      return { id: value.device.id as string, code: value.device.code as string, credential: value.credential as string, ownershipId: ownershipId as string };
+    };
+    const ingestV2 = (device: { id: string; credential: string }, value: number, messageId = randomUUID(), measuredAt = new Date().toISOString()) => app!.inject({
+      method: 'POST',
+      url: '/api/ingest',
+      headers: { authorization: 'Bearer ' + device.credential },
+      payload: { version: 2, deviceId: device.id, type: 'AQ-PH', messageId, measuredAt, readings: { ph: value } },
+    });
+    const assertV1Error = (response: { statusCode: number; body: string; json: () => any }, status: number, code: string) => {
+      assert.equal(response.statusCode, status, response.body);
+      assert.equal(response.json().error.code, code);
+    };
+
+    await context.test('V1-19: transisi ambang tetap tunggal pada ingest v1 dan v2', async () => {
+      const device = await createAndClaim();
+      thresholdDeviceId = device.id;
+      thresholdDeviceCredential = device.credential;
+      const firstTime = new Date().toISOString();
+      const firstId = randomUUID();
+      const low = await ingestV2(device, 6.1, firstId, firstTime);
+      assert.deepEqual(low.json(), { accepted: true, duplicate: false });
+      const retry = await ingestV2(device, 6.1, firstId, firstTime);
+      assert.deepEqual(retry.json(), { accepted: true, duplicate: true });
+      assert.deepEqual((await pool.query('SELECT type FROM device_events WHERE device_id=$1 ORDER BY id', [device.id])).rows.map(row => row.type), ['threshold_low']);
+      const repeatedLow = await ingestV2(device, 6.0);
+      assert.deepEqual(repeatedLow.json(), { accepted: true, duplicate: false });
+      const normal = await ingestV2(device, 7.0);
+      assert.deepEqual(normal.json(), { accepted: true, duplicate: false });
+      assert.deepEqual((await pool.query('SELECT type,sensor_code FROM device_events WHERE device_id=$1 ORDER BY id', [device.id])).rows, [
+        { type: 'threshold_low', sensor_code: 'ph' },
+        { type: 'threshold_clear', sensor_code: 'ph' },
+      ]);
+      const filteredEvents = await request('GET', `/api/v1/events?deviceId=${device.id}&type=threshold_low&limit=1`, userCookie);
+      assert.equal(filteredEvents.statusCode, 200, filteredEvents.body);
+      assert.equal(filteredEvents.json().events.length, 1);
+      assert.equal(filteredEvents.json().events[0].type, 'threshold_low');
+      assert.equal(filteredEvents.json().events[0].sensor, 'ph');
+
+      const legacy = await app!.inject({
+        method: 'POST', url: '/api/admin/devices', headers: { cookie: adminCookie, origin },
+        payload: { userId, name: 'Pilot air untuk transisi ambang', model: 'water-v1' },
+      });
+      assert.equal(legacy.statusCode, 200, legacy.body);
+      const pilot = legacy.json();
+      const paired = await app!.inject({ method: 'POST', url: '/api/devices/pair', headers: { cookie: userCookie, origin }, payload: { code: pilot.activationCode } });
+      assert.equal(paired.statusCode, 200, paired.body);
+      await pool.query("UPDATE devices SET credential_since=clock_timestamp()-interval '1 hour' WHERE id=$1", [pilot.deviceId]);
+      await pool.query("UPDATE ownerships SET started_at=clock_timestamp()-interval '1 hour' WHERE device_id=$1 AND ended_at IS NULL", [pilot.deviceId]);
+      const legacyPayload = (ph: number, messageId: string) => ({
+        version: 1, deviceId: pilot.deviceId, model: 'water-v1', messageId, measuredAt: new Date().toISOString(),
+        readings: { water_temperature: 26, ph, ec: 1.2 },
+      });
+      const legacyLow = legacyPayload(6.1, randomUUID());
+      assert.deepEqual((await app!.inject({ method: 'POST', url: '/api/ingest', headers: { authorization: 'Bearer ' + pilot.credential }, payload: legacyLow })).json(), { accepted: true, duplicate: false });
+      assert.deepEqual((await app!.inject({ method: 'POST', url: '/api/ingest', headers: { authorization: 'Bearer ' + pilot.credential }, payload: legacyPayload(6.0, randomUUID()) })).json(), { accepted: true, duplicate: false });
+      assert.deepEqual((await app!.inject({ method: 'POST', url: '/api/ingest', headers: { authorization: 'Bearer ' + pilot.credential }, payload: legacyPayload(7.0, randomUUID()) })).json(), { accepted: true, duplicate: false });
+      assert.deepEqual((await pool.query('SELECT type,sensor_code FROM device_events WHERE device_id=$1 ORDER BY id', [pilot.deviceId])).rows, [
+        { type: 'threshold_low', sensor_code: 'ph' },
+        { type: 'threshold_clear', sensor_code: 'ph' },
+      ]);
+    });
+
+    await context.test('GET events memakai cursor, filter, ownership, dan environment key', async () => {
+      const firstPage = await request('GET', `/api/v1/events?deviceId=${thresholdDeviceId}&limit=1`, userCookie);
+      assert.equal(firstPage.statusCode, 200, firstPage.body);
+      assert.equal(firstPage.json().events[0].type, 'threshold_clear');
+      assert.ok(firstPage.json().nextCursor);
+      const secondPage = await request('GET', `/api/v1/events?deviceId=${thresholdDeviceId}&limit=1&cursor=${encodeURIComponent(firstPage.json().nextCursor)}`, userCookie);
+      assert.equal(secondPage.statusCode, 200, secondPage.body);
+      assert.equal(secondPage.json().events[0].type, 'threshold_low');
+      assert.equal(secondPage.json().nextCursor, null);
+
+      const otherDevice = await createAndClaim('AR-OTHER', otherCookie);
+      await pool.query("INSERT INTO device_events(device_id,type) VALUES($1,'offline')", [otherDevice.id]);
+      const hiddenDeviceEvents = await request('GET', `/api/v1/events?deviceId=${otherDevice.id}`, userCookie);
+      assertV1Error(hiddenDeviceEvents, 404, 'NOT_FOUND');
+      const ownEvents = await request('GET', '/api/v1/events', userCookie);
+      assert.equal(ownEvents.statusCode, 200, ownEvents.body);
+      assert.equal(ownEvents.json().events.some((event: { deviceId: string }) => event.deviceId === otherDevice.id), false);
+
+      const testKey = 'jf_test_' + secret();
+      await pool.query(
+        'INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment) VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [randomUUID(), userId, 'Key test kejadian', testKey.slice(0, 12), hash(testKey), ['readings:read'], 'test'],
+      );
+      const testEvents = await app!.inject({ method: 'GET', url: '/api/v1/events', headers: { authorization: 'Bearer ' + testKey } });
+      assert.equal(testEvents.statusCode, 200, testEvents.body);
+      assert.equal(testEvents.json().events.some((event: { deviceId: string }) => event.deviceId === thresholdDeviceId || event.deviceId === otherDevice.id), false);
+    });
+
+    await context.test('V1-23: SSE menjaga akses actor, replay ID event, tanpa ID reading, heartbeat terkendali, batas 5, dan cleanup peer/app.close', async () => {
+      const unauthenticated = await app!.inject({ method: 'GET', url: '/api/v1/stream', headers: { accept: 'text/event-stream' } });
+      assert.equal(unauthenticated.statusCode, 401, unauthenticated.body);
+      const invalidReplay = await app!.inject({
+        method: 'GET', url: '/api/v1/stream',
+        headers: { accept: 'text/event-stream', cookie: userCookie, 'last-event-id': 'bukan-id' },
+      });
+      assert.equal(invalidReplay.statusCode, 400, invalidReplay.body);
+      assert.equal(invalidReplay.json().error.code, 'VALIDATION_FAILED');
+
+      const liveReplayDevice = await createAndClaim('AR-STREAM-LIVE');
+      const livePublishDevice = await createAndClaim('AR-STREAM-PUBLISH');
+      const otherDevice = await createAndClaim('AR-STREAM-OTHER', otherCookie);
+      const typeId = (await pool.query("SELECT id FROM device_types WHERE code='AQ-PH'")).rows[0].id;
+      const sandboxDeviceId = randomUUID();
+      const sandboxCode = 'AQ-SBX-' + randomUUID().slice(0, 8).toUpperCase();
+      await pool.query(
+        `INSERT INTO devices(id,name,model,credential_hash,credential_since,allocated_to,code,type_id,area_ref,is_sandbox,sandbox_scenario)
+         VALUES($1,'Device sandbox SSE',NULL,NULL,clock_timestamp()-interval '1 hour',$2,$3,$4,'AR-SBX',true,'normal')`,
+        [sandboxDeviceId, userId, sandboxCode, typeId],
+      );
+      await pool.query(
+        "INSERT INTO ownerships(id,device_id,user_id,started_at) VALUES($1,$2,$3,clock_timestamp()-interval '1 hour')",
+        [randomUUID(), sandboxDeviceId, userId],
+      );
+
+      const replayBaseId = String((await pool.query('SELECT COALESCE(max(id),0)::text AS id FROM device_events')).rows[0].id);
+      const eventTime = new Date().toISOString();
+      const liveEventId = (await pool.query(
+        `INSERT INTO device_events(device_id,type,sensor_code,value,at)
+         VALUES($1,'threshold_low','ph',6.1,$2) RETURNING id::text AS id`,
+        [liveReplayDevice.id, eventTime],
+      )).rows[0].id as string;
+      const sandboxEventId = (await pool.query(
+        `INSERT INTO device_events(device_id,type,at)
+         VALUES($1,'offline',$2) RETURNING id::text AS id`,
+        [sandboxDeviceId, eventTime],
+      )).rows[0].id as string;
+      const otherEventId = (await pool.query(
+        `INSERT INTO device_events(device_id,type,at)
+         VALUES($1,'offline',$2) RETURNING id::text AS id`,
+        [otherDevice.id, eventTime],
+      )).rows[0].id as string;
+
+      const sessionActor = await authenticateSession(pool, userCookie.slice('pilot_session='.length));
+      const otherActor = await authenticateSession(pool, otherCookie.slice('pilot_session='.length));
+      assert.ok(sessionActor);
+      assert.ok(otherActor);
+      const testKey = 'jf_test_' + secret();
+      await pool.query(
+        'INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment) VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [randomUUID(), userId, 'Key test SSE', testKey.slice(0, 12), hash(testKey), ['readings:read'], 'test'],
+      );
+      const parsedKey = parseApiKey('Bearer ' + testKey);
+      assert.ok(parsedKey);
+      const keyActor = await authenticateApiKey(pool, parsedKey);
+      const sessionFrames: string[] = [];
+      const keyFrames: string[] = [];
+      const otherFrames: string[] = [];
+      const resumedFrames: string[] = [];
+      const sessionConnection = streamHub.subscribe(sessionActor, frame => { sessionFrames.push(frame); });
+      const keyConnection = streamHub.subscribe(keyActor, frame => { keyFrames.push(frame); });
+      const otherConnection = streamHub.subscribe(otherActor, frame => { otherFrames.push(frame); });
+      assert.ok(sessionConnection);
+      assert.ok(keyConnection);
+      assert.ok(otherConnection);
+      assert.equal(streamHub.connectionCount(userId), 2);
+
+      await Promise.all([
+        streamHub.replay(sessionConnection, replayBaseId),
+        streamHub.replay(keyConnection, replayBaseId),
+        streamHub.replay(otherConnection, replayBaseId),
+      ]);
+      const frameIds = (frames: string[]) => frames.filter(frame => frame.startsWith('id: ')).map(frame => frame.slice(4).split('\n', 1)[0]);
+      assert.deepEqual(frameIds(sessionFrames), [liveEventId, sandboxEventId]);
+      assert.deepEqual(frameIds(keyFrames), [sandboxEventId]);
+      assert.deepEqual(frameIds(otherFrames), [otherEventId]);
+      assert.equal(sessionFrames.every(frame => !frame.includes(`id: ${otherEventId}\n`)), true);
+
+      const thirdConnection = streamHub.subscribe(sessionActor, () => {});
+      assert.ok(thirdConnection);
+      assert.equal(streamHub.connectionCount(userId), 3);
+      const fourthConnection = streamHub.subscribe(keyActor, () => {});
+      assert.ok(fourthConnection);
+      const fifthConnection = streamHub.subscribe(sessionActor, () => {});
+      assert.ok(fifthConnection);
+      assert.equal(streamHub.connectionCount(userId), 5);
+      const sixthConnection = streamHub.subscribe(keyActor, () => {});
+      assert.equal(sixthConnection, null);
+      const limited = await app!.inject({
+        method: 'GET', url: '/api/v1/stream',
+        headers: { accept: 'text/event-stream', cookie: userCookie },
+      });
+      assert.equal(limited.statusCode, 429, limited.body);
+      assert.equal(limited.json().error.code, 'RATE_LIMITED');
+
+      thirdConnection.close();
+      const resumed = streamHub.subscribe(keyActor, frame => { resumedFrames.push(frame); });
+      assert.ok(resumed);
+      await streamHub.replay(resumed, liveEventId);
+      assert.deepEqual(frameIds(resumedFrames), [sandboxEventId]);
+
+      const sandboxReadOffset = keyFrames.length;
+      await streamHub.publishReading(sandboxDeviceId, { measuredAt: eventTime, readings: { ph: 6.9 } });
+      const sandboxReading = keyFrames.slice(sandboxReadOffset).find(frame => frame.includes('event: reading'));
+      assert.ok(sandboxReading);
+      assert.equal(sandboxReading.startsWith('id: '), false);
+      const liveReadOffset = sessionFrames.length;
+      const keyLiveOffset = keyFrames.length;
+      const otherLiveOffset = otherFrames.length;
+      const liveReadingTime = new Date().toISOString();
+      const messageId = randomUUID();
+      const ingested = await ingestV2(livePublishDevice, 6.0, messageId, liveReadingTime);
+      assert.deepEqual(ingested.json(), { accepted: true, duplicate: false });
+      const liveFrames = sessionFrames.slice(liveReadOffset);
+      const readingFrame = liveFrames.find(frame => frame.includes('event: reading'));
+      assert.ok(readingFrame);
+      assert.equal(readingFrame.startsWith('id: '), false);
+      const publishedThreshold = (await pool.query(
+        "SELECT id::text AS id FROM device_events WHERE device_id=$1 AND type='threshold_low' ORDER BY id DESC LIMIT 1",
+        [livePublishDevice.id],
+      )).rows[0].id as string;
+      assert.equal(liveFrames.some(frame => frame.startsWith(`id: ${publishedThreshold}\nevent: device_event`)), true);
+      assert.equal(keyFrames.length, keyLiveOffset);
+      assert.equal(otherFrames.length, otherLiveOffset);
+      const deliveredCount = sessionFrames.length;
+      const duplicate = await ingestV2(livePublishDevice, 6.0, messageId, liveReadingTime);
+      assert.deepEqual(duplicate.json(), { accepted: true, duplicate: true });
+      assert.equal(sessionFrames.length, deliveredCount);
+
+      const heartbeat = heartbeatTimers.find(timer => !timer.cancelled);
+      assert.ok(heartbeat);
+      assert.equal(heartbeat.delayMs, HEARTBEAT_INTERVAL_MS);
+      heartbeat.callback();
+      assert.equal(sessionFrames.some(frame => frame === ': heartbeat\n\n'), true);
+
+      for (const connection of [sessionConnection, keyConnection, otherConnection, fourthConnection, fifthConnection, resumed]) connection.close();
+      assert.equal(streamHub.connectionCount(userId), 0);
+      assert.equal(heartbeatTimers.some(timer => !timer.cancelled), false);
+
+      const appCloseConnection = streamHub.subscribe(sessionActor, () => {});
+      assert.ok(appCloseConnection);
+      assert.equal(streamHub.connectionCount(userId), 1);
+      await app!.close();
+      assert.equal(streamHub.connectionCount(userId), 0);
+      assert.equal(heartbeatTimers.some(timer => !timer.cancelled), false);
+      app = await buildApp({ pool, origin, sendInvite: async () => undefined, enableOfflineDetection: false, streamHub });
+    });
+
+    await context.test('V1-19: pelanggaran tinggi dicatat sekali lalu dibersihkan', async () => {
+      const device = { id: thresholdDeviceId, credential: thresholdDeviceCredential };
+      assert.deepEqual((await ingestV2(device, 8.0)).json(), { accepted: true, duplicate: false });
+      assert.deepEqual((await ingestV2(device, 7.0)).json(), { accepted: true, duplicate: false });
+      assert.deepEqual((await pool.query('SELECT type,sensor_code FROM device_events WHERE device_id=$1 ORDER BY id', [device.id])).rows, [
+        { type: 'threshold_low', sensor_code: 'ph' },
+        { type: 'threshold_clear', sensor_code: 'ph' },
+        { type: 'threshold_high', sensor_code: 'ph' },
+        { type: 'threshold_clear', sensor_code: 'ph' },
+      ]);
+    });
+
+    await context.test('V1-20: ambang area mengalahkan default dan null mengembalikan default', async () => {
+      const device = await createAndClaim('AR-THRESHOLD');
+      const setArea = await request('PUT', '/api/v1/areas/AR-THRESHOLD/thresholds', adminCookie, {
+        thresholds: [{ sensor: 'ph', low: 6.5, high: 7.5 }],
+      });
+      assert.equal(setArea.statusCode, 200, setArea.body);
+      const latestArea = await request('GET', '/api/v1/devices/' + device.id + '/latest', userCookie);
+      assert.equal(latestArea.statusCode, 200, latestArea.body);
+      assert.deepEqual(latestArea.json().readings[0].threshold, { low: 6.5, high: 7.5, source: 'area' });
+      assert.equal(latestArea.json().readings[0].state, 'unknown');
+      const overview = await request('GET', '/api/v1/sensors/ph/overview', userCookie);
+      assert.equal(overview.statusCode, 200, overview.body);
+      assert.equal(overview.json().items.find((item: { deviceId: string }) => item.deviceId === device.id).state, 'unknown');
+      assert.deepEqual(overview.json().items.find((item: { deviceId: string }) => item.deviceId === device.id).threshold, { low: 6.5, high: 7.5, source: 'area' });
+
+      const invalid = await request('PUT', '/api/v1/areas/AR-THRESHOLD/thresholds', adminCookie, {
+        thresholds: [{ sensor: 'ph', low: 14.1, high: 15 }],
+      });
+      assertV1Error(invalid, 400, 'VALIDATION_FAILED');
+      const invalidOrder = await request('PUT', '/api/v1/areas/AR-THRESHOLD/thresholds', adminCookie, {
+        thresholds: [{ sensor: 'ph', low: 7.5, high: 7.0 }],
+      });
+      assertV1Error(invalidOrder, 400, 'VALIDATION_FAILED');
+      const reset = await request('PUT', '/api/v1/areas/AR-THRESHOLD/thresholds', adminCookie, {
+        thresholds: [{ sensor: 'ph', low: null, high: null }],
+      });
+      assert.equal(reset.statusCode, 200, reset.body);
+      const latestDefault = await request('GET', '/api/v1/devices/' + device.id + '/latest', userCookie);
+      assert.deepEqual(latestDefault.json().readings[0].threshold, { low: 6.2, high: 7.6, source: 'default' });
+    });
+
+    await context.test('reading buffer yang terlambat tidak menimpa latest atau state ambang', async () => {
+      const device = await createAndClaim();
+      const latestMeasuredAt = new Date(Date.now() - 60_000).toISOString();
+      const newest = await ingestV2(device, 7.0, randomUUID(), latestMeasuredAt);
+      assert.deepEqual(newest.json(), { accepted: true, duplicate: false });
+
+      const lateMeasuredAt = new Date(Date.now() - 90_000).toISOString();
+      assert.ok(Date.parse(lateMeasuredAt) < Date.parse(latestMeasuredAt));
+      const late = await ingestV2(device, 6.0, randomUUID(), lateMeasuredAt);
+      assert.deepEqual(late.json(), { accepted: true, duplicate: false });
+      const latest = await request('GET', '/api/v1/devices/' + device.id + '/latest', userCookie);
+      assert.equal(latest.statusCode, 200, latest.body);
+      assert.equal(latest.json().measuredAt, latestMeasuredAt);
+      assert.equal(latest.json().readings[0].value, 7.0);
+      assert.equal(latest.json().readings[0].state, 'normal');
+      assert.equal(Number((await pool.query('SELECT count(*) FROM device_events WHERE device_id=$1 AND sensor_code IS NOT NULL', [device.id])).rows[0].count), 0);
+
+      const transitionAt = new Date().toISOString();
+      const transition = await ingestV2(device, 6.0, randomUUID(), transitionAt);
+      assert.deepEqual(transition.json(), { accepted: true, duplicate: false });
+      const event = (await pool.query("SELECT type,at FROM device_events WHERE device_id=$1 AND type='threshold_low'", [device.id])).rows[0];
+      assert.equal(event.type, 'threshold_low');
+      assert.equal(new Date(event.at).toISOString(), transitionAt);
+    });
+
+    await context.test('V1-21: bucket 5m terurut dan raw memakai cursor maksimal 100 baris', async () => {
+      const device = await createAndClaim();
+      const endMs = Math.floor(Date.now() / 300_000) * 300_000;
+      const startMs = endMs - 24 * 60 * 60 * 1000;
+      const messageIds: string[] = [];
+      const measuredAt: string[] = [];
+      for (let index = 0; index < 288; index++) {
+        messageIds.push(randomUUID());
+        measuredAt.push(new Date(startMs + index * 300_000 + 1000).toISOString());
+      }
+      messageIds.push(randomUUID());
+      measuredAt.push(new Date(startMs + 1000).toISOString());
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,readings,ingest_version,ingest_type,ingest_meta)
+         SELECT $1,message_id,$2,measured_at,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb
+         FROM unnest($3::uuid[],$4::timestamptz[]) AS sample(message_id,measured_at)`,
+        [device.id, device.ownershipId, messageIds, measuredAt],
+      );
+      const from = new Date(startMs).toISOString();
+      const to = new Date(endMs).toISOString();
+      const aggregate = await request('GET', `/api/v1/devices/${device.id}/readings?sensor=ph&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&bucket=5m`, userCookie);
+      assert.equal(aggregate.statusCode, 200, aggregate.body);
+      const points = aggregate.json().points;
+      assert.equal(points.length, 288);
+      assert.equal(points[0].n, 2);
+      assert.deepEqual(points.map((point: { t: string }) => point.t), [...points].map((point: { t: string }) => point.t).sort());
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,readings,ingest_version,ingest_type,ingest_meta)
+         VALUES($1,$2,$3,$4,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb)`,
+        [device.id, randomUUID(), device.ownershipId, new Date(endMs + 500).toISOString()],
+      );
+      const unalignedFrom = new Date(startMs + 1000).toISOString();
+      const unalignedTo = new Date(endMs + 1000).toISOString();
+      const unaligned = await request('GET', `/api/v1/devices/${device.id}/readings?sensor=ph&from=${encodeURIComponent(unalignedFrom)}&to=${encodeURIComponent(unalignedTo)}&bucket=5m`, userCookie);
+      assert.equal(unaligned.statusCode, 200, unaligned.body);
+      assert.equal(unaligned.json().points.length, 288);
+
+      let cursor: string | null = null;
+      const seen: string[] = [];
+      for (let page = 0; page < 4; page++) {
+        const query = new URLSearchParams({ sensor: 'ph', from, to, bucket: 'raw', limit: '100' });
+        if (cursor) query.set('cursor', cursor);
+        const response = await request('GET', `/api/v1/devices/${device.id}/readings?${query}`, userCookie);
+        assert.equal(response.statusCode, 200, response.body);
+        const body = response.json();
+        assert.ok(body.points.length <= 100);
+        seen.push(...body.points.map((point: { messageId: string }) => point.messageId));
+        cursor = body.nextCursor;
+        if (!cursor) break;
+      }
+      assert.equal(seen.length, 289);
+      assert.equal(new Set(seen).size, 289);
+    });
+
+    await context.test('V1-22: rentang riwayat lebih dari 31 hari ditolak', async () => {
+      const device = await createAndClaim();
+      const to = new Date().toISOString();
+      const from = new Date(Date.now() - 32 * 24 * 60 * 60 * 1000).toISOString();
+      const response = await request('GET', `/api/v1/devices/${device.id}/readings?sensor=ph&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&bucket=5m`, userCookie);
+      assertV1Error(response, 400, 'VALIDATION_FAILED');
+    });
+
+    await context.test('V1-24b: offline job publish ke SSE setelah commit saja; rollback tidak publish', async () => {
+      const { runOfflineDetection } = await import('./v1/offline.js');
+      const actor = await authenticateSession(pool, userCookie.slice('pilot_session='.length));
+      assert.ok(actor);
+      const frames: string[] = [];
+      const connection = streamHub.subscribe(actor, frame => { frames.push(frame); });
+      assert.ok(connection);
+      await streamHub.replay(connection, null);
+
+      const device = await createAndClaim();
+      const now = Date.now();
+      const staleAt = new Date(now - 181_000).toISOString();
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         VALUES($1,$2,$3,$4,$4,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb)`,
+        [device.id, randomUUID(), device.ownershipId, staleAt],
+      );
+      let publishCalls = 0;
+      assert.equal(await runOfflineDetection(pool, now, async events => {
+        publishCalls++;
+        const committed = await pool.query('SELECT id FROM device_events WHERE id=ANY($1::bigint[])', [events.map(event => event.id)]);
+        assert.equal(committed.rowCount, events.length);
+        await streamHub.publishDeviceEvents(events);
+      }), 1);
+      assert.equal(publishCalls, 1);
+      const offlineId = String((await pool.query("SELECT id FROM device_events WHERE device_id=$1 AND type='offline'", [device.id])).rows[0].id);
+      assert.equal(frames.some(frame => frame.startsWith(`id: ${offlineId}\nevent: device_event`)), true);
+
+      const rollbackDevice = await createAndClaim();
+      const rollbackNow = Date.now();
+      const rollbackStaleAt = new Date(rollbackNow - 181_000).toISOString();
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         VALUES($1,$2,$3,$4,$4,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb)`,
+        [rollbackDevice.id, randomUUID(), rollbackDevice.ownershipId, rollbackStaleAt],
+      );
+      await pool.query(`CREATE FUNCTION fail_offline_event_for_test() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'forced offline rollback'; END;
+      $$`);
+      await pool.query(`CREATE TRIGGER fail_specific_offline_event BEFORE INSERT ON device_events
+        FOR EACH ROW WHEN (NEW.device_id='${rollbackDevice.id}'::uuid AND NEW.type='offline')
+        EXECUTE FUNCTION fail_offline_event_for_test()`);
+      const frameCountBeforeRollback = frames.length;
+      let rollbackPublishCalls = 0;
+      try {
+        await assert.rejects(runOfflineDetection(pool, rollbackNow, async events => {
+          rollbackPublishCalls++;
+          await streamHub.publishDeviceEvents(events);
+        }), /forced offline rollback/);
+        assert.equal(rollbackPublishCalls, 0);
+        assert.equal(Number((await pool.query("SELECT count(*) FROM device_events WHERE device_id=$1 AND type='offline'", [rollbackDevice.id])).rows[0].count), 0);
+        assert.equal(frames.slice(frameCountBeforeRollback).some(frame => frame.includes(rollbackDevice.id)), false);
+      } finally {
+        await pool.query('DROP TRIGGER fail_specific_offline_event ON device_events');
+        await pool.query('DROP FUNCTION fail_offline_event_for_test()');
+      }
+      await pool.query('DELETE FROM readings WHERE device_id=$1', [rollbackDevice.id]);
+      connection.close();
+      assert.equal(streamHub.connectionCount(userId), 0);
+    });
+
+    await context.test('V1-24: offline sekali, online saat pulih, tetap benar sesudah restart dan saat race', async () => {
+      const { runOfflineDetection } = await import('./v1/offline.js');
+      const device = await createAndClaim();
+      const now = Date.now();
+      const staleAt = new Date(now - 181_000).toISOString();
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         VALUES($1,$2,$3,$4,$4,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb)`,
+        [device.id, randomUUID(), device.ownershipId, staleAt],
+      );
+      assert.equal(await runOfflineDetection(pool, now), 1);
+      assert.equal(await runOfflineDetection(pool, now + 60_000), 0);
+      assert.equal(Number((await pool.query("SELECT count(*) FROM device_events WHERE device_id=$1 AND type='offline'", [device.id])).rows[0].count), 1);
+
+      await app!.close();
+      app = await buildApp({ pool, origin, sendInvite: async () => undefined, enableOfflineDetection: false, streamHub });
+      assert.equal(await runOfflineDetection(pool, now + 120_000), 0);
+      const measuredAt = new Date().toISOString();
+      const messageId = randomUUID();
+      const recovered = await ingestV2(device, 7.0, messageId, measuredAt);
+      assert.deepEqual(recovered.json(), { accepted: true, duplicate: false });
+      const recoveredRetry = await ingestV2(device, 7.0, messageId, measuredAt);
+      assert.deepEqual(recoveredRetry.json(), { accepted: true, duplicate: true });
+      assert.deepEqual((await pool.query("SELECT type FROM device_events WHERE device_id=$1 AND sensor_code IS NULL ORDER BY id", [device.id])).rows.map(row => row.type), ['offline', 'online']);
+
+      const racingDevice = await createAndClaim();
+      const raceNow = Date.now();
+      const raceStaleAt = new Date(raceNow - 181_000).toISOString();
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         VALUES($1,$2,$3,$4,$4,'{"ph":7.0}'::jsonb,2,'AQ-PH','{}'::jsonb)`,
+        [racingDevice.id, randomUUID(), racingDevice.ownershipId, raceStaleAt],
+      );
+      const raceMessageId = randomUUID();
+      const raceTime = new Date(raceNow).toISOString();
+      const [raceIngest, raceOfflineCount] = await Promise.all([
+        ingestV2(racingDevice, 6.0, raceMessageId, raceTime),
+        runOfflineDetection(pool, raceNow),
+      ]);
+      assert.deepEqual(raceIngest.json(), { accepted: true, duplicate: false });
+      assert.ok(raceOfflineCount === 0 || raceOfflineCount === 1);
+      const connection = await pool.query("SELECT type FROM device_events WHERE device_id=$1 AND sensor_code IS NULL ORDER BY id", [racingDevice.id]);
+      const connectionTypes = connection.rows.map(row => row.type);
+      if (raceOfflineCount === 0) assert.deepEqual(connectionTypes, []);
+      else assert.deepEqual(connectionTypes, ['offline', 'online']);
+      assert.equal(Number((await pool.query("SELECT count(*) FROM device_events WHERE device_id=$1 AND type='offline'", [racingDevice.id])).rows[0].count) <= 1, true);
+      assert.deepEqual((await pool.query("SELECT type FROM device_events WHERE device_id=$1 AND sensor_code='ph' ORDER BY id", [racingDevice.id])).rows.map(row => row.type), ['threshold_low']);
     });
   } finally {
     await app?.close();

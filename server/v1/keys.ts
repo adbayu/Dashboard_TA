@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { hash, secret } from '../domain.js';
+import { transaction } from '../db.js';
+import { ensureSandboxDevice } from '../sandbox/provision.js';
 import type { Actor } from '../auth/session.js';
 import type { ApiKeyEnvironment, ApiScope } from '../auth/types.js';
 import { failV1, requireActor, shortTextSchema, uuidSchema, v1Object } from './common.js';
@@ -126,13 +128,17 @@ export function registerKeyRoutes(app: FastifyInstance, pool: pg.Pool) {
     const rawSecret = secret();
     const apiSecret = `jf_${environment}_${rawSecret}`;
     const id = randomUUID();
-    const created = await pool.query<ApiKeyRow>(
-      `INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment)
-       VALUES($1,$2,$3,$4,$5,$6,$7)
-       RETURNING id,name,prefix,scopes,environment,created_at,last_used_at,revoked_at`,
-      [id, actor.userId, name.trim(), apiSecret.slice(0, 12), hash(apiSecret), scopes, environment],
-    );
-    return reply.code(201).send({ key: presentKey(created.rows[0]), secret: apiSecret });
+    const created = await transaction(pool, async client => {
+      const key = await client.query<ApiKeyRow>(
+        `INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment)
+         VALUES($1,$2,$3,$4,$5,$6,$7)
+         RETURNING id,name,prefix,scopes,environment,created_at,last_used_at,revoked_at`,
+        [id, actor.userId, name.trim(), apiSecret.slice(0, 12), hash(apiSecret), scopes, environment],
+      );
+      if (environment === 'test') await ensureSandboxDevice(client, actor.userId);
+      return key.rows[0];
+    });
+    return reply.code(201).send({ key: presentKey(created), secret: apiSecret });
   });
 
   app.delete<{ Params: KeyParams }>('/api/v1/keys/:id', {

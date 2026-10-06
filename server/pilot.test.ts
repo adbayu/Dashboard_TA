@@ -162,13 +162,20 @@ test('Sprint 1: PostgreSQL-backed pilot isolation and persistence', async contex
     assert.equal((await request('POST', '/api/admin/invitations', admin, { email: 'over-limit@example.test' })).statusCode, 409);
     assert.equal(Number((await pool.query('SELECT count(*) FROM users')).rows[0].count), 10);
   });
-  await context.test('Pilot unit limit remains atomic under concurrent allocations', async () => {
-    const count = Number((await pool.query('SELECT count(*) FROM devices')).rows[0].count);
-    for (let index = count; index < 19; index++) await pool.query("INSERT INTO devices(id,name,model,credential_hash,allocated_to) VALUES($1,$2,'water-v1',$3,$4)", [randomUUID(), 'Reserved ' + index, hash(secret()), accountA]);
+  await context.test('Pilot unit limit remains atomic under concurrent allocations and excludes sandbox devices', async () => {
+    for (let index = 0; index < 2; index++) {
+      await pool.query(
+        'INSERT INTO devices(id,name,model,credential_hash,allocated_to,is_sandbox) VALUES($1,$2,NULL,NULL,$3,true)',
+        [randomUUID(), 'Sandbox pilot ' + index, accountA],
+      );
+    }
+    const count = Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=false')).rows[0].count);
+    for (let index = count; index < 19; index++) await pool.query("INSERT INTO devices(id,name,model,credential_hash,allocated_to,is_sandbox) VALUES($1,$2,'water-v1',$3,$4,false)", [randomUUID(), 'Reserved ' + index, hash(secret()), accountA]);
     const payload = { userId: accountA, name: 'Final available unit', model: 'water-v1' };
     const responses = await Promise.all([request('POST', '/api/admin/devices', admin, payload), request('POST', '/api/admin/devices', admin, payload)]);
     assert.deepEqual(responses.map(response => response.statusCode).sort(), [200, 409]);
-    assert.equal(Number((await pool.query('SELECT count(*) FROM devices')).rows[0].count), 20);
+    assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=false')).rows[0].count), 20);
+    assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=true')).rows[0].count), 2);
   });
   await context.test('S1-10: database unavailable returns visible structured error, never fixture data', async () => {
     const unavailable = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema });

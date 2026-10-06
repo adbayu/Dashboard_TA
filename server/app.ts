@@ -12,12 +12,21 @@ import { authenticateSession, sessionUser, type Actor } from './auth/session.js'
 import { failV1 } from './v1/common.js';
 import { ingestV2, type V2IngestBody } from './v1/ingest.js';
 import { registerV1Routes } from './v1/index.js';
+import { OFFLINE_SCAN_INTERVAL_MS, runOfflineDetection } from './v1/offline.js';
+import { recordReadingEvents } from './v1/monitoring-state.js';
+import { StreamHub } from './v1/stream.js';
+import { startSandboxRunner, type SandboxScheduler } from './sandbox/runner.js';
 
 type Options = {
   pool: pg.Pool;
   origin: string;
   production?: boolean;
   logger?: boolean;
+  enableOfflineDetection?: boolean;
+  enableSandbox?: boolean;
+  sandboxRetentionDays?: number;
+  sandboxScheduler?: SandboxScheduler;
+  streamHub?: StreamHub;
   sendInvite: (email: string, token: string) => Promise<void>;
 };
 const text = { type: 'string', minLength: 1, maxLength: 100 };
@@ -64,11 +73,32 @@ export async function buildApp(options: Options) {
       redact: ['req.headers', 'password', 'token', 'credential', 'activationCode', 'apiKey', 'secret'],
     } : false,
   });
+  const streamHub = options.streamHub ?? new StreamHub(pool);
+  const sandboxRunner = options.enableSandbox === undefined
+    ? null
+    : startSandboxRunner(pool, streamHub, options.sandboxRetentionDays ?? 7, {
+      enableCycles: options.enableSandbox,
+      scheduler: options.sandboxScheduler,
+      onError: (error, task) => app.log.error({ err: error, task }, 'Sandbox runner gagal.'),
+    });
+  app.addHook('onClose', async () => {
+    await sandboxRunner?.stop();
+    streamHub.closeAll();
+  });
   await app.register(cookie);
   const apiKeyFailureLimit = new ApiKeyFailureLimit();
   const cleanupTimer = setInterval(() => apiKeyFailureLimit.cleanupExpired(), 10_000);
   cleanupTimer.unref();
   app.addHook('onClose', async () => clearInterval(cleanupTimer));
+  if (options.enableOfflineDetection) {
+    const offlineTimer = setInterval(() => {
+      void runOfflineDetection(pool, Date.now(), events => streamHub.publishDeviceEvents(events)).catch(error => {
+        app.log.error({ err: error }, 'Deteksi offline gagal.');
+      });
+    }, OFFLINE_SCAN_INTERVAL_MS);
+    offlineTimer.unref();
+    app.addHook('onClose', async () => clearInterval(offlineTimer));
+  }
   const authenticateRequestApiKey = async (ip: string, parsed: NonNullable<ReturnType<typeof parseApiKey>>) => {
     try {
       return await authenticateApiKey(pool, parsed);
@@ -279,7 +309,7 @@ export async function buildApp(options: Options) {
         if ((await client.query('SELECT id FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [id])).rowCount) fail(409, 'Pemilik lama harus melepas unit dahulu.');
         await client.query("UPDATE devices SET name=$2,allocated_to=$3,credential_hash=$4,credential_since=clock_timestamp(),activation_hash=$5,activation_expires=now()+interval '24 hours' WHERE id=$1", [id, name, userId, hash(credential), hash(activationCode)]);
       } else {
-        if (Number((await client.query('SELECT count(*) FROM devices')).rows[0].count) >= 20) fail(409, 'Batas pilot 20 unit tercapai.');
+        if (Number((await client.query('SELECT count(*) FROM devices WHERE is_sandbox=false')).rows[0].count) >= 20) fail(409, 'Batas pilot 20 unit tercapai.');
         await client.query("INSERT INTO devices(id,name,model,credential_hash,allocated_to,activation_hash,activation_expires) VALUES ($1,$2,$3,$4,$5,$6,now()+interval '24 hours')", [id, name, model, hash(credential), userId, hash(activationCode)]);
       }
     });
@@ -340,14 +370,25 @@ export async function buildApp(options: Options) {
         if (request.body.version === 2) failV1(401, 'UNAUTHENTICATED', 'Credential device salah atau sudah dirotasi.');
         fail(401, 'Kredensial perangkat salah.');
       }
-      if (request.body.version === 2) return ingestV2(pool, request.body, authorization.slice(7));
+      if (request.body.version === 2) return ingestV2(pool, request.body, authorization.slice(7), streamHub);
 
       const { deviceId, model, messageId, measuredAt, readings } = request.body;
       if (Date.parse(measuredAt) > Date.now() + 60_000) fail(400, 'Waktu perangkat lebih dari 60 detik di masa depan.');
       const sensors = models[model].sensors;
       if (Object.keys(readings).length !== sensors.length || sensors.some(sensor => !Number.isFinite(readings[sensor.code]) || readings[sensor.code] < sensor.min || readings[sensor.code] > sensor.max)) fail(400, 'Sensor, nilai, atau model tidak valid.');
-      return transaction(pool, async client => {
-        const device = (await client.query('SELECT id FROM devices WHERE id=$1 AND model=$2 AND credential_hash=$3 AND credential_since<=$4::timestamptz FOR UPDATE', [deviceId, model, hash(authorization.slice(7)), measuredAt])).rows[0];
+      const result = await transaction(pool, async client => {
+        const device = (await client.query(
+          `SELECT d.id,COALESCE(d.type_id,pilot_type.id) AS type_id,d.area_ref
+           FROM devices d
+           LEFT JOIN device_types pilot_type ON pilot_type.code=CASE d.model
+             WHEN 'water-v1' THEN 'PILOT-WATER-V1'
+             WHEN 'environment-v1' THEN 'PILOT-ENV-V1'
+           END
+           WHERE d.id=$1 AND d.model=$2 AND d.credential_hash=$3
+             AND d.credential_since<=$4::timestamptz
+           FOR UPDATE OF d`,
+          [deviceId, model, hash(authorization.slice(7)), measuredAt],
+        )).rows[0];
         if (!device) fail(401, 'Kredensial perangkat salah.');
         const prior = (await client.query(`
           SELECT (measured_at=$3::timestamptz AND readings=$4::jsonb AND ingest_version=1
@@ -355,17 +396,23 @@ export async function buildApp(options: Options) {
           FROM readings WHERE device_id=$1 AND message_id=$2`, [deviceId, messageId, measuredAt, JSON.stringify(readings), model])).rows[0];
         if (prior) {
           if (!prior.matches) fail(409, 'ID kiriman sudah dipakai untuk payload berbeda.');
-          return { accepted: true, duplicate: true };
+          return { duplicate: true, events: [] };
         }
         const owner = (await client.query('SELECT id FROM ownerships WHERE device_id=$1 AND started_at<=$2::timestamptz AND (ended_at IS NULL OR ended_at>$2::timestamptz)', [deviceId, measuredAt])).rows[0];
         if (!owner) fail(409, 'Tidak ada kepemilikan pada waktu pengukuran.');
         await client.query(`
           INSERT INTO readings(device_id,message_id,ownership_id,measured_at,readings,ingest_version,ingest_type,ingest_meta)
           VALUES($1,$2,$3,$4,$5,1,$6,'{}'::jsonb)`, [deviceId, messageId, owner.id, measuredAt, JSON.stringify(readings), model]);
-        return { accepted: true, duplicate: false };
+        const events = await recordReadingEvents(client, deviceId, device.type_id, device.area_ref, readings, messageId, measuredAt);
+        return { duplicate: false, events };
       });
+      if (!result.duplicate) {
+        await streamHub.publishReading(deviceId, { measuredAt, readings });
+        if (result.events.length) await streamHub.publishDeviceEvents(result.events);
+      }
+      return { accepted: true, duplicate: result.duplicate };
     });
-  registerV1Routes(app, pool, options.origin);
+  registerV1Routes(app, pool, options.origin, streamHub);
   return app;
 }
 

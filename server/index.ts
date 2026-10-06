@@ -14,6 +14,19 @@ function port(name: string, fallback: number) {
   if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(name + ' must be a valid port');
   return value;
 }
+function boolean(name: string, fallback: boolean) {
+  const value = process.env[name];
+  if (value === undefined) return fallback;
+  if (value !== 'true' && value !== 'false') throw new Error(name + ' must be true or false');
+  return value === 'true';
+}
+function boundedInteger(name: string, fallback: number, minimum: number, maximum: number) {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return value;
+}
 const connectionString = required('DATABASE_URL');
 try {
   if (!['postgres:', 'postgresql:'].includes(new URL(connectionString).protocol)) throw new Error();
@@ -61,6 +74,9 @@ try {
       auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS! } : undefined,
     });
     const app = await buildApp({ pool, origin: origin.origin, production, logger: true,
+      enableOfflineDetection: process.env.OFFLINE_DETECTION_ENABLED !== 'false',
+      enableSandbox: boolean('SANDBOX_ENABLED', true),
+      sandboxRetentionDays: boundedInteger('SANDBOX_RETENTION_DAYS', 7, 1, 3650),
       sendInvite: async (email, token) => {
         await transport.sendMail({ from, to: email, subject: 'Undangan Pilot JagoFarm',
           text: 'Buka ' + origin.origin + '/#invite=' + token + '\nBerlaku 24 jam. Buat password untuk memverifikasi alamat email. Jangan bagikan tautan ini.',
