@@ -6,3 +6,8 @@ export function roleCanOpenPath(role, pathname) {
   }
   return true;
 }
+
+export function loginDestination(role, returnTo) {
+  if (typeof returnTo === 'string' && /^\/d\/[A-Z0-9-]{3,32}$/.test(returnTo)) return returnTo;
+  return role === 'pengelola' ? '/admin' : '/';
+}

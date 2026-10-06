@@ -28,7 +28,7 @@ import AdminDetailInformation from './pages/admin/AdminDetailInformation';
 import { IOT_SOURCE } from './services/iotApi.js';
 import Developer from './pages/Developer.jsx';
 import Monitoring from './pages/Monitoring.jsx';
-import { roleCanOpenPath } from './utils/roleAccess.js';
+import { loginDestination, roleCanOpenPath } from './utils/roleAccess.js';
 
 // Judul halaman untuk top bar
 const TITLES = [
@@ -115,6 +115,10 @@ function Shell() {
         <Toast />
       </div>
     );
+  }
+
+  if (isLoggedIn && location.pathname === '/masuk') {
+    return <Navigate to={loginDestination(role, location.state?.from)} replace />;
   }
 
   // Pengguna biasa tidak boleh membuka alamat /admin, dan sebaliknya.

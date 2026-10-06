@@ -4,6 +4,7 @@ import { useSmart } from '../store/SmartStore';
 import { Avatar, Button, Field, Input } from '../components/ui';
 import { DEMO_PASSWORD } from '../data/seed';
 import { IOT_SOURCE } from '../services/iotApi.js';
+import { loginDestination } from '../utils/roleAccess.js';
 
 // Halaman masuk. Role TIDAK dipilih di sini — ditentukan oleh akun yang dipakai:
 // akun pengguna masuk ke "/", akun pengelola masuk ke "/admin".
@@ -24,17 +25,14 @@ export default function Login() {
     e.preventDefault();
     setGalat('');
     setProses(true);
+    const returnTo = location.state?.from;
     const hasil = await login(email, password);
     setProses(false);
     if (!hasil.ok) {
       setGalat(hasil.pesan);
       return;
     }
-    const returnTo = location.state?.from;
-    const destination = typeof returnTo === 'string' && returnTo.startsWith('/d/')
-      ? returnTo
-      : hasil.akun.role === 'pengelola' ? '/admin' : '/';
-    navigate(destination, { replace: true });
+    navigate(loginDestination(hasil.akun.role, returnTo), { replace: true });
   }
 
   function pakaiAkun(akun) {
