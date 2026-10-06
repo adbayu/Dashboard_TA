@@ -18,6 +18,7 @@ import {
 import { pilotApi } from '../services/pilotApi.js';
 import { IOT_SOURCE, iotApi } from '../services/iotApi.js';
 import { mapSessionUser } from '../services/sessionUser.js';
+import { activationCodeMemory, beginActivationCodeLogout } from '../utils/activationCodeMemory.js';
 
 const KEY = 'aquasmart_smart_v1';
 const SmartCtx = createContext(null);
@@ -530,6 +531,7 @@ export function SmartProvider({ children }) {
         return { ok: true, akun };
       },
       logout: async () => {
+        beginActivationCodeLogout(activationCodeMemory);
         if (IOT_SOURCE === 'api') {
           try {
             await pilotApi('/session/logout', { method: 'POST' });

@@ -27,12 +27,15 @@ import AdminPoints from './pages/admin/AdminPoints';
 import AdminDetailInformation from './pages/admin/AdminDetailInformation';
 import { IOT_SOURCE } from './services/iotApi.js';
 import Developer from './pages/Developer.jsx';
+import Monitoring from './pages/Monitoring.jsx';
+import { roleCanOpenPath } from './utils/roleAccess.js';
 
 // Judul halaman untuk top bar
 const TITLES = [
   { path: '/admin/pengguna', title: 'Kelola User', subtitle: 'Akun pengguna, peran, dan area tanggung jawab' },
   { path: '/admin/iot', title: 'Kelola IoT', subtitle: 'Registrasi perangkat, kalibrasi, dan QR penjelas alat' },
   { path: '/developer', title: 'Developer', subtitle: 'API key dan pemakaian API' },
+  { path: '/monitoring', title: 'Monitoring', subtitle: 'Nilai sensor, area, dan kejadian perangkat live' },
   { path: '/admin/kategori', title: 'Kategori Device', subtitle: 'Jenis alat beserta parameter dan ambang idealnya' },
   { path: '/admin/detail-informasi', title: 'Detail Information', subtitle: 'Penjelasan alat yang sama dengan yang dibaca pengguna' },
   { path: '/admin/area', title: 'Kelola Area', subtitle: 'Kolam, growbed, dan tandon yang sudah dipasangi IoT' },
@@ -116,11 +119,7 @@ function Shell() {
 
   // Pengguna biasa tidak boleh membuka alamat /admin, dan sebaliknya.
   // (Bila dipaksa lewat alamat, langsung dialihkan ke beranda role-nya.)
-  const diAreaAdmin = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
-  if (role === 'pengguna' && diAreaAdmin) return <Navigate to="/" replace />;
-  if (role === 'pengelola' && !diAreaAdmin && location.pathname !== '/profil' && location.pathname !== '/developer') {
-    return <Navigate to="/admin" replace />;
-  }
+  if (!roleCanOpenPath(role, location.pathname)) return <Navigate to={role === 'pengelola' ? '/admin' : '/'} replace />;
 
   const match = TITLES.filter((row) => {
     if (row.path === '/') return location.pathname === '/' || location.pathname === '';
@@ -140,6 +139,7 @@ function Shell() {
             {/* ── Profil: tersedia untuk kedua role ── */}
             <Route path="/profil" element={<Profil />} />
             <Route path="/developer" element={<Developer />} />
+            <Route path="/monitoring" element={<Monitoring />} />
 
             {/* ── Role Pengguna: alamat akar ── */}
             <Route path="/" element={<Dashboard />} />

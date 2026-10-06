@@ -2,7 +2,8 @@ export async function pilotApi(path, { method = 'GET', body, signal } = {}) {
   let response;
   try {
     response = await fetch('/api' + path, {
-      method, credentials: 'same-origin', signal: signal ?? AbortSignal.timeout(15000),
+      method, credentials: 'same-origin',
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
       headers: body ? { 'Content-Type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined,
     });

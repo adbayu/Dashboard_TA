@@ -71,6 +71,19 @@ Regresi frontend E1 otomatis dijalankan bersama tes UI dan service:
 | E1-FE-03 | SSE pulih dengan HTTP 200 setelah fallback; reconnect dan unsubscribe akhir | Polling berhenti saat 200; request stream tidak overlap; reader, controller, subscription, interval, dan retry timer dibersihkan |
 | E1-FE-04 | Pembacaan kosong, ringkasan grafik, serta status polling | Copy kosong tepat dan satuan min/maks tampil; status polite hanya berubah pada transisi, bukan setiap refresh |
 
+Regresi frontend E2 otomatis:
+
+| ID | Skenario | Hasil yang diharapkan |
+| --- | --- | --- |
+| E2-FE-01 | Adapter memanggil overview sensor, events dengan filter/cursor, sandbox devices, dan update skenario | Hanya route dan bentuk request yang sudah ada dipakai; pesan error API tetap diteruskan |
+| E2-FE-02 | Gabungkan daftar device dan latest overview untuk badge perhatian | Device offline atau low/high dihitung sekali; sandbox dan unknown states tidak dihitung, stale dengan low/high tetap dihitung; label aksesibel tepat `[n] kejadian perlu perhatian`, badge tersembunyi saat nol |
+| E2-FE-03 | Agregasikan bucket area dengan jumlah sampel berbeda dan rentang hari lokal | Min/maks lintas bucket benar; mean `sum(avg*n)/sum(n)`; awal rentang tengah malam lokal dan label waktu tepat |
+| E2-FE-04 | Jalankan fan-out area bersamaan dengan batch aktif, lebih dari 60 pekerjaan, atau anggaran 120/60 detik tidak cukup | Concurrency maksimal 4, tidak ada batch overlap, batch di atas 60 atau anggaran tidak cukup ditolak sebelum request tambahan |
+| E2-FE-05 | Gabungkan halaman event yang beririsan dan waktu `at` tidak sejalan dengan ID | ID unik diurut numerik DESC; pagination memakai cursor API dan waktu tampilan memakai `at` |
+| E2-FE-06 | Uji sparkline paket dan curl sandbox | Sparkline mengumumkan sensor serta min/maks aktual; contoh curl hanya memakai prefix aman/variabel secret, tidak memuat secret |
+| E2-FE-07 | Buka route QR, login, kembali, tunggu TTL, klaim, atau mulai logout | Query aktivasi langsung dihapus; kode tetap hanya di memori, pulih lewat route `/d/:code`, lalu dibersihkan saat sukses/logout/10 menit |
+| E2-FE-08 | Render Monitoring dan uji navigasi keyboard tab | Tepat tiga tab memakai roving focus; Left/Right berpindah melingkar, Home/End ke tab pertama/terakhir; log kejadian tetap panel dengan filter, cursor, loading, empty, error, dan ready |
+
 ## 4. Uji manual UI
 
 | ID | Langkah | Lulus kalau |
@@ -93,6 +106,11 @@ Regresi frontend E1 otomatis dijalankan bersama tes UI dan service:
 | UI-16 | Request awal atau reconnect stream menerima respons non-200, termasuk 429 dengan `Retry-After` | Satu interval polling memakai label "Diperbarui tiap 30 detik" sambil retry menunggu sekurangnya `Retry-After`; setelah HTTP 200 polling berhenti |
 | UI-17 | Buka pembacaan sensor tanpa nilai dan grafik riwayat dengan rentang terpilih | Copy kosong berbunyi "Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi."; ringkasan terakhir, min, dan maks menyebut satuan sensor |
 | UI-18 | Buka List IoT/Detail melalui Vite proxy dengan fetch SSE | Komentar awal membuat HTTP 200 dan status "Live" terlihat kurang dari 5 detik; komentar tidak diumumkan sebagai telemetry dan replay tetap utuh |
+| UI-19 | Buka Monitoring sebagai pengguna dan pengelola; pindah di antara tiga tab dan gunakan panel Log kejadian | Kedua role dapat masuk; nilai, ambang, waktu, grafik, area, dan kejadian hanya berasal dari API; panel log berada di samping pada desktop dan di bawah pada layar sempit; loading, kosong, error, dan ready jelas |
+| UI-20 | Bandingkan tab Per area dengan rentang pada zona waktu browser | Label tepat "Hari ini sejak 00.00 (waktu perangkatmu)"; min/maks lintas bucket dan rata-rata berbobot cocok dengan data readings; refresh tidak tumpang tindih |
+| UI-21 | Bandingkan badge menu pada device offline, stale, low/high, unknown, dan sandbox | Badge memakai union device berbeda; stale dengan low/high tetap dihitung, sandbox/unknown tidak; label `[n] kejadian perlu perhatian`, tersembunyi saat nol, berhenti saat logout/unmount, dan error tidak mengubahnya menjadi nol |
+| UI-22 | Developer: pilih `ph_turun` pada panel Sandbox dan tunggu runner | Status, nilai/state pH, dan event berasal dari sandbox API/stream; dalam 1-2 siklus runner pH menjadi "Di bawah ambang" dan event ambang terlihat; tidak ada stream kedua atau secret di curl |
+| UI-23 | Scan QR sebelum login, masuk, kembali ke QR, lalu klaim; ulangi dengan kode manual dan logout | Query `c` langsung hilang; hanya `/d/:code` melintasi login; activation code dihapus setelah klaim/logout/10 menit dan tidak ada di storage browser |
 
 ## 5. Uji bench alat
 
@@ -151,3 +169,5 @@ Status akhir Minggu 2 pada 5 Oktober 2026: **PASS**. UI-03 dan UI-04 diuji denga
 Status verifikasi A-D backend pada 6 Oktober 2026: `test:pilot` 16/16, `test:v1` 58/58, typecheck, lint, dan build lulus. HW-08: **belum diuji**, menunggu alat asli. Kriteria gate mingguan di bagian 7 tidak diubah.
 
 Status verifikasi E1 pada 6 Oktober 2026: unit frontend 45/45, typecheck, lint, dan build lulus. Click-through headless Chrome memakai fixture API terkontrol pada lebar 360, 841, dan 1280 px; mencakup loading/empty/error/retry List IoT, latest dan polling 429, tema terang/gelap, navigasi Detail, pembacaan dan kejadian live, reconnect berurutan dengan `Last-Event-ID`, seleksi sensor grafik, error riwayat/kejadian, konfirmasi rotasi, Escape dan pemulihan fokus, penolakan 409 yang bisa dicoba ulang, salin credential satu kali, dan penghapusan secret dari state saat dialog ditutup. Tidak ada overflow horizontal atau error console/runtime. Kontrak dan persistensi backend diverifikasi terpisah dengan PostgreSQL asli pada `test:pilot` dan `test:v1`. Kriteria gate mingguan di bagian 7 tidak diubah.
+
+Status verifikasi E2 browser pada 6 Oktober 2026: **PASS untuk cakupan perangkat lunak yang diuji**. Chrome 154.0.8037.98 menjalankan UI dengan Fastify dan schema PostgreSQL disposable pada viewport 360×844 dan 1280×900, tema terang/gelap, tanpa overflow horizontal. UI-07: skenario sandbox `ph_turun` membuat pH berstatus low dan event ambang muncul dalam 20.342 ms; request skenario dan daftar berstatus HTTP 200. UI-10: overview pH Monitoring mengembalikan 21 item, termasuk device satuan dan paket. Menu dan badge Monitoring pengguna/pengelola, tiga tab, filter/cursor kejadian, serta rotasi credential pengelola dengan verifikasi fokus dan pembersihan secret lulus; saat pemeriksaan admin terdapat 20 device berbeda yang perlu perhatian dan label cocok dengan `[20] kejadian perlu perhatian`. Batch Per area: 58/58 HTTP 200, concurrency maksimum 4, 253 ms, tanpa 429, dan agregat cocok dengan PostgreSQL. SSE E1 pulih dari 429 ke 200; SSE lewat Vite proxy 20 ms; error console/runtime 0 dan cleanup lulus. Di browser, query QR terhapus, history bersih, dan handoff login hanya membawa pathname; lifecycle kode aktivasi setelah login serta TTL 10 menit tercakup dalam unit test frontend, bukan inspeksi langsung di browser. Run ini tidak mencakup pemindaian kamera HP atau kriteria hardware/lapangan Minggu 3, sehingga tidak menyatakan gate tersebut lulus. Gerbang otomatis terbaru: `test:pilot` 16/16, `test:v1` 58/58, frontend 75/75, typecheck, lint, build, dan `git diff --check` lulus. Kriteria gate mingguan di bagian 7 tidak diubah.

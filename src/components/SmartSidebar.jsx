@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
-import { IOT_SOURCE } from '../services/iotApi.js';
+import { IOT_SOURCE, iotApi } from '../services/iotApi.js';
 import { Avatar } from './ui';
+import AttentionBadge from './iot/AttentionBadge.jsx';
+import { countAttentionDevices } from '../utils/monitoring.js';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
 // oxlint-disable-next-line react/only-export-components -- Shared menu data stays beside its existing consumer.
@@ -13,6 +15,7 @@ export const MENUS = {
       items: [
         { to: '/', end: true, label: 'Dashboard', icon: 'dashboard', hint: 'Ringkasan kolam & sensor aktif' },
         { to: '/iot', label: 'List IoT', icon: 'sensors', hint: 'Semua perangkat terpasang' },
+        { to: '/monitoring', label: 'Monitoring', icon: 'query_stats', hint: 'Nilai sensor, area & kejadian', attention: true },
         { to: '/detail-informasi', label: 'Detail Information', icon: 'qr_code_scanner', hint: 'Pindai QR alat & baca penjelasannya' },
       ],
     },
@@ -38,7 +41,10 @@ export const MENUS = {
   pengelola: [
     {
       group: 'Ringkasan',
-      items: [{ to: '/admin', end: true, label: 'Dashboard Pengelola', icon: 'dashboard', hint: 'Kondisi seluruh farm' }],
+      items: [
+        { to: '/admin', end: true, label: 'Dashboard Pengelola', icon: 'dashboard', hint: 'Kondisi seluruh farm' },
+        { to: '/monitoring', label: 'Monitoring', icon: 'query_stats', hint: 'Nilai sensor, area & kejadian', attention: true },
+      ],
     },
     {
       group: 'Kelola Master Data',
@@ -65,6 +71,81 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
   const { role: roleCtx, currentUser, points } = useSmart();
   const role = roleProp || roleCtx;
   const menu = MENUS[role] || MENUS.pengguna;
+  const [attentionCount, setAttentionCount] = useState(null);
+
+  useEffect(() => {
+    if (IOT_SOURCE !== 'api') return undefined;
+    let active = true;
+    let generation = 0;
+    let loading = false;
+    let interval = null;
+    let controller = null;
+    let sensorCodes = null;
+
+    const refresh = async () => {
+      if (!active || loading || document.visibilityState !== 'visible') return;
+      loading = true;
+      const requestGeneration = ++generation;
+      controller = new AbortController();
+      try {
+        if (sensorCodes === null) {
+          const result = await iotApi.getSensorTypes({ signal: controller.signal });
+          sensorCodes = (result.sensorTypes || []).map(sensor => sensor.code);
+        }
+        const [deviceResult, ...overviews] = await Promise.all([
+          iotApi.getDeviceList({ signal: controller.signal }),
+          ...sensorCodes.map(code => iotApi.getSensorOverview(code, { signal: controller.signal })),
+        ]);
+        if (!active || requestGeneration !== generation) return;
+        const liveDevices = (deviceResult.devices || []).filter(device => !device.isSandbox && !device.is_sandbox);
+        const liveIds = new Set(liveDevices.map(device => device.id));
+        const latestByDevice = {};
+        for (const overview of overviews) {
+          for (const item of overview.items || []) {
+            if (!liveIds.has(item.deviceId)) continue;
+            const latest = latestByDevice[item.deviceId] || { readings: [] };
+            latest.readings.push({ state: item.state });
+            latestByDevice[item.deviceId] = latest;
+          }
+        }
+        setAttentionCount(countAttentionDevices(liveDevices, latestByDevice));
+      } catch {
+        // Tanpa snapshot lengkap, badge mempertahankan hitungan terakhir atau tetap tersembunyi.
+      } finally {
+        if (requestGeneration === generation) {
+          loading = false;
+          controller = null;
+        }
+      }
+    };
+
+    const startVisibleRefresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      void refresh();
+      if (interval === null) interval = setInterval(() => { void refresh(); }, 60_000);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') startVisibleRefresh();
+      else {
+        if (interval !== null) clearInterval(interval);
+        interval = null;
+        generation += 1;
+        controller?.abort();
+        loading = false;
+        controller = null;
+      }
+    };
+
+    startVisibleRefresh();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      active = false;
+      generation += 1;
+      if (interval !== null) clearInterval(interval);
+      controller?.abort();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -148,10 +229,11 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
                     {({ isActive }) => (
                       <>
                         <span className={`material-symbols-outlined text-[20px] mt-0.5 ${isActive ? 'fill text-primary' : ''}`}>{item.icon}</span>
-                        <span className="min-w-0">
+                        <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-bold leading-tight">{item.label}</span>
                           <span className={`block text-[11px] leading-tight ${isActive ? 'text-on-surface-variant dark:text-inverse-primary' : 'text-white/60'}`}>{item.hint}</span>
                         </span>
+                        {item.attention && attentionCount !== null && <AttentionBadge count={attentionCount} />}
                       </>
                     )}
                   </NavLink>

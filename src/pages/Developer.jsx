@@ -4,6 +4,7 @@ import { AksiBaris, Badge, Button, Card, Empty, Field, Input, Modal, SectionTitl
 import { developerApi } from '../services/developerApi.js';
 import { IOT_SOURCE } from '../services/iotApi.js';
 import { developerDataEnabled } from '../utils/frontendReview.js';
+import SandboxPanel from '../components/iot/SandboxPanel.jsx';
 
 const SCOPES = [
   ['devices:read', 'Baca device'],
@@ -287,6 +288,8 @@ export default function Developer() {
           </div>
         ) : <p className="py-5 text-sm text-on-surface-variant">Pemakaian belum tersedia.</p>}
       </Card>
+
+      <SandboxPanel apiKeyPrefix={keys.find(key => key.environment === 'test' && !key.revokedAt)?.prefix || ''} />
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Buat API key">
         <form onSubmit={submitCreate} className="space-y-4">

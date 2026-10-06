@@ -108,7 +108,7 @@ Kalau browser tidak mendukung `BarcodeDetector` (Safari dan Firefox saat dokumen
 2. Modal menampilkan secret satu kali, dengan tombol salin dan peringatan bahwa secret tidak bisa dilihat lagi.
 3. Pilih key untuk melihat request, persentase error, respons 429, grafik harian, dan maksimal lima route dari data usage API.
 4. Klik "Referensi API" untuk membuka dokumen OpenAPI JSON (`/docs/openapi.json`) di tab baru. Scalar tetap direncanakan untuk Minggu 4.
-5. Panel Sandbox dan contoh request belum termasuk Tahap frontend 2 dan tidak ditampilkan.
+5. Panel Sandbox menyediakan satu device Test milik akun, pilihan skenario, pembacaan pH/state/kejadian terbaru, dan contoh `curl` yang hanya memakai prefix aman serta placeholder secret.
 
 ## 5. Spesifikasi layar
 
@@ -147,13 +147,17 @@ Gambar: [terang](design/screens/02-detail-device.png), [gelap](design/screens/02
 
 ### 5.3 Monitoring (`/monitoring`), baru
 
-Tab **Per paket**: grid kartu IoT paket. Setiap kartu menampilkan nilai semua sensornya dan sparkline 24 jam per sensor.
+Monitoring memiliki tepat tiga tab kategori: **Per paket**, **Per sensor**, dan **Per area**. Panel **Log kejadian** selalu menyertai tampilan aktif—di sampingnya pada desktop dan di bawahnya pada layar sempit.
 
-Tab **Per sensor**: pilih jenis sensor (pH, TDS, Suhu air). Tabel berisi semua device yang punya sensor itu, baik satuan maupun paket. Kolomnya: device (beserta tipe dan kode), area, nilai, ambang, dan waktu ukur. Device yang keluar ambang diurutkan paling atas. Di atas tabel ada grafik perbandingan 24 jam untuk maksimal 3 device, supaya warna garis tetap dari palet (`primary`, `tertiary`, `secondary`).
+Tab **Per paket**: kartu hanya untuk device live bertipe paket. Setiap kartu menampilkan nilai terbaru, state, ambang efektif, waktu ukur, dan sparkline 24 jam per sensor. Sparkline memakai titik riwayat API; label aksesibelnya menyebut nama sensor serta min/maks dari rentang yang sama. Tidak ada metrik contoh saat request gagal.
 
-Tab **Per area**: area beserta device di dalamnya. Ringkasan per sensor (min, rata-rata, maks hari ini) dihitung dari semua device di area itu. Ini menggantikan perhitungan statistik harian yang sekarang ada di `SmartStore`.
+Tab **Per sensor**: pilihan jenis sensor berasal dari `GET /sensor-types`. Ringkasan memakai `GET /sensors/:code/overview`, lalu menggabungkan item dengan metadata device dan tipe dari daftar live. Tabel berisi device satuan maupun paket yang memiliki sensor tersebut, kode dan tipe, area, nilai/state, ambang efektif, dan waktu ukur. Device `low`/`high` berada paling atas. Pilih maksimal 3 device untuk grafik perbandingan 24 jam dari API, memakai warna token `primary`, `tertiary`, dan `secondary`.
 
-Panel **Log kejadian** ada di samping (desktop) atau di bawah (layar sempit), bisa difilter Semua, Ambang, atau Koneksi.
+Tab **Per area**: kelompok `areaRef` aktual beserta perangkat live di dalamnya. Untuk setiap pasangan device/sensor, klien meminta `GET /devices/:id/readings?sensor=<code>&from=<local midnight>&to=<now>&bucket=5m`. Awal rentang memakai tengah malam zona waktu browser dan labelnya tepat **"Hari ini sejak 00.00 (waktu perangkatmu)"**. Min adalah nilai minimum dari semua `min` bucket, maks adalah nilai maksimum dari semua `max`, dan rata-rata digabung berbobot jumlah sampel `sum(avg*n)/sum(n)`, bukan rata-rata dari rata-rata bucket. Refresh berjalan saat tab Per area dibuka lalu setiap 60 detik selagi tab itu aktif dan dokumen terlihat; batch tidak overlap, concurrency dibatasi, dan maksimal 60 route per refresh. Counter menampilkan request batch serta sisa anggaran jendela 120 request/60 detik. Frame SSE tidak memicu pemuatan ulang histori area.
+
+Panel **Log kejadian** memfilter kejadian menurut device dan tipe melalui `GET /events?deviceId=&type=&cursor=&limit=`. Tombol halaman berikutnya meneruskan cursor dan hasil digabung tanpa ID duplikat. Panel menampilkan status loading, kosong, error, dan ready tanpa mengganti kegagalan API dengan data contoh. Baris diurutkan menurut ID numerik menurun sesuai kontrak, sementara waktu yang ditampilkan berasal dari `at`.
+
+Badge Monitoring pada kedua menu menghitung jumlah ID device live berbeda yang berstatus `offline` atau memiliki sensor latest state `low`/`high`. Satu device hanya dihitung sekali; sandbox dan state `unknown` dikecualikan. Device berstatus `stale` tidak dihitung hanya karena stale, tetapi tetap dihitung jika statusnya offline atau ada sensor `low`/`high`. Badge disembunyikan saat hitungan nol. Sumber badge adalah satu daftar device dan satu overview per jenis sensor, diperbarui paling sering sekali per 60 detik saat dokumen terlihat. Kegagalan sumber mempertahankan hitungan valid terakhir atau menyembunyikan badge bila belum pernah berhasil, bukan mengganti error dengan nol.
 
 Gambar: [per paket](design/screens/03-monitoring-per-paket.png), [per sensor](design/screens/03b-monitoring-per-sensor.png), [per area](design/screens/03c-monitoring-per-area.png), [gelap](design/screens/03d-monitoring-gelap.png).
 
@@ -180,6 +184,8 @@ Gambar: [device](design/screens/04-kelola-iot-device.png), [tipe](design/screens
 
 Tombol Klaim setinggi 52 px dan selebar layar, supaya mudah ditekan dengan satu tangan di pinggir kolam.
 
+Jika QR membawa kode aktivasi, halaman menyalinnya ke memori JavaScript sementara lalu segera mengganti entri history agar query `c` hilang dari address bar. Alur ke `/masuk` hanya meneruskan `/d/:code`; setelah login, kode dipulihkan dari memori tanpa router state. Kode dihapus setelah klaim berhasil, saat logout mulai, atau setelah 10 menit. Kode tidak disimpan di localStorage/sessionStorage, SmartStore, URL setelah penukaran history, maupun log. Input kode manual tetap tersedia sebagai fallback dan mengikuti masa hidup memori yang sama.
+
 State yang wajib ada: belum login, belum diklaim, milik sendiri, milik orang lain, kode kedaluwarsa, kode tidak dikenal, dan backend tidak tersedia. Gambar semua state ada di [design/README.md](design/README.md), termasuk [mode gelap](design/screens/07i-klaim-qr-gelap.png).
 
 Pratinjau publik hanya menampilkan nama, kode, tipe, sensor, status klaim, dan validitas kode aktivasi. Area/kolam, readings, identitas akun, credential, dan kode aktivasi tidak ditampilkan. Informasi area menunggu keputusan Q4.
@@ -188,7 +194,7 @@ Pratinjau publik hanya menampilkan nama, kode, tipe, sensor, status klaim, dan v
 
 ![Developer](design/screens/06-developer.png)
 
-Isinya tautan "Referensi API" yang membuka OpenAPI JSON di `/docs/openapi.json` pada tab baru, tabel API key (nama, environment, prefix, scope, terakhir dipakai, status, aksi Cabut), dan panel pemakaian 7 hari per key dari GET `/keys/:id/usage`. Key yang belum pernah dipakai menampilkan state kosong. Tautan belum membuka UI Scalar, yang tetap direncanakan pada Minggu 4. Panel Sandbox, skenario, dan contoh `curl` ditunda ke Minggu 3.
+Isinya tautan "Referensi API" yang membuka OpenAPI JSON di `/docs/openapi.json` pada tab baru, tabel API key (nama, environment, prefix, scope, terakhir dipakai, status, aksi Cabut), panel pemakaian 7 hari per key dari GET `/keys/:id/usage`, dan panel Sandbox. Panel Sandbox memanggil `GET /sandbox/devices` untuk memperoleh device Test aktual milik akun, lalu menampilkan status koneksi, pH latest beserta state/ambang/waktu, dan kejadian terbaru. Skenario `normal`, `ph_turun`, `suhu_naik`, atau `offline` disimpan ke `PUT /sandbox/devices/:id/scenario`. Pembaruan memakai subscriber `iotStreamClient` bersama, tanpa membuat stream kedua; callback `onRefresh` bersama hanya memperbarui sandbox pada fallback polling 30 detik. Contoh `curl` yang dapat disalin memuat prefix key Test yang aman dan variabel `JAGOFARM_TEST_API_KEY`, bukan secret.
 
 Modal secret key:
 

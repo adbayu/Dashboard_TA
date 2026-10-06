@@ -154,6 +154,29 @@ test('adapter API membaca latest, histori, kejadian, dan merotasi credential ses
   ]);
 });
 
+test('adapter E2 memakai overview, filter log kejadian, daftar sandbox, dan skenario yang sudah ada', async () => {
+  const calls = [];
+  const request = async (path, options) => {
+    calls.push({ path, options });
+    return { sensor: 'ph', items: [], events: [], devices: [], scenario: 'ph_turun' };
+  };
+  const api = createIotApi({ source: 'api', request });
+
+  await api.getDeviceList();
+  await api.getSensorOverview('ph');
+  await api.getEvents({ deviceId: 'device/id', type: 'threshold_low', cursor: 'MTA=', limit: 25 });
+  await api.getSandboxDevices();
+  await api.setSandboxScenario('sandbox/id', 'ph_turun');
+
+  assert.deepEqual(calls, [
+    { path: '/v1/devices', options: undefined },
+    { path: '/v1/sensors/ph/overview', options: undefined },
+    { path: '/v1/events?deviceId=device%2Fid&type=threshold_low&limit=25&cursor=MTA%3D', options: undefined },
+    { path: '/v1/sandbox/devices', options: undefined },
+    { path: '/v1/sandbox/devices/sandbox%2Fid/scenario', options: { method: 'PUT', body: { scenario: 'ph_turun' } } },
+  ]);
+});
+
 test('mode local tidak membuat telemetri atau credential dan menolak rotasi', async () => {
   const api = createIotApi({ source: 'local' });
   const latest = await api.getDeviceLatest('contoh-device-01');

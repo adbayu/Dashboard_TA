@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { iotApi, IOT_SOURCE } from '../services/iotApi.js';
 import { Badge, Button, Card, Empty, IconButton } from '../components/ui';
 import { claimedDeviceState } from '../utils/frontendReview.js';
-import { stripQrActivationCodeFromAddressBar } from '../utils/activationCodeUrl.js';
+import { activationCodeMemory, claimAndForgetActivationCode } from '../utils/activationCodeMemory.js';
 
 export default function DeviceClaim() {
   const { code = '' } = useParams();
   const location = useLocation();
   const { currentUser, isLoggedIn, sessionStatus, sessionError, theme, toggleTheme, role } = useSmart();
-  const [activationCode, setActivationCode] = useState(() => new URLSearchParams(location.search).get('c') || '');
+  const navigate = useNavigate();
+  const urlActivationCode = new URLSearchParams(location.search).get('c') || '';
+  const subscribeActivationCodes = useCallback(listener => activationCodeMemory.subscribe(listener), []);
+  const getActivationCodeSnapshot = useCallback(() => activationCodeMemory.peek(code), [code]);
+  const memoryActivationCode = useSyncExternalStore(subscribeActivationCodes, getActivationCodeSnapshot, () => '');
+  const activationCode = urlActivationCode || memoryActivationCode;
   const [manualActivationCode, setManualActivationCode] = useState('');
   const [preview, setPreview] = useState(null);
   const [state, setState] = useState('loading');
@@ -21,9 +26,30 @@ export default function DeviceClaim() {
   const requestKey = [code, activationCode, sessionStatus, sessionError, currentUser?.id, role, isLoggedIn, attempt].join('|');
   const [resolvedKey, setResolvedKey] = useState('');
 
-  useEffect(() => {
-    stripQrActivationCodeFromAddressBar(window.location, window.history);
-  }, []);
+  useLayoutEffect(() => {
+    if (urlActivationCode) {
+      activationCodeMemory.set(code, urlActivationCode);
+      const safeSearch = new URLSearchParams(location.search);
+      safeSearch.delete('c');
+      const search = safeSearch.toString();
+      navigate({
+        pathname: location.pathname,
+        search: search ? `?${search}` : '',
+        hash: location.hash,
+      }, { replace: true });
+    }
+  }, [code, location.hash, location.pathname, location.search, navigate, urlActivationCode]);
+
+  useEffect(() => activationCodeMemory.subscribe(() => {
+    const currentCode = activationCodeMemory.peek(code);
+    if (!currentCode) {
+      setManualActivationCode('');
+      setPreview(null);
+      setError('');
+      setState('activation-required');
+      setResolvedKey('');
+    }
+  }), [code]);
 
   useEffect(() => {
     let current = true;
@@ -91,7 +117,8 @@ export default function DeviceClaim() {
       return;
     }
     setError('');
-    setActivationCode(value);
+    setManualActivationCode('');
+    activationCodeMemory.set(code, value);
     setAttempt(current => current + 1);
   }
 
@@ -100,7 +127,7 @@ export default function DeviceClaim() {
     setClaiming(true);
     setError('');
     try {
-      const result = await iotApi.claimDevice(code, activationCode, currentUser.id);
+      const result = await claimAndForgetActivationCode(activationCodeMemory, () => iotApi.claimDevice(code, activationCode, currentUser.id));
       setDeviceId(result.deviceId);
       setPreview(current => current ? {
         ...current,
@@ -119,7 +146,7 @@ export default function DeviceClaim() {
   }
 
   const viewReady = !activationCode || resolvedKey === requestKey;
-  const viewState = !activationCode ? 'activation-required' : viewReady ? state : 'loading';
+  const viewState = state === 'success' ? 'success' : !activationCode ? 'activation-required' : viewReady ? state : 'loading';
   const viewPreview = activationCode && viewReady ? preview : null;
   const viewError = viewReady ? error : '';
   const returnToQr = location.pathname;
@@ -221,7 +248,7 @@ export default function DeviceClaim() {
 
         {viewState === 'success' && (
           <Card>
-            <Empty title={`${viewPreview?.device.code} sudah masuk ke akun Anda.`} hint="Perangkat berhasil diklaim." icon="check_circle" />
+            <Empty title={`${viewPreview?.device.code || code} sudah masuk ke akun Anda.`} hint="Perangkat berhasil diklaim." icon="check_circle" />
             {deviceId && <Link to={`/iot/${encodeURIComponent(deviceId)}`} className="block">
               <Button size="lg" icon="sensors" className="!h-[52px] w-full">Buka detail perangkat</Button>
             </Link>}
