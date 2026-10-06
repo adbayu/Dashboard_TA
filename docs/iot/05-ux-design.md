@@ -120,7 +120,7 @@ Setiap layar yang menampilkan data wajib punya empat state: loading, kosong, err
 | --- | --- |
 | Ringkasan | 4 StatCard: Total device, Terhubung, Data tertunda, Tidak terhubung |
 | Filter | Cari, Tipe (Semua, Satuan, Paket), Area, Status |
-| Daftar | Kartu device menampilkan identitas, badge tipe/status, dan pembacaan tiap sensor dari `GET /devices/:id/latest`, termasuk state serta ambang efektif. Nilai `null` ditampilkan sebagai "Belum ada data"; nilai ilustrasi screenshot tidak pernah dipakai sebagai telemetry. Di mode API, pembacaan diperbarui lewat SSE; mode local tetap menandai "Data contoh" dan tidak mengarang nilai |
+| Daftar | Kartu device menampilkan identitas, badge tipe/status, dan pembacaan tiap sensor dari `GET /devices/:id/latest`, termasuk state serta ambang efektif. Nilai `null` menampilkan "Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi."; nilai ilustrasi screenshot tidak pernah dipakai sebagai telemetry. Di mode API, pembacaan diperbarui lewat fetch streaming; mode local tetap menandai "Data contoh" dan tidak mengarang nilai |
 | Loading | Teks "Memuat perangkat..." dengan `role="status"` |
 | Kosong (belum punya device) | "Belum ada perangkat di akun ini." + tombol "Scan QR alat" |
 | Kosong (hasil filter) | "Tidak ada device cocok" (teks yang sudah ada) |
@@ -135,13 +135,13 @@ Gambar: [berisi](design/screens/01-list-iot.png), [gelap](design/screens/01b-lis
 | Bagian | Isi |
 | --- | --- |
 | Kepala | Nama, kode, badge tipe, badge status, tombol Lepas alat (pemilik). Tombol QR hanya untuk pengelola, jadi tidak tampil di gambar yang memakai sudut pandang pengguna |
-| Nilai sekarang | Nilai terbaru, state, waktu ukur, dan ambang efektif dari API. Ambang `/latest` adalah acuan; pembacaan `null` menampilkan "Belum ada data" |
-| Grafik | Riwayat 24 jam untuk sensor terpilih, diringkas per 5 menit dengan rata-rata, rentang minimum-maksimum, dan ambang efektif. Error riwayat ditampilkan di bagian grafik |
+| Nilai sekarang | Nilai terbaru, state, waktu ukur, dan ambang efektif dari API. Ambang `/latest` adalah acuan; nilai `null` menampilkan "Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi." |
+| Grafik | Riwayat 24 jam untuk sensor terpilih, diringkas per 5 menit dengan rata-rata, rentang minimum-maksimum, dan ambang efektif. Ringkasan terakhir/min/maks menyertakan satuan sensor. Error riwayat ditampilkan di bagian grafik |
 | Kejadian | Maksimal 10 perubahan ambang dan koneksi terbaru dari API. Error kejadian ditampilkan di bagian ini |
 | Kesehatan unit | Firmware, RSSI, kalibrasi terakhir, kiriman terakhir |
 | Fungsi alat | Daftar fungsi alat, teks yang sama dengan yang tampil saat QR dipindai |
 
-Status koneksi menunjukkan "Live" saat SSE tersambung, "Menyambung ulang..." saat stream yang sempat aktif terputus, atau "Diperbarui tiap 30 detik" saat polling. Jika koneksi awal atau percobaan reconnect gagal, UI beralih ke polling 30 detik; kegagalan awal termasuk respons non-200 seperti 429 tidak memicu percobaan stream berulang. Reconnect setelah stream aktif dilakukan berurutan dengan `Last-Event-ID`.
+Status koneksi menunjukkan "Live" saat fetch stream tersambung, "Menyambung ulang..." saat stream yang sempat aktif terputus, atau "Diperbarui tiap 30 detik" saat fallback polling. Server mengirim komentar SSE awal setelah header HTTP 200 di-flush agar fetch client di balik proxy segera menerima respons dan menampilkan "Live" tanpa menunggu heartbeat. Kegagalan koneksi awal atau reconnect, termasuk 429, memulai satu interval polling dan retry stream berbatas backoff; retry tidak berjalan sebelum `Retry-After`. HTTP 200 menghentikan polling. Reconnect dilakukan satu per satu dengan `Last-Event-ID`; server me-replay event setelah cursor, termasuk event yang tersimpan selama gap tanpa GET `/events` tambahan, dan client mengabaikan ID duplikat.
 
 Gambar: [terang](design/screens/02-detail-device.png), [gelap](design/screens/02b-detail-device-gelap.png).
 
@@ -234,10 +234,10 @@ Gambar: [secret key](design/screens/06c-secret-key.png), [secret key gelap](desi
 ## 7. Aksesibilitas dan responsif
 
 - Kontras teks minimal WCAG AA di mode terang dan gelap. Warna status memakai tone Badge yang sudah ada, karena tone itu sudah punya varian gelap.
-- Semua aksi bisa dijalankan dengan keyboard. Saat modal dibuka, fokus pindah ke elemen pertama di dalamnya, Tab dan Shift+Tab berputar di dalam dialog, Escape menutup, dan fokus kembali ke tombol pemicu. Pola ini dipasang sekali di komponen `Modal` (`ui.jsx`).
+- Semua aksi bisa dijalankan dengan keyboard. Saat modal dibuka, fokus pindah ke elemen pertama di dalamnya, Tab dan Shift+Tab berputar di dalam dialog, Escape menutup, dan fokus kembali ke tombol pemicu yang direferensikan, bukan ke `body`. Konfirmasi rotasi dan dialog reveal credential memakai ref tombol pemicu yang sama. Pola ini dipasang sekali di komponen `Modal` (`ui.jsx`).
 - Tombol yang berulang di tabel punya nama aksesibel yang menyebut barisnya, misalnya "Nonaktifkan AQ-TMP" atau "Buat ulang kode aktivasi AQ-PH-002". Label `select` dipasang dengan `for`/`id`, bukan membungkus `select`, supaya namanya tidak tercampur teks opsi.
-- Nilai yang berubah lewat SSE diumumkan lewat region `aria-live="polite"`, hanya ketika state ambang berubah, bukan setiap angka berubah.
+- Status stream/polling List IoT memakai `role="status"` dan `aria-live="polite"`; region hanya mengumumkan transisi status, bukan setiap refresh polling 30 detik. Nilai yang berubah lewat SSE diumumkan lewat region `aria-live="polite"`, hanya ketika state ambang berubah, bukan setiap angka berubah.
 - Target sentuh minimal 44 px untuk halaman `/d/:code` dan tombol utama di layar sempit.
-- Grafik punya ringkasan teks di bawahnya (nilai terakhir, min, maks) supaya informasinya tetap terbaca tanpa melihat grafik.
+- Grafik punya ringkasan teks di bawahnya (nilai terakhir, min, maks, masing-masing dengan satuan sensor) supaya informasinya tetap terbaca tanpa melihat grafik.
 - Tidak ada scroll horizontal di lebar 360 px. Ini sudah diuji di prototype untuk List IoT, Detail device, Monitoring, Kelola IoT, Developer, dan halaman QR. Tabel lebar memakai kotak scroll horizontal sendiri, jadi halaman tidak ikut bergeser.
 - Di lebar 720 px ke bawah, sidebar disembunyikan dan diganti tombol Menu (44 px) di top bar. Ini usulan perubahan untuk `SmartSidebar`, karena sidebar 208 px yang selalu tampil menyisakan sekitar 180 px untuk konten di HP.

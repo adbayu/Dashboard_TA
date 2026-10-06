@@ -61,6 +61,7 @@ export default function AdminIotPage() {
   const labelUrlsRef = useRef(new Set());
   const [rotationConfirmation, setRotationConfirmation] = useState(null);
   const [rotationReveal, setRotationReveal] = useState(null);
+  const rotationTriggerRef = useRef(null);
   const [rotationBusy, setRotationBusy] = useState(false);
   const [rotationError, setRotationError] = useState('');
   const [rotationCopied, setRotationCopied] = useState(false);
@@ -499,7 +500,7 @@ export default function AdminIotPage() {
                             <IconButton icon="qr_code_2" size="sm" onClick={() => openLabelForDevice(device)} title={`Buat label QR ${device.code}`} />
                             <IconButton icon="edit" size="sm" onClick={() => openEditDevice(device)} title={`Ubah ${device.code}`} />
                             <IconButton icon="autorenew" size="sm" onClick={() => startActivationRenewal(device)} title={`Buat ulang kode aktivasi ${device.code}`} />
-                            {canRotateDeviceCredential(device) && <IconButton icon="key" size="lg" onClick={() => openRotationConfirmation(device)} title={`Rotasi credential ${device.code}`} />}
+                            {canRotateDeviceCredential(device) && <IconButton icon="key" size="lg" onClick={event => { rotationTriggerRef.current = event.currentTarget; openRotationConfirmation(device); }} title={`Rotasi credential ${device.code}`} />}
                             <IconButton icon="build_circle" size="sm" onClick={() => setCalibrationDevice(device)} title={`Catat kalibrasi ${device.code}`} />
                           </AksiBaris>
                         ) : <span className="text-xs text-on-surface-variant">Hanya-baca</span>}
@@ -623,6 +624,7 @@ export default function AdminIotPage() {
         onClose={cancelRotationConfirmation}
         title="Rotasi credential device"
         closeDisabled={rotationBusy}
+        returnFocusRef={rotationTriggerRef}
       >
         {rotationConfirmation && <div className="space-y-4">
           <p className="text-sm leading-relaxed text-on-surface-variant">
@@ -641,6 +643,7 @@ export default function AdminIotPage() {
         onClose={closeRotationReveal}
         title={`Credential baru ${rotationReveal?.code || ''}`}
         closeDisabled={!credentialRevealCanClose({ credential: rotationReveal?.credential, copied: rotationCopied, saved: rotationSaved })}
+        returnFocusRef={rotationTriggerRef}
       >
         {rotationReveal && <div className="space-y-4">
           <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100">

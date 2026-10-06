@@ -20,6 +20,18 @@ function exposeShellForRouteTests() {
   };
 }
 
+function exposeStreamStatusForTests() {
+  return {
+    name: 'expose-list-iot-stream-status-for-tests',
+    transform(source, id) {
+      if (id.replaceAll('\\', '/').endsWith('/src/pages/ListIot.jsx')) {
+        return `${source}\nexport { StreamStatus };`;
+      }
+      return null;
+    },
+  };
+}
+
 test('Field connects the visible label to a control nested in a wrapper', async t => {
   const vite = await createServer({
     root: process.cwd(),
@@ -43,6 +55,25 @@ test('Field connects the visible label to a control nested in a wrapper', async 
   assert.ok(labelId, 'label should reference a control id');
   assert.equal(inputId, labelId);
   assert.doesNotMatch(markup, /<div[^>]* id="[^"]+"/);
+});
+
+test('List IoT stream status is announced politely as a status region', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [exposeStreamStatusForTests(), react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { StreamStatus } = await vite.ssrLoadModule('/src/pages/ListIot.jsx');
+  const markup = renderToStaticMarkup(React.createElement(StreamStatus, { status: 'polling' }));
+
+  assert.match(markup, /role="status"/);
+  assert.match(markup, /aria-live="polite"/);
+  assert.match(markup, /Diperbarui tiap 30 detik/);
 });
 
 test('Field links the label to the input in a two-control wrapper without a key warning', async t => {

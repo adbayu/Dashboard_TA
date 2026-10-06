@@ -81,7 +81,7 @@ export default function ReadingChart({ sensor, points = [], threshold, theme = '
         {threshold?.high != null && <span>Ambang atas {formatSensorNumber(threshold.high, decimals)} {unit}</span>}
       </div>
       <p className="mt-3 text-xs leading-relaxed text-on-surface-variant">
-        Terakhir {formatSensorNumber(summary.latest, decimals)} {unit}. Min {formatSensorNumber(summary.min, decimals)}. Maks {formatSensorNumber(summary.max, decimals)}. {summary.count} titik agregat.
+        Terakhir {formatSensorNumber(summary.latest, decimals)} {unit}. Min {formatSensorNumber(summary.min, decimals)} {unit}. Maks {formatSensorNumber(summary.max, decimals)} {unit}. {summary.count} titik agregat.
       </p>
     </figure>
   );

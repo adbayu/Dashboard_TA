@@ -1467,6 +1467,35 @@ test('V1 readings, ambang, kejadian, dan deteksi offline memakai PostgreSQL', as
         [otherDevice.id, eventTime],
       )).rows[0].id as string;
 
+      const streamOrigin = await app!.listen({ host: '127.0.0.1', port: 0 });
+      const initialStreamController = new AbortController();
+      let initialStreamReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+      try {
+        const initialStreamResponse = await fetch(`${streamOrigin}/api/v1/stream`, {
+          headers: {
+            accept: 'text/event-stream',
+            cookie: userCookie,
+            'last-event-id': replayBaseId,
+          },
+          signal: initialStreamController.signal,
+        });
+        assert.equal(initialStreamResponse.status, 200);
+        initialStreamReader = initialStreamResponse.body!.getReader();
+        const firstFrame = await initialStreamReader.read();
+        assert.equal(firstFrame.done, false);
+        assert.ok(
+          new TextDecoder().decode(firstFrame.value).startsWith(': connected\n\n'),
+          'SSE must flush an initial comment before replay frames',
+        );
+      } finally {
+        try { await initialStreamReader?.cancel(); } catch { /* The test assertion may close the stream first. */ }
+        initialStreamController.abort();
+        for (let attempt = 0; attempt < 50 && streamHub.connectionCount(userId) > 0; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      }
+      assert.equal(streamHub.connectionCount(userId), 0);
+
       const sessionActor = await authenticateSession(pool, userCookie.slice('pilot_session='.length));
       const otherActor = await authenticateSession(pool, otherCookie.slice('pilot_session='.length));
       assert.ok(sessionActor);

@@ -33,7 +33,7 @@ export function SensorReading({ sensor, reading, measuredAt, compact = false, sh
         <span>{formatSensorNumber(value, decimals)}</span>
         {sensor.unit && <span className="text-sm font-semibold text-on-surface-variant">{sensor.unit}</span>}
       </p>
-      {value == null && <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">Belum ada pembacaan untuk sensor ini.</p>}
+      {value == null && <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi.</p>}
       <p className="mt-2 break-words text-xs text-on-surface-variant">{formatThreshold(threshold, sensor.unit, decimals)}</p>
       {showTime && (
         <time

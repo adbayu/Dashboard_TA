@@ -245,6 +245,8 @@ Mengirim `low` atau `high` bernilai `null` untuk sebuah sensor berarti batas ter
 `GET /stream` (scope `readings:read`), header `Accept: text/event-stream`.
 
 ```
+: connected
+
 event: reading
 data: {"deviceId":"c3f1...","measuredAt":"2026-10-10T08:05:30.000Z","readings":{"ph":6.12,"tds":640,"water_temperature":27.6}}
 
@@ -257,9 +259,11 @@ data: {"deviceId":"c3f1...","type":"threshold_low","sensor":"ph","value":6.12,"a
 
 Hanya `device_event` yang membawa `id`, sama dengan `device_events.id`. `reading` tidak membawa `id` sehingga tidak memajukan posisi replay. Saat browser mengirim `Last-Event-ID`, server mengirim ulang `device_event` sesudah ID itu dan menerapkan filter actor, ownership, serta environment yang sama dengan event live. Header yang tidak valid ditolak 400 `VALIDATION_FAILED`. Reading dan event live dipublish hanya setelah transaksi ingest commit; retry `duplicate: true` tidak mempublish. Event dari job offline dipublish hanya setelah transaksi job commit, sehingga rollback tidak menghasilkan event SSE.
 
+Setelah header HTTP 200 di-flush, server mengirim komentar awal `: connected\n\n` sebelum replay. Komentar SSE ini tidak memiliki nama event atau ID dan diabaikan klien; byte awal memastikan fetch client di balik proxy segera melihat status respons tanpa menunggu replay atau heartbeat.
+
 Batasnya 5 koneksi per actor; sesi dan key milik akun yang sama berbagi batas. Lima memungkinkan beberapa tab klien tetap tersambung, tetapi menyisakan ruang dari batas umum enam koneksi HTTP/1.1 per origin. Upaya koneksi keenam mendapat 429 `RATE_LIMITED` sesuai tabel error Contract 4; koneksi ke-4 masih diizinkan.
 
-Untuk browser, pakai `EventSource` dengan `withCredentials: true`. `EventSource` tidak bisa mengirim header `Authorization`, jadi klien API key perlu memakai library SSE yang mendukung header custom, atau polling `/latest`.
+Untuk browser, implementasi dashboard memakai fetch streaming dengan `credentials: 'same-origin'`, bukan `EventSource`: fetch dapat mengirim `Last-Event-ID` saat reconnect sekaligus memeriksa status HTTP dan header `retry-after` pada 429. Request reconnect tetap ke `GET /stream` yang sama; tidak ada endpoint atau query parameter catch-up baru. Klien reconnect berurutan, memproses replay event setelah cursor, dan mengabaikan ID event yang sudah diterima. Saat fallback, polling berjalan tiap 30 detik sambil retry berbatas backoff menunggu sekurangnya `Retry-After`; stream HTTP 200 menghentikan polling.
 
 ### 6.8 API key
 

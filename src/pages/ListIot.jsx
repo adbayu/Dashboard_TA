@@ -29,7 +29,7 @@ function StreamStatus({ status }) {
     polling: { label: 'Diperbarui tiap 30 detik', tone: 'muted', icon: 'schedule' },
   }[status];
   if (!details) return null;
-  return <Badge tone={details.tone} icon={details.icon}>{details.label}</Badge>;
+  return <span className="inline-flex" role="status" aria-live="polite"><Badge tone={details.tone} icon={details.icon}>{details.label}</Badge></span>;
 }
 
 const READING_STATE_LABEL = { normal: 'Normal', low: 'Di bawah ambang', high: 'Di atas ambang', unknown: 'Tanpa ambang' };

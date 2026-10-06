@@ -4,17 +4,35 @@ import { createIotStreamClient, createSseParser } from './iotStream.js';
 
 const encoder = new TextEncoder();
 
-function createTimers() {
+function createTimers(startAt = 0) {
   let nextId = 0;
+  let currentTime = startAt;
   const callbacks = new Map();
+  const timeouts = new Map();
   return {
     callbacks,
+    timeouts,
+    now: () => currentTime,
     setInterval(callback, delay) {
       const id = ++nextId;
       callbacks.set(id, { callback, delay });
       return id;
     },
     clearInterval(id) { callbacks.delete(id); },
+    setTimeout(callback, delay) {
+      const id = ++nextId;
+      timeouts.set(id, { callback, delay, dueAt: currentTime + delay });
+      return id;
+    },
+    clearTimeout(id) { timeouts.delete(id); },
+    advance(milliseconds) {
+      currentTime += milliseconds;
+      for (const [id, timeout] of [...timeouts]) {
+        if (timeout.dueAt > currentTime) continue;
+        timeouts.delete(id);
+        timeout.callback();
+      }
+    },
   };
 }
 
@@ -77,18 +95,28 @@ test('multiple subscribers share one stream and final unsubscribe aborts it', as
   await waitFor(() => client.getSubscriberCount() === 0);
   await waitFor(() => stream.closed);
   assert.equal(timers.callbacks.size, 0);
+  assert.equal(requests[0].options.signal.aborted, true);
   assert.equal(requests.length, 1);
 });
 
-test('initial non-200 including 429 stops stream attempts and shares 30-second polling', async () => {
+test('initial 429 honors Retry-After seconds and recovers to one stream without early retry', async () => {
   const timers = createTimers();
+  const stream = openResponse();
   const statuses = [];
   const refreshes = [0, 0];
   let requests = 0;
   const client = createIotStreamClient({
-    fetchImpl: async () => { requests += 1; return new Response('rate limited', { status: 429 }); },
+    fetchImpl: async () => {
+      requests += 1;
+      return requests === 1
+        ? new Response('rate limited', { status: 429, headers: { 'retry-after': '5' } })
+        : stream.response;
+    },
     setIntervalImpl: timers.setInterval,
     clearIntervalImpl: timers.clearInterval,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+    nowImpl: timers.now,
   });
   const stop = client.subscribe({ onStatus: status => statuses.push(status), onRefresh: () => { refreshes[0] += 1; } });
   const stopSecond = client.subscribe({ onRefresh: () => { refreshes[1] += 1; } });
@@ -98,13 +126,56 @@ test('initial non-200 including 429 stops stream attempts and shares 30-second p
   assert.equal(requests, 1);
   assert.equal(timers.callbacks.size, 1);
   assert.equal([...timers.callbacks.values()][0].delay, 30_000);
+  assert.equal(timers.timeouts.size, 1);
+  assert.equal([...timers.timeouts.values()][0].delay, 5_000);
   [...timers.callbacks.values()][0].callback();
   assert.deepEqual(refreshes, [1, 1]);
+  assert.deepEqual(statuses, ['connecting', 'polling']);
+  timers.advance(4_999);
+  await Promise.resolve();
   assert.equal(requests, 1);
+  timers.advance(1);
+  await waitFor(() => requests === 2 && statuses.includes('live'));
+  assert.equal(timers.callbacks.size, 0);
+  assert.equal(timers.timeouts.size, 0);
+  assert.deepEqual(statuses, ['connecting', 'polling', 'live']);
   stop();
-  assert.equal(timers.callbacks.size, 1);
+  assert.equal(timers.callbacks.size, 0);
   stopSecond();
   assert.equal(timers.callbacks.size, 0);
+  stream.close();
+});
+
+test('initial 429 honors Retry-After HTTP dates and does not retry before the date', async () => {
+  const startAt = Date.UTC(2026, 9, 6, 8, 0, 0);
+  const timers = createTimers(startAt);
+  const stream = openResponse();
+  const retryAt = new Date(startAt + 7_000).toUTCString();
+  let requests = 0;
+  const client = createIotStreamClient({
+    fetchImpl: async () => {
+      requests += 1;
+      return requests === 1
+        ? new Response('rate limited', { status: 429, headers: { 'retry-after': retryAt } })
+        : stream.response;
+    },
+    setIntervalImpl: timers.setInterval,
+    clearIntervalImpl: timers.clearInterval,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+    nowImpl: timers.now,
+  });
+  const stop = client.subscribe({});
+
+  await waitFor(() => timers.timeouts.size === 1);
+  assert.equal([...timers.timeouts.values()][0].delay, 7_000);
+  timers.advance(6_999);
+  await Promise.resolve();
+  assert.equal(requests, 1);
+  timers.advance(1);
+  await waitFor(() => requests === 2);
+  stop();
+  stream.close();
 });
 
 test('established stream reconnects sequentially with Last-Event-ID and dispatches live frames', async () => {
@@ -153,36 +224,93 @@ test('established stream reconnects sequentially with Last-Event-ID and dispatch
   streams[1].close();
 });
 
-test('non-200 reconnect response stops retries and falls back to polling', async () => {
+test('reconnect replays an event persisted during the gap exactly once and ignores duplicate IDs', async () => {
   const timers = createTimers();
-  const stream = openResponse();
-  const statuses = [];
+  const streams = [openResponse(), openResponse()];
   const requests = [];
-  let refreshes = 0;
+  const events = [];
+  const statuses = [];
+  const replay = 'id: 89\nevent: device_event\ndata: {"deviceId":"device-1","type":"threshold_low"}\n\n';
   const client = createIotStreamClient({
     fetchImpl: async (url, options) => {
       requests.push({ url, options });
-      return requests.length === 1 ? stream.response : new Response('unauthorized', { status: 401 });
+      if (requests.length === 2) return new Response('rate limited', { status: 429, headers: { 'retry-after': '1' } });
+      if (requests.length === 3) {
+        streams[1].send(replay);
+        streams[1].send(replay);
+      }
+      return requests.length === 1 ? streams[0].response : streams[1].response;
     },
     setIntervalImpl: timers.setInterval,
     clearIntervalImpl: timers.clearInterval,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+    nowImpl: timers.now,
   });
-  const stop = client.subscribe({ onStatus: status => statuses.push(status), onRefresh: () => { refreshes += 1; } });
+  const stop = client.subscribe({ onStatus: status => statuses.push(status), onDeviceEvent: (event, id) => events.push({ event, id }) });
 
-  await waitFor(() => statuses.includes('live'));
-  stream.send('id: 91\nevent: device_event\ndata: {"deviceId":"device-1","type":"online"}\n\n');
-  stream.close();
-  await waitFor(() => statuses.includes('polling'));
+  await waitFor(() => requests.length === 1);
+  streams[0].send('id: 88\nevent: device_event\ndata: {"deviceId":"device-1","type":"offline"}\n\n');
+  await waitFor(() => events.length === 1);
+  streams[0].close();
+  await waitFor(() => requests.length === 2 && statuses.includes('polling'));
+  timers.advance(1_000);
+  await waitFor(() => requests.length === 3 && events.length >= 2);
 
-  assert.deepEqual(statuses, ['connecting', 'live', 'reconnecting', 'polling']);
-  assert.equal(requests.length, 2);
-  assert.equal(requests[1].options.headers['Last-Event-ID'], '91');
-  [...timers.callbacks.values()][0].callback();
-  assert.equal(refreshes, 1);
+  assert.equal(requests[2].options.headers['Last-Event-ID'], '88');
+  assert.deepEqual(events, [
+    { event: { deviceId: 'device-1', type: 'offline' }, id: '88' },
+    { event: { deviceId: 'device-1', type: 'threshold_low' }, id: '89' },
+  ]);
   stop();
+  streams[1].close();
 });
 
-test('initial network failure switches directly to polling without retrying the stream', async () => {
+test('multiple subscribers share one polling interval and bounded recovery timer across repeated errors', async () => {
+  const timers = createTimers();
+  const requests = [];
+  const statuses = [];
+  const client = createIotStreamClient({
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      if (requests.length === 1) return new Response('rate limited', { status: 429, headers: { 'retry-after': '1' } });
+      if (requests.length === 2) return new Response('unavailable', { status: 503 });
+      return new Response('rate limited', { status: 429, headers: { 'retry-after': '10' } });
+    },
+    setIntervalImpl: timers.setInterval,
+    clearIntervalImpl: timers.clearInterval,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+    nowImpl: timers.now,
+  });
+  const stop = client.subscribe({ onStatus: status => statuses.push(status) });
+  const stopSecond = client.subscribe({});
+
+  await waitFor(() => requests.length === 1 && timers.timeouts.size === 1);
+  assert.equal(timers.callbacks.size, 1);
+  timers.advance(1_000);
+  await waitFor(() => requests.length === 2 && timers.timeouts.size === 1);
+  assert.equal(timers.callbacks.size, 1);
+  assert.equal([...timers.timeouts.values()][0].delay, 2_000);
+  assert.deepEqual(statuses, ['connecting', 'polling']);
+  timers.advance(1_999);
+  await Promise.resolve();
+  assert.equal(requests.length, 2);
+  timers.advance(1);
+  await waitFor(() => requests.length === 3 && timers.timeouts.size === 1);
+  assert.equal(timers.callbacks.size, 1);
+  assert.equal([...timers.timeouts.values()][0].delay, 10_000);
+  assert.deepEqual(statuses, ['connecting', 'polling']);
+
+  stop();
+  assert.equal(timers.callbacks.size, 1);
+  assert.equal(timers.timeouts.size, 1);
+  stopSecond();
+  assert.equal(timers.callbacks.size, 0);
+  assert.equal(timers.timeouts.size, 0);
+});
+
+test('initial network failure polls while waiting for a bounded stream recovery attempt', async () => {
   const timers = createTimers();
   const statuses = [];
   let requests = 0;
@@ -190,11 +318,25 @@ test('initial network failure switches directly to polling without retrying the 
     fetchImpl: async () => { requests += 1; throw new Error('offline'); },
     setIntervalImpl: timers.setInterval,
     clearIntervalImpl: timers.clearInterval,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+    nowImpl: timers.now,
   });
   const stop = client.subscribe({ onStatus: status => statuses.push(status) });
 
   await waitFor(() => statuses.includes('polling'));
   assert.deepEqual(statuses, ['connecting', 'polling']);
   assert.equal(requests, 1);
+  assert.equal([...timers.timeouts.values()][0].delay, 1_000);
+  timers.advance(999);
+  await Promise.resolve();
+  assert.equal(requests, 1);
+  timers.advance(1);
+  await waitFor(() => requests === 2 && timers.timeouts.size === 1);
+  assert.equal(timers.callbacks.size, 1);
+  assert.equal([...timers.timeouts.values()][0].delay, 2_000);
+  assert.equal(timers.timeouts.size, 1);
   stop();
+  assert.equal(timers.timeouts.size, 0);
+  assert.equal(timers.callbacks.size, 0);
 });

@@ -234,6 +234,7 @@ export function registerStreamRoute(app: FastifyInstance, hub: StreamHub) {
       'x-accel-buffering': 'no',
     });
     raw.flushHeaders();
+    raw.write(': connected\n\n');
     const cleanup = () => {
       connection.close();
       request.raw.off('aborted', cleanup);

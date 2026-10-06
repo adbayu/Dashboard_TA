@@ -60,6 +60,16 @@ Semua uji yang sudah ada di `pilot.test.ts` wajib tetap hijau setelah migration 
 | V1-31 | Rotasi credential: hak admin, hash dan timestamp atomik, ingest lama/baru, race rotasi-ingest | Scope non-admin ditolak 403; credential lama 401 sesudah commit, credential baru diterima; race terserialisasi |
 | V1-32 | Retensi data sandbox melewati event threshold/koneksi terakhir | Hanya event anchor terakhir dipertahankan; readings/events live tidak disentuh dan threshold tidak ditulis ulang |
 | V1-33 | Sesi akun yang belum pernah membuat key test membuka `/sandbox/devices` | Device sandbox diprovisikan idempoten dan satu kali |
+| V1-34 | Route SSE membuka koneksi dengan komentar awal sebelum replay | Frame `: connected` tanpa event/ID diterima lebih dulu; frame replay berikutnya tetap mengikuti cursor dan filter actor |
+
+Regresi frontend E1 otomatis dijalankan bersama tes UI dan service:
+
+| ID | Skenario | Hasil yang diharapkan |
+| --- | --- | --- |
+| E1-FE-01 | Event `device_event` tersimpan saat gap setelah cursor N; stream reconnect/recovery mengirim `Last-Event-ID` N dan replay ID yang sama dua kali | Event gap diterima subscriber tepat sekali |
+| E1-FE-02 | Respons 429 dengan `Retry-After` detik atau tanggal; beberapa subscriber dan error berulang | Retry tidak lebih awal dari header, backoff dibatasi, hanya satu interval polling dan satu timer retry bersama |
+| E1-FE-03 | SSE pulih dengan HTTP 200 setelah fallback; reconnect dan unsubscribe akhir | Polling berhenti saat 200; request stream tidak overlap; reader, controller, subscription, interval, dan retry timer dibersihkan |
+| E1-FE-04 | Pembacaan kosong, ringkasan grafik, serta status polling | Copy kosong tepat dan satuan min/maks tampil; status polite hanya berubah pada transisi, bukan setiap refresh |
 
 ## 4. Uji manual UI
 
@@ -78,9 +88,11 @@ Semua uji yang sudah ada di `pilot.test.ts` wajib tetap hijau setelah migration 
 | UI-11 | Ulangi UI-01 sampai UI-10 di mode gelap | Semua teks terbaca, tidak ada elemen hilang |
 | UI-12 | Lebar 360 px dan 841 px | Tidak ada scroll horizontal |
 | UI-13 | Jalankan seluruh alur hanya dengan keyboard | Semua aksi bisa dicapai, fokus terlihat, Escape menutup modal |
-| UI-14 | Buka List IoT dan Detail device dengan telemetry, lalu putuskan SSE setelah tersambung | Nilai terbaru, riwayat 24 jam, dan kejadian berasal dari API; status menunjukkan "Menyambung ulang...", lalu polling menampilkan "Diperbarui tiap 30 detik" bila reconnect gagal |
-| UI-15 | Kelola IoT: bandingkan device live terprovisioning, live belum terprovisioning, dan sandbox | Rotasi hanya tampil untuk device live dengan `credentialProvisioned: true`. Modal memindahkan fokus ke dalam, mengunci Tab/Shift+Tab, Escape menutup dan memulihkan fokus; secret tampil sekali dan dialog meminta salin atau pengakuan penyimpanan sebelum ditutup |
-| UI-16 | Buat request awal SSE menerima respons non-200, termasuk 429 | Stream tidak dicoba ulang dan UI melanjutkan polling dengan label "Diperbarui tiap 30 detik" |
+| UI-14 | Buka List IoT dan Detail device dengan telemetry, lalu putuskan fetch stream setelah tersambung | Nilai terbaru, riwayat 24 jam, dan kejadian berasal dari API; status polite berubah ke "Menyambung ulang...", lalu "Diperbarui tiap 30 detik" saat fallback. Retry memakai `Last-Event-ID`, hanya satu request aktif, dan status tidak diumumkan ulang tiap refresh |
+| UI-15 | Kelola IoT: bandingkan device live terprovisioning, live belum terprovisioning, dan sandbox | Rotasi hanya tampil untuk device live dengan `credentialProvisioned: true`. Kedua modal rotasi memindahkan fokus ke dalam, mengunci Tab/Shift+Tab, Escape menutup dan mengembalikan fokus ke ref tombol pemicu; secret tampil sekali dan dialog meminta salin atau pengakuan penyimpanan sebelum ditutup |
+| UI-16 | Request awal atau reconnect stream menerima respons non-200, termasuk 429 dengan `Retry-After` | Satu interval polling memakai label "Diperbarui tiap 30 detik" sambil retry menunggu sekurangnya `Retry-After`; setelah HTTP 200 polling berhenti |
+| UI-17 | Buka pembacaan sensor tanpa nilai dan grafik riwayat dengan rentang terpilih | Copy kosong berbunyi "Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi."; ringkasan terakhir, min, dan maks menyebut satuan sensor |
+| UI-18 | Buka List IoT/Detail melalui Vite proxy dengan fetch SSE | Komentar awal membuat HTTP 200 dan status "Live" terlihat kurang dari 5 detik; komentar tidak diumumkan sebagai telemetry dan replay tetap utuh |
 
 ## 5. Uji bench alat
 

@@ -285,7 +285,7 @@ export function Empty({ title, hint, icon = 'inbox', action }) {
   );
 }
 
-export function Modal({ open, onClose, title, children, wide, closeDisabled = false }) {
+export function Modal({ open, onClose, title, children, wide, closeDisabled = false, returnFocusRef }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(onClose);
   const titleId = useId();
@@ -294,7 +294,8 @@ export function Modal({ open, onClose, title, children, wide, closeDisabled = fa
 
   useEffect(() => {
     if (!open) return undefined;
-    const previousFocus = document.activeElement;
+    const returnFocusTarget = returnFocusRef?.current;
+    const previousFocus = returnFocusTarget || document.activeElement;
     const dialog = dialogRef.current;
     const focusable = () => [...(dialog?.querySelectorAll('a[href],button:not([disabled]),input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') || [])]
       .filter(element => element.getAttribute('aria-hidden') !== 'true');
@@ -327,9 +328,10 @@ export function Modal({ open, onClose, title, children, wide, closeDisabled = fa
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+      const focusTarget = returnFocusTarget || previousFocus;
+      if (focusTarget instanceof HTMLElement && focusTarget.isConnected) focusTarget.focus();
     };
-  }, [open, closeDisabled]);
+  }, [open, closeDisabled, returnFocusRef]);
   if (!open) return null;
   return (
     <div

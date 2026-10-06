@@ -1,4 +1,6 @@
 export const IOT_STREAM_POLL_INTERVAL_MS = 30_000;
+const RECONNECT_BASE_DELAY_MS = 1_000;
+const RECONNECT_MAX_DELAY_MS = 30_000;
 
 export function createSseParser(onFrame) {
   let buffer = '';
@@ -61,20 +63,43 @@ export function createSseParser(onFrame) {
   };
 }
 
+function retryAfterDelay(response, now) {
+  if (response.status !== 429) return 0;
+  const value = response.headers?.get?.('retry-after')?.trim();
+  if (!value) return 0;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const retryAt = Date.parse(value);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - now) : 0;
+}
+
+function isDuplicateEventId(id, cursor) {
+  if (cursor === null) return false;
+  if (id === cursor) return true;
+  if (/^\d+$/.test(id) && /^\d+$/.test(cursor)) return BigInt(id) <= BigInt(cursor);
+  return false;
+}
+
 export function createIotStreamClient({
   fetchImpl = globalThis.fetch,
   setIntervalImpl = globalThis.setInterval,
   clearIntervalImpl = globalThis.clearInterval,
+  setTimeoutImpl = globalThis.setTimeout,
+  clearTimeoutImpl = globalThis.clearTimeout,
+  nowImpl = () => Date.now(),
   pollIntervalMs = IOT_STREAM_POLL_INTERVAL_MS,
   url = '/api/v1/stream',
 } = {}) {
   const subscribers = new Set();
   let status = 'idle';
+  let hasConnected = false;
   let lastEventId = null;
   let streamTask = null;
   let activeController = null;
   let activeReader = null;
   let pollTimer = null;
+  let retryTimer = null;
+  let retryAttempt = 0;
 
   function notify(name, ...args) {
     for (const handlers of subscribers) {
@@ -94,23 +119,44 @@ export function createIotStreamClient({
     pollTimer = null;
   }
 
-  function startPolling() {
+  function clearRetry() {
+    if (retryTimer === null) return;
+    clearTimeoutImpl(retryTimer);
+    retryTimer = null;
+  }
+
+  function scheduleRecovery(retryAfterMs = 0) {
+    if (!subscribers.size || retryTimer !== null) return;
+    const backoff = Math.min(RECONNECT_BASE_DELAY_MS * (2 ** retryAttempt), RECONNECT_MAX_DELAY_MS);
+    retryAttempt = Math.min(retryAttempt + 1, 5);
+    retryTimer = setTimeoutImpl(() => {
+      retryTimer = null;
+      ensureStream();
+    }, Math.max(backoff, retryAfterMs));
+  }
+
+  function startPolling(retryAfterMs = 0) {
     if (!subscribers.size) return;
     setStatus('polling');
-    if (pollTimer !== null) return;
-    pollTimer = setIntervalImpl(() => {
-      if (subscribers.size) notify('onRefresh');
-    }, pollIntervalMs);
+    if (pollTimer === null) {
+      pollTimer = setIntervalImpl(() => {
+        if (subscribers.size) notify('onRefresh');
+      }, pollIntervalMs);
+    }
+    scheduleRecovery(retryAfterMs);
   }
 
   function stopConnection() {
     clearPolling();
+    clearRetry();
     const reader = activeReader;
     activeReader = null;
     activeController?.abort();
     activeController = null;
     if (reader) void reader.cancel().catch(() => {});
     lastEventId = null;
+    hasConnected = false;
+    retryAttempt = 0;
     setStatus('idle');
   }
 
@@ -119,12 +165,17 @@ export function createIotStreamClient({
     activeReader = reader;
     const decoder = new TextDecoder();
     const parser = createSseParser(frame => {
-      if (frame.event === 'device_event' && frame.id !== undefined) lastEventId = frame.id;
       if (frame.event !== 'reading' && frame.event !== 'device_event') return;
       try {
         const data = JSON.parse(frame.data);
         if (frame.event === 'reading') notify('onReading', data);
-        else notify('onDeviceEvent', data, frame.id);
+        else {
+          if (frame.id !== undefined) {
+            if (isDuplicateEventId(frame.id, lastEventId)) return;
+            lastEventId = frame.id;
+          }
+          notify('onDeviceEvent', data, frame.id);
+        }
       } catch {
         // Malformed event data is ignored; the connection stays usable.
       }
@@ -147,31 +198,38 @@ export function createIotStreamClient({
   }
 
   async function runStream() {
-    let established = false;
-
     while (subscribers.size) {
-      setStatus(established ? 'reconnecting' : 'connecting');
+      if (pollTimer === null) setStatus(hasConnected ? 'reconnecting' : 'connecting');
       const controller = new AbortController();
       activeController = controller;
       const headers = { Accept: 'text/event-stream' };
-      if (established && lastEventId !== null) headers['Last-Event-ID'] = lastEventId;
+      if (hasConnected && lastEventId !== null) headers['Last-Event-ID'] = lastEventId;
 
       let response;
       try {
         response = await fetchImpl(url, { credentials: 'same-origin', headers, signal: controller.signal });
       } catch {
+        if (activeController === controller) activeController = null;
         if (subscribers.size && !controller.signal.aborted) startPolling();
         return;
       }
 
-      if (!subscribers.size || controller.signal.aborted) return;
+      if (!subscribers.size || controller.signal.aborted) {
+        if (activeController === controller) activeController = null;
+        try { await response.body?.cancel(); } catch { /* The response body may already be closed. */ }
+        return;
+      }
       if (response.status !== 200 || !response.body?.getReader) {
         try { await response.body?.cancel(); } catch { /* The response body may already be closed. */ }
-        startPolling();
+        if (activeController === controller) activeController = null;
+        startPolling(retryAfterDelay(response, nowImpl()));
         return;
       }
 
-      established = true;
+      hasConnected = true;
+      retryAttempt = 0;
+      clearPolling();
+      clearRetry();
       setStatus('live');
       try {
         await consume(response, controller);
@@ -186,7 +244,7 @@ export function createIotStreamClient({
   }
 
   function ensureStream() {
-    if (streamTask || !subscribers.size || status === 'polling') return;
+    if (streamTask || retryTimer !== null || !subscribers.size) return;
     streamTask = runStream().finally(() => {
       streamTask = null;
       if (subscribers.size && status !== 'polling') ensureStream();
