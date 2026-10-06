@@ -16,5 +16,7 @@ Setiap keputusan teknis yang sulit dibalik dicatat di sini dengan format: kontek
 | [0010](0010-pratinjau-qr-publik-terbatas.md) | Pratinjau QR publik hanya menampilkan ringkasan device yang aman | Usulan |
 | [0011](0011-qr-dibuat-dengan-kode-aktivasi-di-body.md) | Pembuatan gambar QR menerima kode aktivasi melalui body POST | Usulan |
 | [0012](0012-idempotensi-ingest-mencakup-metadata.md) | Idempotensi ingest membandingkan metadata bersama payload | Usulan |
+| [0013](0013-state-monitoring-dari-database.md) | State ambang dan koneksi dipulihkan dari database dengan row lock device | Usulan |
+| [0014](0014-sandbox-satu-device-per-akun.md) | Satu device sandbox per akun, di luar batas 20 unit live | Usulan |
 
 Semua masih berstatus Usulan sampai direview tim. Untuk menambah ADR baru, salin salah satu file, beri nomor berikutnya, lalu tambahkan barisnya di tabel ini.

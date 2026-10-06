@@ -28,10 +28,10 @@ Mengirim cookie dan API key sekaligus akan ditolak dengan `400 AMBIGUOUS_AUTH`.
 
 | Scope | Endpoint |
 | --- | --- |
-| `devices:read` | `GET /sensor-types`, `GET /device-types`, `GET /devices`, `GET /devices/:id` |
-| `devices:write` | `POST /devices/claim`, `POST /devices/:id/release`, `PATCH /devices/:id` (nama dan area milik sendiri) |
+| `devices:read` | `GET /sensor-types`, `GET /device-types`, `GET /devices`, `GET /devices/:id`, `GET /sandbox/devices` |
+| `devices:write` | `POST /devices/claim`, `POST /devices/:id/release`, `PATCH /devices/:id` (nama dan area milik sendiri), `PUT /sandbox/devices/:id/scenario` |
 | `readings:read` | `GET /devices/:id/latest`, `GET /devices/:id/readings`, `GET /sensors/:code/overview`, `GET /events`, `GET /stream` |
-| `admin` | `POST/PATCH/DELETE /sensor-types`, `POST/PATCH /device-types`, `POST /devices`, `POST /devices/:id/qr`, `POST /devices/:id/activation`, `PUT /areas/:ref/thresholds` |
+| `admin` | `POST/PATCH/DELETE /sensor-types`, `POST/PATCH /device-types`, `POST /devices`, `POST /devices/:id/credentials/rotate`, `POST /devices/:id/qr`, `POST /devices/:id/activation`, `PUT /areas/:ref/thresholds` |
 
 Sesi cookie memakai scope sesuai peran: `user` mendapat tiga scope pertama, `admin` mendapat keempatnya.
 Pengecualian publik hanya `GET /devices?code=...` untuk pratinjau QR dengan field terbatas di bagian 6.3.
@@ -117,7 +117,7 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 
 ```json
 { "devices": [
-  { "id": "5e0a...", "code": "AQ-PH-001", "legacyId": "IOT-001", "name": "Sensor pH Kolam Nila A",
+  { "id": "5e0a...", "code": "AQ-PH-001", "legacyId": "IOT-001", "name": "Sensor pH Kolam Nila A", "isSandbox": false,
     "type": { "code": "AQ-PH", "kind": "satuan" }, "areaRef": "AR-01",
     "status": "online", "lastMeasuredAt": "2026-10-10T08:00:00.000Z", "lastReceivedAt": "2026-10-10T08:00:01.120Z",
     "firmware": "0.3.0", "rssi": -58, "calibratedAt": "2026-10-08T03:00:00.000Z" }
@@ -157,6 +157,16 @@ Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan un
 
 `POST /devices/:id/release` (scope `devices:write`) melepas kepemilikan. Riwayat tetap milik pemilik lama.
 
+`POST /devices/:id/credentials/rotate` (scope `admin`, sesi admin atau key live admin) merotasi credential device live yang sudah diprovisioning. **Penyimpangan path:** prompt awal menyebut `/credential/rotate` (singular); kontrak memakai `/credentials/rotate` sebagai subresource rotasi credential, dengan `credentials` sebagai namespace operasi di bawah device. Adapter frontend harus memakai path kontrak ini secara persis. Response `200` menampilkan credential baru satu kali:
+
+```json
+{ "credential": "<64 hex, hanya ditampilkan sekali>", "credentialSince": "2026-10-05T14:00:00.000Z" }
+```
+
+Server mengubah `credential_hash` serta `credential_since` dalam satu transaksi sambil mengunci baris device yang sama dengan ingest. Setelah transaksi rotasi commit, credential lama langsung mendapat 401 `UNAUTHENTICATED` di `/api/ingest`. Credential tidak dikembalikan oleh daftar/detail device dan tidak ditulis ke log. Kiriman buffer dengan `measuredAt` sebelum `credentialSince` baru mendapat 400 `VALIDATION_FAILED`; ini disengaja. Device live yang ada tetapi belum diprovisioning (`credential_hash IS NULL`) mendapat 409 `CONFLICT`.
+
+Device sandbox tidak dapat dirotasi, dilepas, diklaim, diberi kode aktivasi, atau dibuatkan QR. Route tersebut mengembalikan 404 `NOT_FOUND`, termasuk pratinjau QR publik dengan kode sandbox.
+
 ### 6.4 Readings
 
 `GET /devices/:id/latest` (scope `readings:read`)
@@ -164,14 +174,16 @@ Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan un
 ```json
 { "measuredAt": "2026-10-10T08:00:00.000Z",
   "readings": [
-    { "sensor": "ph", "value": 7.02, "unit": "pH", "state": "normal" },
-    { "sensor": "tds", "value": 950, "unit": "ppm", "state": "high" }
+    { "sensor": "ph", "value": 7.02, "unit": "pH", "state": "normal",
+      "threshold": { "low": 6.2, "high": 7.6, "source": "default" } },
+    { "sensor": "tds", "value": 950, "unit": "ppm", "state": "high",
+      "threshold": { "low": 500, "high": 900, "source": "area" } }
   ] }
 ```
 
-`state` bernilai `normal`, `low`, `high`, atau `unknown` (tidak ada ambang).
+`state` bernilai `normal`, `low`, `high`, atau `unknown` (belum ada nilai atau tidak ada ambang). Bila device belum pernah mengirim data, `measuredAt` bernilai `null`, setiap sensor bernilai `null`, dan state bernilai `unknown`. `threshold.source` bernilai `area` atau `default`.
 
-`GET /devices/:id/readings?sensor=ph&from=...&to=...&bucket=5m` (scope `readings:read`)
+`GET /devices/:id/readings?sensor=ph&from=...&to=...&bucket=5m` (scope `readings:read`). `sensor`, `from`, dan `to` wajib; `bucket` bawaan `5m`.
 
 ```json
 { "sensor": "ph", "bucket": "5m",
@@ -179,16 +191,26 @@ Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan un
   "threshold": { "low": 6.5, "high": 7.5, "source": "area" } }
 ```
 
-`bucket` bernilai `1m`, `5m`, `1h`, atau `raw`. Mode `raw` dibatasi 100 baris per halaman dan memakai `cursor`, sama seperti `/api/devices/:id/history` di pilot. Rentang `from` sampai `to` maksimal 31 hari.
+`bucket` bernilai `1m`, `5m`, `1h`, atau `raw`. Bucket agregat berurutan dari waktu terlama. Mode `raw` diurutkan dari waktu terbaru, memakai `cursor`, dan memiliki `limit` bawaan 100 serta maksimum 100 baris per halaman; response memiliki `nextCursor`. `cursor` dan `limit` hanya berlaku untuk `bucket=raw`.
+
+```json
+{ "sensor": "ph", "bucket": "raw",
+  "points": [ { "messageId": "0b7e...", "measuredAt": "2026-10-10T08:00:00.000Z", "receivedAt": "2026-10-10T08:00:01.120Z", "value": 7.02, "unit": "pH" } ],
+  "threshold": { "low": 6.5, "high": 7.5, "source": "area" }, "nextCursor": null }
+```
+
+Rentang `from` sampai `to` maksimal 31 hari. Rentang kosong mengembalikan `points: []`.
 
 `GET /sensors/:code/overview` (scope `readings:read`) mengembalikan nilai terakhir satu jenis sensor di semua device milik actor:
 
 ```json
 { "sensor": "ph", "items": [
-  { "deviceId": "5e0a...", "deviceCode": "AQ-PH-001", "areaRef": "AR-01", "value": 6.8, "state": "normal", "measuredAt": "..." },
-  { "deviceId": "c3f1...", "deviceCode": "AQ-PKT-001", "areaRef": "AR-02", "value": 6.1, "state": "low", "measuredAt": "..." }
+  { "deviceId": "5e0a...", "deviceCode": "AQ-PH-001", "areaRef": "AR-01", "value": 6.8, "unit": "pH", "state": "normal", "threshold": { "low": 6.2, "high": 7.6, "source": "default" }, "measuredAt": "..." },
+  { "deviceId": "c3f1...", "deviceCode": "AQ-PKT-001", "areaRef": "AR-02", "value": 6.1, "unit": "pH", "state": "low", "threshold": { "low": 6.5, "high": 7.5, "source": "area" }, "measuredAt": "..." }
 ] }
 ```
+
+Device yang belum pernah mengirim tetap ada di `items` dengan `value` dan `measuredAt` bernilai `null`, serta state `unknown`.
 
 ### 6.5 Ambang per area
 
@@ -198,33 +220,42 @@ Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan un
 { "thresholds": [ { "sensor": "ph", "low": 6.5, "high": 7.5 }, { "sensor": "tds", "low": 500, "high": 900 } ] }
 ```
 
-Mengirim `low` dan `high` bernilai `null` untuk sebuah sensor berarti kembali ke ambang default.
+Mengirim `low` atau `high` bernilai `null` untuk sebuah sensor berarti batas tersebut kembali ke ambang default sensor. Jika keduanya `null`, override area dihapus. Nilai non-null harus berada di antara `sensor_types.min_value` dan `max_value`; jika kedua batas non-null, `low` harus lebih kecil dari `high`. `ref` adalah string referensi area dari modul lain, bukan ID baris area di modul IoT. Response mengembalikan batas efektif dan sumbernya:
+
+```json
+{ "areaRef": "AR-01", "thresholds": [ { "sensor": "ph", "low": 6.5, "high": 7.5, "source": "area" } ] }
+```
 
 ### 6.6 Log kejadian
 
-`GET /events?deviceId=&type=&cursor=` (scope `readings:read`)
+`GET /events?deviceId=&type=&cursor=&limit=` (scope `readings:read`)
 
 ```json
 { "events": [
-  { "id": 812, "deviceId": "c3f1...", "type": "threshold_low", "sensor": "ph", "value": 6.1, "at": "2026-10-10T08:05:00.000Z" }
-], "nextCursor": "ODEx" }
+  { "id": "812", "deviceId": "c3f1...", "type": "threshold_low", "sensor": "ph", "value": 6.1, "at": "2026-10-10T08:05:00.000Z" }
+], "nextCursor": "ODEy" }
 ```
+
+`deviceId` dan `type` bersifat opsional. Urutan selalu `id DESC` (ID terbesar ke terkecil), bukan `at`, karena `at` event ambang memakai `measuredAt` dan reading buffer yang datang terlambat dapat memiliki waktu lebih lama daripada event dengan ID lebih kecil. Cursor adalah Base64URL dari `id` event terakhir pada halaman; halaman berikutnya memakai `id < cursor` dan tetap diurutkan `id DESC`. `limit` bawaan 50 dan maksimal 100. Actor hanya menerima event dari device yang boleh dilihatnya, dengan isolasi `live`/`test` untuk API key. Untuk event ambang, `at` memakai `measuredAt` reading yang memicu transisi. Event koneksi memakai waktu penerimaan atau deteksi di server.
 
 ### 6.7 Stream (SSE)
 
 `GET /stream` (scope `readings:read`), header `Accept: text/event-stream`.
 
 ```
-id: 813
 event: reading
 data: {"deviceId":"c3f1...","measuredAt":"2026-10-10T08:05:30.000Z","readings":{"ph":6.12,"tds":640,"water_temperature":27.6}}
 
 id: 814
 event: device_event
-data: {"deviceId":"c3f1...","type":"threshold_low","sensor":"ph","value":6.12}
+data: {"deviceId":"c3f1...","type":"threshold_low","sensor":"ph","value":6.12,"at":"2026-10-10T08:05:30.000Z"}
 
 : heartbeat
 ```
+
+Hanya `device_event` yang membawa `id`, sama dengan `device_events.id`. `reading` tidak membawa `id` sehingga tidak memajukan posisi replay. Saat browser mengirim `Last-Event-ID`, server mengirim ulang `device_event` sesudah ID itu dan menerapkan filter actor, ownership, serta environment yang sama dengan event live. Header yang tidak valid ditolak 400 `VALIDATION_FAILED`. Reading dan event live dipublish hanya setelah transaksi ingest commit; retry `duplicate: true` tidak mempublish. Event dari job offline dipublish hanya setelah transaksi job commit, sehingga rollback tidak menghasilkan event SSE.
+
+Batasnya 5 koneksi per actor; sesi dan key milik akun yang sama berbagi batas. Lima memungkinkan beberapa tab klien tetap tersambung, tetapi menyisakan ruang dari batas umum enam koneksi HTTP/1.1 per origin. Upaya koneksi keenam mendapat 429 `RATE_LIMITED` sesuai tabel error Contract 4; koneksi ke-4 masih diizinkan.
 
 Untuk browser, pakai `EventSource` dengan `withCredentials: true`. `EventSource` tidak bisa mengirim header `Authorization`, jadi klien API key perlu memakai library SSE yang mendukung header custom, atau polling `/latest`.
 
@@ -241,13 +272,19 @@ Endpoint `/keys` hanya bisa diakses dengan sesi cookie. API key tidak bisa dipak
 
 ### 6.9 Sandbox
 
-`PUT /sandbox/devices/:id/scenario` (sesi atau key `test`)
+Pembuatan key dengan `environment: "test"` otomatis memastikan akun memiliki tepat satu device virtual `AQ-WATER-01`. Provisioning idempoten dan diserialisasi di database; kode global berbentuk `AQ-SBX-<NNN>` tidak digunakan ulang antar akun. `GET /sandbox/devices` dari sesi juga memprovisikan device meskipun akun belum pernah membuat key test. Key test yang sudah ada sebelumnya mendapat device saat panel pertama kali memanggil daftar sandbox.
+
+`GET /sandbox/devices` (sesi atau API key `test` dengan scope `devices:read`) memastikan device tersedia lalu mengembalikan device sandbox milik actor, skenario, area, dan reading terakhir. Pemanggilan berulang tidak membuat device baru. Key `live` mendapat 404 `NOT_FOUND`.
+
+`PUT /sandbox/devices/:id/scenario` (sesi atau API key `test` dengan scope `devices:write`)
 
 ```json
 { "scenario": "ph_turun" }
 ```
 
-Nilai yang valid: `normal`, `ph_turun`, `suhu_naik`, `offline`.
+Nilai yang valid: `normal`, `ph_turun`, `suhu_naik`, `offline`. Device non-sandbox atau sandbox yang bukan milik actor selalu mendapat 404 `NOT_FOUND`, termasuk request dengan key `live`. `ph_turun` menghasilkan pH di bawah ambang bawah efektif pada siklus berikutnya, paling lambat 30 detik.
+
+`SANDBOX_ENABLED=false` mematikan siklus simulasi, bukan provisioning endpoint atau job retensi. Retensi memakai `SANDBOX_RETENTION_DAYS` (default 7 hari) dan hanya menghapus readings/events device `is_sandbox=true`; device, ownership, dan telemetry live tetap ada. Untuk memulihkan status, event transisi terakhir per `(device, sensor)` dan event koneksi terakhir per device dipertahankan meskipun lebih tua dari masa retensi.
 
 ## 7. Ingest (untuk firmware)
 

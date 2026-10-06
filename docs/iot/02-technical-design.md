@@ -136,6 +136,8 @@ Hook `onResponse` mencatat `api_usage` tanpa menunggu query selesai. Kolom `rout
 
 Migration `003_api_key_prefix_lookup.sql` menambahkan indeks non-unik pada `api_keys(prefix)` untuk lookup key sebelum hash dicocokkan. Indeks `api_usage(key_id, at DESC)` dari migration 002 sudah memenuhi query usage, jadi tidak ditambahkan ulang.
 
+Migration `004_iot_monitoring_sandbox.sql` menambahkan `devices.sandbox_scenario` dengan default `normal` dan CHECK untuk empat skenario sandbox. Migration ini juga membuat `device_events_state_lookup(device_id, sensor_code, id DESC)`, karena indeks lama mengurutkan berdasarkan `at`, bukan ID event yang dipakai untuk memulihkan status terakhir per sensor dan koneksi.
+
 ### 5.2 DDL `002_iot_platform.sql`
 
 ```sql
@@ -283,21 +285,23 @@ sequenceDiagram
   end
 ```
 
-Event ambang hanya ditulis saat status berubah (normal ke di luar ambang, atau sebaliknya), bukan di setiap pengukuran, supaya log tidak penuh. Status ambang terakhir per device dan sensor disimpan di memori dan dipulihkan dari `device_events` saat server start.
+Evaluator ambang v1 dan v2 berjalan setelah reading disimpan dan dalam transaksi yang sama. Retry idempoten berhenti sebelum evaluasi. Hanya reading yang menjadi terbesar menurut `(measured_at, message_id)` boleh mengubah state ambang; reading buffer yang lebih lama tetap tersimpan, tetapi tidak membalik state terbaru. Status terakhir dibaca dari `device_events` per device dan sensor, jadi tetap tersedia setelah restart. Event threshold memakai waktu ukur pada `device_events.at`; event `online` memakai waktu penerimaan, sedangkan `offline` memakai waktu deteksi. Ingest dan deteksi offline mengunci baris device yang sama dengan `SELECT ... FOR UPDATE`; jika status berubah, setiap pelanggaran hanya mencatat satu event. Kembali normal mencatat `threshold_clear`; perpindahan langsung dari low ke high menutup pelanggaran sebelumnya sebelum mencatat pelanggaran baru. Hub hanya menerima reading/event sesudah transaksi commit; retry idempoten tidak dipublish, dan job offline tidak mempublish jika transaksinya rollback.
 
 ### 6.3 Deteksi offline
 
-Job tiap 60 detik mencari device yang kiriman terakhirnya lebih dari 180 detik lalu dan belum punya event `offline` sejak kiriman itu. Untuk device tersebut, job menulis event `offline`. Saat data masuk lagi, ingest menulis event `online`. Batas 90 dan 180 detik sama dengan `connectionStatus()` yang sudah ada.
+Job tiap 60 detik mencari device yang `received_at` terakhirnya mencapai batas offline 180 detik. Job mengunci baris device dengan `FOR UPDATE SKIP LOCKED`, lalu membaca event koneksi terakhir sebelum menulis `offline`. Ingest mengambil kunci baris yang sama dan menulis `online` bila event terakhir `offline`. Dengan demikian ingest dan job offline yang berlomba tidak meninggalkan event offline setelah reading segar atau menulis transisi ganda. Status memakai konstanta yang sama dengan `connectionStatus()`: stale 90 detik dan offline 180 detik. Event di database menjaga idempotensi setelah server restart. Job deteksi offline dimatikan dengan `OFFLINE_DETECTION_ENABLED=false`; test memanggil satu siklus langsung dengan waktu terkendali.
 
 ## 7. Monitoring
 
 ### 7.1 Ambang
 
-Urutan ambang yang dipakai mengikuti logika `SmartStore.jsx` sekarang:
+Urutan ambang efektif:
 
-1. `area_thresholds` untuk area tempat device dipasang (`devices.area_ref`).
+1. Nilai non-null di `area_thresholds` untuk area device (`devices.area_ref`). Nilai yang null mewarisi batas default sensor.
 2. `sensor_types.warn_low` dan `warn_high` sebagai ambang default.
-3. Kalau dua-duanya kosong, nilai tidak dievaluasi.
+3. Jika kedua batas efektif tidak tersedia, state bernilai `unknown`; evaluasi tidak memulai pelanggaran baru. Bila ada pelanggaran low/high yang masih aktif, event ditutup dengan `threshold_clear`.
+
+Response latest, readings, dan overview membawa `threshold.source` bernilai `area` atau `default` bila konfigurasi sensor tersedia.
 
 ### 7.2 Riwayat teragregasi
 
@@ -322,18 +326,18 @@ ORDER BY 1;
 | 24 jam | 5 menit | 288 |
 | 7 hari | 1 jam | 168 |
 
-Index `reading_history (ownership_id, measured_at DESC, message_id DESC)` yang sudah ada cukup untuk query ini. Kalau data per device sudah lewat ratusan ribu baris dan query mulai lambat, opsi berikutnya adalah tabel ringkasan per jam yang diisi job.
+Index `reading_history (ownership_id, measured_at DESC, message_id DESC)` yang sudah ada cukup untuk query ini. Jumlah bucket dibatasi `floor(rentang / durasi bucket)` dengan minimal satu titik; jika batas date_bin yang tidak sejajar menghasilkan satu bucket ekstra, bucket terlama dibuang agar rentang 24 jam tidak melebihi 288 titik. Kalau data per device sudah lewat ratusan ribu baris dan query mulai lambat, opsi berikutnya adalah tabel ringkasan per jam yang diisi job.
 
 ### 7.3 SSE
 
-`GET /api/v1/stream` membuka koneksi `text/event-stream`. Hub di memori menyimpan daftar koneksi beserta `actor`-nya, dan hanya mengirim event untuk device yang boleh dilihat actor tersebut. Heartbeat dikirim tiap 25 detik supaya koneksi tidak diputus proxy. Kalau koneksi putus, browser menyambung ulang memakai `Last-Event-ID`, lalu server mengirim ulang event dari `device_events` setelah ID itu.
+`GET /api/v1/stream` membuka koneksi `text/event-stream`. Hub di memori menyimpan actor beserta koneksinya, dan hanya mengirim event untuk device yang actor tersebut boleh lihat. Frame `device_event` membawa `id:` dari `device_events.id`; frame `reading` tidak memiliki `id:`. Heartbeat dikirim tiap 25 detik supaya koneksi tidak diputus proxy. Browser menyambung ulang memakai `Last-Event-ID`; server memutar ulang hanya baris `device_events` setelah ID itu dengan filter akses yang sama seperti pengiriman live. Maksimal 5 koneksi per actor; key dan sesi milik akun yang sama berbagi batas. Ini mengizinkan beberapa tab tetapi menyisakan ruang dari batas umum enam koneksi HTTP/1.1 per origin; upaya koneksi keenam mendapat 429 `RATE_LIMITED`. Koneksi dan timer dibersihkan saat peer menutup stream atau aplikasi berhenti.
 
 ## 8. Sandbox
 
-- Saat akun pertama kali membuat key `test`, server otomatis membuat 1 device virtual tipe `AQ-WATER-01` dengan kode `AQ-SBX-<NNN>` dan `is_sandbox = true`, lalu mengklaimnya untuk akun tersebut.
-- `sandbox/runner.ts` menjalankan semua device virtual tiap 30 detik. Datanya dihasilkan sesuai skenario, lalu dimasukkan lewat fungsi ingest yang sama (tanpa HTTP), jadi validasi dan event-nya identik dengan alat asli.
-- Skenario disimpan per device: `normal`, `ph_turun`, `suhu_naik`, `offline`. Skenario diubah lewat `PUT /api/v1/sandbox/devices/:id/scenario`.
-- Data sandbox dihapus otomatis setelah 7 hari (usulan) supaya database tidak membengkak.
+- Satu device virtual `AQ-WATER-01` diprovisikan per akun secara idempoten saat akun membuat key `test` atau membuka `GET /api/v1/sandbox/devices` dengan sesi maupun key test. Ini juga mencakup akun yang belum pernah membuat key test dan key test yang sudah ada sebelum Minggu 3. Advisory transaction lock mencegah duplikasi pada request paralel; tabel `sandbox_accounts` menjaga pemetaan akun, sedangkan sequence PostgreSQL memberi kode `AQ-SBX-<NNN>` yang unik lintas akun.
+- Unit `is_sandbox=true` tidak dihitung terhadap batas pilot 20 unit. Batas tersebut hanya menghitung device live di route pilot maupun `/api/v1/devices`.
+- `sandbox/runner.ts` menjalankan device virtual aktif tiap 30 detik melalui ingest v2 internal, tanpa melewati validasi sensor, transisi ambang, atau publish setelah commit. Siklus per instance tidak boleh overlap. Skenario `offline` melewatkan sampel; `ph_turun` menghasilkan pH di bawah batas bawah efektif pada siklus berikutnya (maksimal 30 detik). Skenario lain menjaga pembacaan di rentang normal atau memicu suhu di atas batas efektif.
+- Runner yang sama menjalankan cleanup retensi sekali saat startup lalu tiap 24 jam, bukan tiap siklus simulasi. `SANDBOX_ENABLED=false` mematikan siklus simulasi, tetapi provisioning dan job retensi tetap berjalan. `SANDBOX_RETENTION_DAYS` menentukan umur data; readings sandbox dihapus berdasarkan `received_at` dan event lama berdasarkan `at`, hanya untuk `devices.is_sandbox=true`. Event transisi terakhir per `(device, sensor)` dan event koneksi terakhir per device dipertahankan sebagai anchor state meskipun lebih tua dari batas retensi; device, ownership, dan telemetry live tetap ada.
 
 ## 9. Integrasi frontend
 
@@ -356,11 +360,12 @@ Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0
 
 | Variabel | Bawaan | Fungsi |
 | --- | --- | --- |
-| `SANDBOX_ENABLED` | `true` | Menyalakan runner device virtual |
+| `SANDBOX_ENABLED` | `true` | Mengaktifkan siklus simulasi 30 detik; job retensi tetap berjalan jika `false` |
+| `OFFLINE_DETECTION_ENABLED` | `true` | Menyalakan job deteksi offline tiap 60 detik; `false` untuk test yang memanggil siklus langsung |
 | `USAGE_RETENTION_DAYS` | `30` (usulan) | Umur data `api_usage` |
-| `SANDBOX_RETENTION_DAYS` | `7` (usulan) | Umur readings device sandbox |
+| `SANDBOX_RETENTION_DAYS` | `7` | Umur telemetry sandbox sebelum dihapus; query dibatasi `is_sandbox=true` dan mempertahankan event state anchor terakhir |
 | `READINGS_RETENTION_DAYS` | `365` (usulan) | Umur minimal readings device asli sebelum boleh dipindah atau diringkas |
-| `MAX_ACCOUNTS`, `MAX_DEVICES` | `10`, `20` | Menggantikan angka batas pilot yang sekarang di-hardcode |
+| `MAX_ACCOUNTS`, `MAX_DEVICES` | `10`, `20 live` | Menggantikan angka batas pilot yang sekarang di-hardcode; device sandbox tidak dihitung |
 | `VITE_IOT_SOURCE` | `api` | Sumber data halaman IoT di frontend |
 
 Pembersihan tabel `api_usage` direncanakan memakai query berikut dengan parameter jumlah hari dari `USAGE_RETENTION_DAYS`:
@@ -379,6 +384,7 @@ Job terjadwal untuk query retensi belum dibuat.
 - Klaim lewat QR: kalau `allocated_to` diisi admin, hanya akun itu yang bisa mengklaim (perilaku pilot). Kalau kosong, akun pertama yang memasukkan kode aktivasi valid yang mendapatkannya. Kode aktivasi sekali pakai dan kedaluwarsa 24 jam.
 - Pembuatan gambar QR hanya bisa diakses admin dan menerima kode aktivasi di body POST. Kode mentah tidak disimpan. Pratinjau publik QR hanya menampilkan kode, nama, tipe, daftar sensor, status klaim, dan hasil validasi aktivasi. Area, readings, identitas akun, credential, dan kode aktivasi tidak dikembalikan; area ditunda sampai Q4 diputuskan.
 - Device yang dipindah ke pemilik lain dirotasi credential-nya (perilaku pilot), jadi alat harus diprovisioning ulang.
+- Rotasi credential live hanya scope `admin`; satu transaksi mengunci baris device yang sama dengan ingest, mengganti `credential_hash` dan `credential_since`, lalu mengembalikan credential baru satu kali. Logger hanya menyimpan method/status/route, tidak body response atau credential.
 
 ## 12. Risiko teknis
 

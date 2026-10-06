@@ -39,22 +39,27 @@ Semua uji yang sudah ada di `pilot.test.ts` wajib tetap hijau setelah migration 
 | V1-11 | Key tanpa `readings:read` memanggil `/latest` | 403 `FORBIDDEN_SCOPE` |
 | V1-12 | Key yang sudah dicabut | 401 `UNAUTHENTICATED` |
 | V1-13 | Request dengan cookie dan key sekaligus | 400 `AMBIGUOUS_AUTH` |
-| V1-14 | Request API key tanpa header `Origin` (POST) | Tidak ditolak oleh pengecekan Origin |
+| V1-14 | POST sandbox claim dengan key test tanpa `Origin` | Pengecekan Origin tidak menolak, tetapi device sandbox tersembunyi dengan 404 `NOT_FOUND` |
 | V1-15 | Request cookie dengan `Origin` asing (POST) | 403 |
 | V1-16 | Key `live` melewati 60 request per menit | 429 dengan `retry-after` |
 | V1-17 | Klaim dengan kode aktivasi kedaluwarsa | 400 |
-| V1-18 | Dua akun mengklaim device yang sama bersamaan | Tepat satu berhasil, satunya 409 |
+| V1-18 | Dua akun mengklaim device live yang sama bersamaan | Tepat satu berhasil, satunya 409 |
 | V1-19 | Nilai keluar ambang lalu kembali normal | Tepat 2 event: `threshold_low`/`high` lalu `threshold_clear` |
 | V1-20 | Override ambang area | `/latest` memakai ambang area, `threshold.source = "area"` |
 | V1-21 | `/readings?bucket=5m` untuk 24 jam | Maksimal 288 titik, urut waktu |
 | V1-22 | `/readings` dengan rentang lebih dari 31 hari | 400 |
 | V1-23 | SSE: actor A tidak menerima event device milik B | Tidak ada event B di stream A |
 | V1-24 | Device tanpa kiriman lebih dari 180 detik | Event `offline` ditulis tepat sekali |
+| V1-24b | Job offline publish event ke SSE setelah commit dan mengalami rollback | Event terbit setelah commit; rollback tidak mempublish |
 | V1-25 | Device lama `IOT-001` dicari lewat `legacyId` dan kode `AQ-PH-001` | Keduanya menemukan device yang sama |
 | V1-26 | `POST /devices/:id/qr` dengan sesi `user` | 403 |
 | V1-27 | Database mati | 503 `UNAVAILABLE`, tanpa data contoh |
 | V1-28 | Kode aktivasi dibuat ulang lewat `POST /devices/:id/activation`, lalu kode lama dipakai untuk klaim | Kode lama ditolak 400, kode baru berhasil |
 | V1-29 | Generator kode alat setelah `AQ-PH-001` sudah ada | Device pH baru mendapat `AQ-PH-002` |
+| V1-30 | Rotasi, release, claim, aktivasi, QR, atau preview QR terhadap device sandbox | Semua route menolak dengan 404 `NOT_FOUND` |
+| V1-31 | Rotasi credential: hak admin, hash dan timestamp atomik, ingest lama/baru, race rotasi-ingest | Scope non-admin ditolak 403; credential lama 401 sesudah commit, credential baru diterima; race terserialisasi |
+| V1-32 | Retensi data sandbox melewati event threshold/koneksi terakhir | Hanya event anchor terakhir dipertahankan; readings/events live tidak disentuh dan threshold tidak ditulis ulang |
+| V1-33 | Sesi akun yang belum pernah membuat key test membuka `/sandbox/devices` | Device sandbox diprovisikan idempoten dan satu kali |
 
 ## 4. Uji manual UI
 
@@ -85,7 +90,7 @@ Semua uji yang sudah ada di `pilot.test.ts` wajib tetap hijau setelah migration 
 | HW-05 | Bandingkan DS18B20 dengan termometer acuan | Selisih maksimal ±0,5 °C (akurasi datasheet DS18B20) |
 | HW-06 | Cabut WiFi 30 menit lalu sambungkan lagi | Semua sampel terkirim, tanpa celah, tanpa duplikat |
 | HW-07 | Restart alat saat WiFi tersambung | Lanjut mengirim tanpa provisioning ulang |
-| HW-08 | Rotasi credential dari dashboard | Alat masuk state Halted, LED menyala terus |
+| HW-08 | Rotasi credential dari dashboard lalu provisioning ulang dengan credential baru | Alat masuk state Halted, LED menyala terus. Record buffer lama dengan `measuredAt` sebelum `credential_since` baru ditolak 400 `VALIDATION_FAILED`; ini perilaku yang dimaksud, bukan bug |
 | HW-09 | Provisioning dari awal lewat portal | Selesai dari HP tanpa kabel serial |
 
 ## 6. Uji lapangan 48 jam
@@ -127,3 +132,5 @@ Status verifikasi Minggu 2 pada 4 Oktober 2026: **FAIL/belum lulus gate penuh**.
 Pembaruan status Minggu 2 pada 5 Oktober 2026: masih **FAIL/belum lulus gate penuh**. Setelah perbaikan lanjutan, `test:v1` lulus 38/38 (termasuk uji `scopes: []` dan batas gagal autentikasi API key), `test:pilot` 16/16, dan unit test frontend 26/26, diverifikasi ulang di Windows dengan PostgreSQL 18 lokal. Typecheck, lint, dan build juga lulus. Persiapan uji HP lewat tunnel HTTPS tersedia di `docs/panduan-uji-manual.md` bagian 4.3. UI-03 dan UI-04 tetap **belum diuji** sampai pemindaian QR dengan HP fisik dilaporkan. Kriteria gate di atas tidak diubah.
 
 Status akhir Minggu 2 pada 5 Oktober 2026: **PASS**. UI-03 dan UI-04 diuji dengan HP Android fisik lewat tunnel HTTPS (`docs/panduan-uji-manual.md` bagian 4.3) memakai database uji terpisah dan akun uji sementara. UI-03: label QR device paket `AQ-PKT-001` terbaca oleh pemindai di aplikasi dan membuka `/d/AQ-PKT-001`. UI-04: akun `user` mengklaim device tersebut, device tampil di List IoT akun itu, dan tabel `ownerships` mencatat akun `user` sebagai pemilik. Pengujian ini menemukan bug pemindai QR: loop deteksi berhenti permanen saat effect dijalankan ulang (React StrictMode di development), sehingga kamera tampil tetapi QR tidak pernah terbaca. Bug diperbaiki di `src/components/QrScanner.jsx` sebelum UI-03 dan UI-04 dinyatakan lulus. Semua kriteria gate Minggu 2 terpenuhi; kriteria di atas tidak diubah.
+
+Status verifikasi A-D backend pada 6 Oktober 2026: `test:pilot` 16/16, `test:v1` 57/57, typecheck, lint, dan build lulus. HW-08: **belum diuji**, menunggu alat asli. Kriteria gate mingguan di bagian 7 tidak diubah.
