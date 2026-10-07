@@ -12,6 +12,9 @@ Uji fisik belum dilakukan. Catat board dan modul yang benar-benar dipakai, hasil
 - Ponsel dengan Wi-Fi untuk HW-09.
 - Komputer dengan PlatformIO Core, kabel USB data untuk flash/monitor serial, dan akses ke Wi-Fi/API uji.
 - Catu daya mandiri untuk HW-09 setelah kabel komputer dilepas.
+- Buffer pH 7,00 dan 4,00 yang belum kedaluwarsa, air bilas, serta wadah bersih untuk HW-02.
+- Larutan standar TDS untuk HW-03; nilai label/SDS dan batch/lot hanya diisi dari kemasan yang benar-benar dipakai.
+- Router/access point Wi-Fi uji 2,4 GHz untuk HW-06–HW-08 dan tunnel API sementara sesuai preflight di bawah.
 - Checklist ini dan media untuk mencatat hasil ukur/bukti.
 
 Model board, GPIO, modul, formula TDS, dan rentang ukur masih asumsi sementara. Konstanta firmware ada di `include/hardware_config.h`; ID board ada di `[board_config]` pada `platformio.ini`.
@@ -43,6 +46,21 @@ Sampel diterima backend.
 
 Baris DS18B20 hanya muncul pada varian yang mengaktifkan suhu setelah pembacaan sensor berhasil. Baris sampel memerlukan waktu valid, sedangkan penerimaan backend memerlukan koneksi Wi-Fi dan API.
 
+### Preflight API HTTPS sebelum alat dinyalakan
+
+Rute bench host-side memakai **localtunnel HTTPS sementara**, bukan LAN: firmware hanya menerima HTTP untuk loopback dan memerlukan HTTPS untuk host jarak jauh. Jalankan Fastify pada laptop dengan bind `127.0.0.1:3001` saja (jangan bind `0.0.0.0`), lalu jalankan `npx --yes localtunnel --port 3001 --local-host 127.0.0.1` di terminal lain. URL HTTPS `*.loca.lt` yang dicetak hanya berlaku untuk sesi tunnel tersebut; firmware menambahkan `/api/ingest` ke URL API yang dikonfigurasi.
+
+Sebelum menyalakan ESP32:
+
+1. Sambungkan laptop dan ESP32 ke SSID Wi-Fi uji **2,4 GHz** yang sama; pastikan API aktif di `127.0.0.1:3001`, lalu jalankan localtunnel di atas.
+2. Dari HP yang tersambung ke internet, buka `<URL_HTTPS_LOCA.LT>/api/health`. Respons **HTTP 200 dengan JSON `status: ok`** hanya mengonfirmasi jangkauan host-side; itu bukan bukti rute fisik ESP32.
+3. Sebelum memasukkan URL ke provisioning, verifikasi **hostname HTTPS aktual yang dicetak localtunnel** terhadap ISRG Root X1 yang tertanam di `firmware/include/root_ca.h`. Lanjutkan hanya bila `embeddedRootValidatedTunnelTls` berhasil. Verifikasi host-side terbaru (2026-10-07) berhasil untuk hostname ephemeral yang diuji; hostname baru tetap harus diverifikasi.
+4. Jangan masukkan credential ke URL, catatan, screenshot, atau laporan. Jangan menambahkan header bypass jika muncul interstitial. Gunakan tunnel hanya selama bench dan hentikan proses localtunnel/API setelah selesai.
+
+Hotspot, Wi-Fi publik, isolasi client/AP, DNS yang terfilter, atau outbound HTTPS yang diblokir dapat mencegah koneksi lokal maupun tunnel. Dengan rute tunnel, perubahan/perintah firewall **tidak berlaku dan tidak diperlukan**. Jangan ubah `APP_ORIGIN` atau memperluas host allowlist; URL API perangkat diisi terpisah saat provisioning. Tunnel membuat API sementara dapat dijangkau dari internet: gunakan hanya untuk bench, dengan credential uji, lalu hentikan segera.
+
+**Peringatan kompatibilitas firmware:** verifikasi host-side terbaru berhasil memvalidasi sertifikat localtunnel aktual dengan ISRG Root X1 tertanam, health JSON, dan satu ingest v2 yang terbaca di PostgreSQL. Hasil ini tidak memverifikasi Wi-Fi, DNS, TLS, atau rute fisik ESP32. Untuk setiap hostname tunnel yang akan dipakai, DNS dan embedded-root TLS harus berhasil; **berhenti sebelum provisioning atau flashing** bila validasi gagal atau belum dilakukan. Jangan menambahkan root CA, header bypass, atau melemahkan verifikasi TLS. Rute fisik belum diverifikasi.
+
 ## HW-01: periksa tegangan keluaran modul analog
 
 1. **Jangan sambungkan output modul ke pin ADC ESP32 sebelum mengukurnya.** Nyalakan modul pH dan TDS secara terpisah dengan catu daya yang akan dipakai.
@@ -70,6 +88,72 @@ Baris DS18B20 hanya muncul pada varian yang mengaktifkan suhu setelah pembacaan 
 | TDS |  |  |  |  |  |  |
 
 Bukti/catatan: _______________________________________________________________
+
+## HW-02: kalibrasi dan ukur ulang buffer pH
+
+**Status: belum diuji — menunggu uji fisik owner.**
+
+**Alat:** ESP32 varian `satuan_ph` atau `paket_water`, probe/modul pH, buffer pH 7,00 dan 4,00 yang belum kedaluwarsa, air bilas, wadah bersih, komputer untuk flash/monitor, dan akses dashboard/database uji.
+
+1. Catat board, modul/probe, tanggal kedaluwarsa buffer, suhu larutan, dan kondisi wiring. Jangan mengubah konstanta sensor untuk membuat hasil tampak lulus.
+2. Flash varian yang benar; ikuti instruksi probe/modul untuk mengukur buffer 7,00 dan 4,00. Bilas probe di antara larutan.
+3. Catat tegangan buffer pada parameter kalibrasi yang diminta portal, simpan provisioning, lalu ukur kembali kedua buffer setelah pembacaan stabil. Catat hasil serial dan hitung selisih absolut terhadap nilai nominal.
+4. **Dashboard:** buka Monitoring atau detail `/iot/<device-id>`, pilih pembacaan pH pada waktu uji, dan cocokkan nilai serta `measuredAt` dengan catatan bench.
+5. **Database:** pada database bench yang sesuai, jalankan `SELECT measured_at, readings->>'ph' AS ph FROM readings WHERE device_id = :'device_id'::uuid ORDER BY measured_at DESC LIMIT 20;` melalui `psql` setelah mengisi variabel `device_id`. Cocokkan waktu dan nilai yang terkirim dengan serial serta tabel hasil; jangan menganggap angka dashboard sebagai bukti kalibrasi fisik tanpa catatan buffer.
+
+**Kriteria lulus:** “Selisih maksimal ±0,1 pH (target usulan)”
+
+| Buffer | Nilai nominal pH | Serial sebelum kalibrasi | Hasil ukur ulang pH | Selisih absolut pH | Lulus/Gagal | Tanggal/inisial |
+| --- | --- | --- | --- | --- | --- | --- |
+| 7,00 |  |  |  |  |  |  |
+| 4,00 |  |  |  |  |  |  |
+
+Probe/modul, lot/kedaluwarsa buffer, suhu, bukti/catatan: ______________________
+
+## HW-03: ukur larutan standar TDS
+
+**Status: belum diuji — menunggu uji fisik owner.**
+
+**Alat:** ESP32 varian `satuan_tds` atau `paket_water`, modul/probe TDS, larutan standar yang label/SDS-nya tersedia, wadah bersih, air bilas, alat ukur suhu atau DS18B20, komputer untuk flash/monitor, dan akses dashboard/database uji.
+
+1. Salin nilai standar persis dari label/SDS ke tabel; catat produsen, batch/lot, tanggal kedaluwarsa, dan kondisi/suhu pengukuran. **Jangan mengasumsikan atau mengarang nilai ppm.**
+2. Catat board, modul, wiring dan faktor kalibrasi yang dipakai. Q6/Q7 dan konstanta TDS firmware masih asumsi provisional, bukan spesifikasi yang telah dikonfirmasi.
+3. Ikuti prosedur kalibrasi modul memakai larutan yang dipilih, ukur setelah stabil, lalu ulangi pengukuran. Bilas probe sesuai instruksi modul di antara larutan.
+4. **Dashboard:** buka Monitoring atau `/iot/<device-id>` dan cocokkan nilai TDS serta `measuredAt` dengan serial dan tabel hasil. Periksa bahwa nilai mentah yang dikirim memakai satuan/interpretasi yang sama dengan label/SDS.
+5. **Database:** jalankan `SELECT measured_at, readings->>'tds' AS tds FROM readings WHERE device_id = :'device_id'::uuid ORDER BY measured_at DESC LIMIT 20;` via `psql` setelah mengisi `device_id`. Cocokkan record dan waktunya; catat selisih terhadap nilai standar dari kemasan.
+
+**Kriteria lulus:** “Selisih maksimal ±10% dari nilai standar (target usulan)”
+
+| Standar (nama produk) | Nilai label/SDS (ppm) | Batch/lot | Suhu (°C) | Hasil TDS | Selisih (%) | Lulus/Gagal | Tanggal/inisial |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |  |  |
+|  |  |  |  |  |  |  |  |
+
+Modul/faktor kalibrasi (asumsi Q6/Q7)/bukti/catatan: ___________________________
+
+## HW-04: bandingkan pH saat TDS menyala dan dimatikan
+
+**Status: belum diuji — menunggu uji fisik owner.**
+
+**Alat:** ESP32 varian `paket_water`, probe pH dan modul TDS, larutan/buffer yang sama untuk seluruh pasangan, multimeter bila diperlukan untuk memastikan kondisi daya TDS, komputer untuk flash/monitor, serta akses dashboard/database uji.
+
+1. Flash `paket_water`; stabilkan probe dalam larutan yang sama. Catat suhu, larutan, wiring, waktu stabilisasi, dan urutan uji.
+2. Kumpulkan beberapa pembacaan pH dengan modul TDS menyala, lalu matikan hanya daya TDS dan ulangi pembacaan pH tanpa mengubah kondisi lain. Jika board tidak menyediakan sakelar daya TDS yang didukung, catat konfigurasi tersebut dan jangan mengubah wiring saat rangkaian menyala.
+3. Bandingkan pembacaan pH berpasangan dan catat gangguan yang berulang. Kriteria resmi bersifat kualitatif; catat pengamatan dan diskusikan solusi isolasi dengan owner jika gangguan tetap ada.
+4. **Dashboard:** buka `/iot/<device-id>` atau Monitoring dan periksa pembacaan pH pada waktu uji menyala/mati; cocokkan kelompoknya dengan log serial yang mencatat kondisi daya TDS.
+5. **Database:** jalankan `SELECT measured_at, readings->>'ph' AS ph, readings->>'tds' AS tds FROM readings WHERE device_id = :'device_id'::uuid ORDER BY measured_at DESC LIMIT 50;` melalui `psql`; cocokkan `measured_at` dengan urutan uji. Nilai database membuktikan sampel terkirim, bukan kondisi daya fisik.
+
+**Kriteria lulus:** “Selisih tidak signifikan saat TDS dimatikan ketika pH dibaca. Kalau tetap terganggu, catat dan diskusikan solusi isolasi”
+
+**Usulan, perlu keputusan owner:** bila owner menyetujui ukuran angka, median selisih pH berpasangan `>0,1 pH` dapat ditandai sebagai indikasi signifikan untuk dibahas; `0,1 pH` hanya memakai target HW-02 sebagai referensi provisional, bukan kriteria lulus baru.
+
+| Pasangan | pH TDS menyala | pH TDS mati | Selisih absolut | Kondisi stabil/suhu | Observasi | Lulus/Gagal |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 |  |  |  |  |  |  |
+| 2 |  |  |  |  |  |  |
+| 3 |  |  |  |  |  |  |
+
+Konfigurasi TDS/pH, bukti/catatan, keputusan owner atas usulan: ________________
 
 ## HW-05: periksa akurasi suhu DS18B20
 
@@ -99,6 +183,68 @@ Bukti/catatan: _______________________________________________________________
 | 3 |  |  |  |  |  |  |
 
 Varian/instrumen/tanggal/inisial: _____________________________________________
+
+## HW-06: putuskan Wi-Fi selama 30 menit
+
+**Status: belum diuji — menunggu uji fisik owner.**
+
+**Alat:** ESP32 yang sudah diprovisioning, Wi-Fi/API uji melalui tunnel HTTPS, laptop dan HP pada SSID 2,4 GHz yang sama, serial monitor untuk mencatat waktu/state tanpa menyalin credential, dashboard, dan akses `psql` ke database bench.
+
+1. Catat UTC, `device_id`, dan waktu sampel terakhir yang diterima. Pastikan ESP32 mengirim sampel tiap 30 detik dan dashboard menampilkan perangkat yang benar.
+2. Putuskan akses Wi-Fi perangkat selama 30 menit penuh tanpa mematikan daya ESP32. Catat waktu mulai dan pemulihan dalam UTC; jangan hapus atau format LittleFS.
+3. Pulihkan Wi-Fi, tunggu sampai antrean selesai terkirim, lalu catat waktu sampel terakhir yang diterima dan status serial.
+4. **Dashboard:** periksa Monitoring/detail device untuk rentang uji dan setelah pulih; cocokkan waktu sampel tertua/terbaru, gap, serta jumlah pembacaan yang akhirnya muncul.
+5. **Database:** jalankan semua SELECT dalam `firmware/bench-queries-hw06-hw07.sql` untuk `device_id`, waktu mulai UTC `from_ts`, dan waktu pulih UTC `to_ts` (rentang setengah terbuka `[from_ts,to_ts)`). Untuk pemeriksaan pascapemulihan, jalankan kembali file yang sama dengan `from_ts` awal lima menit pemeriksaan dan `to_ts` lima menit kemudian. Contoh PowerShell: `psql "$env:TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -v schema=public -v "device_id=<UUID>" -v "from_ts=<UTC_ISO>" -v "to_ts=<UTC_ISO>" -f firmware/bench-queries-hw06-hw07.sql`. Ganti placeholder dengan nilai uji; jangan tempel URL database atau credential ke laporan.
+6. Hitung sampel yang diharapkan dari durasi dan cadence firmware, tinjau output per menit, timestamp gap >90 detik (lebih dari 2 interval 30 detik yang hilang), kelompok duplikat, serta timestamp event offline/online. Catat anomali, termasuk sampel yang hilang atau hanya muncul sekali.
+
+**Kriteria lulus:** “Semua sampel terkirim, tanpa celah, tanpa duplikat”
+
+| Mulai putus (UTC) | Pulih (UTC) | Sampel diharapkan | Sampel database | Gap/missed interval | Duplikat | Event offline/online | Lulus/Gagal |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |  |  |
+
+Device ID/cadence/bukti/catatan (tanpa credential): ___________________________
+
+## HW-07: restart saat Wi-Fi tersambung
+
+**Status: belum diuji — menunggu uji fisik owner.**
+
+**Alat:** ESP32 yang sudah diprovisioning, Wi-Fi/API bench stabil melalui tunnel HTTPS, catu daya yang aman untuk restart, laptop/serial monitor, dashboard, dan akses `psql` ke database bench.
+
+1. Pastikan perangkat mengirim data; catat waktu UTC, pembacaan terakhir, dan status Wi-Fi. Jangan melakukan rotasi credential atau menghapus filesystem.
+2. Restart perangkat saat Wi-Fi dan API tetap tersedia. Amati bahwa alat boot kembali dan tidak meminta provisioning ulang; jangan menekan BOOT.
+3. Tunggu sampai koneksi pulih dan sedikitnya lima menit sampel baru terkumpul. Catat waktu restart dan sampel pertama setelahnya.
+4. **Dashboard:** periksa Monitoring/detail device, status koneksi, pembacaan terbaru, dan riwayat sekitar restart. Konfirmasi bahwa pembaruan berlanjut pada device yang sama tanpa klaim/provisioning baru.
+5. **Database:** jalankan `firmware/bench-queries-hw06-hw07.sql` dengan jendela `[from_ts,to_ts)` lima menit setelah sampel pascarestart pertama. Periksa hitungan per menit, gap, duplikat, dan event offline/online. Tidak adanya event koneksi dapat dicatat bila gangguan lebih singkat daripada deteksi offline; jangan mengarang event.
+
+**Kriteria lulus:** “Lanjut mengirim tanpa provisioning ulang”
+
+| Waktu restart (UTC) | Provisioning diminta? | Sampel pertama pascarestart (UTC) | Sampel/menit | Gap | Duplikat | Event koneksi/catatan | Lulus/Gagal |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |  |  |
+
+Device ID/varian/bukti/catatan (tanpa credential): ____________________________
+
+## HW-08: rotasi credential dan reprovisioning
+
+**Status: belum diuji — menunggu uji fisik owner.**
+
+**Alat:** akun pengelola dashboard, device live yang sudah diprovisioning, ESP32 dan tombol BOOT, Wi-Fi/API uji melalui tunnel HTTPS, laptop/serial monitor, serta akses PostgreSQL bench. Siapkan hanya credential uji baru di tempat aman; **jangan tulis atau foto credential/kode ke checklist atau laporan**.
+
+1. Di dashboard **Kelola IoT → Device**, pilih device yang benar dan jalankan rotasi credential. Simpan credential baru hanya untuk reprovisioning perangkat; jangan masukkan nilainya ke catatan.
+2. Dengan firmware masih memakai credential lama, amati request berikutnya: backend menolak autentikasi, perangkat masuk state `Halted`, dan LED menyala terus. Catat state/LED tanpa merekam credential.
+3. Tahan BOOT 5 detik untuk membuka portal; reprovisioning melalui portal dengan credential baru dan URL API HTTPS uji. Simpan konfigurasi dan tunggu perangkat tersambung.
+4. Jika LittleFS berisi record yang `measuredAt`-nya mendahului `credential_since` baru, tunggu percobaan kirim: backend harus merespons HTTP 400 `VALIDATION_FAILED`. Firmware harus mencatat penolakan permanen satu kali, menghapus record itu dari antrean (bukan mengirimnya selamanya), lalu dapat mengirim record baru yang waktunya memenuhi syarat.
+5. **Dashboard:** verifikasi rotasi pada device yang dipilih, waktu berlaku credential baru, status kembali aktif setelah reprovisioning, serta pembacaan baru. Jangan menyalin secret dari modal.
+6. **Database:** gunakan timestamp `credential_since` yang ditampilkan/tercatat secara aman di dashboard dan query read-only berikut untuk record device: `SELECT credential_since FROM devices WHERE id = :'device_id'::uuid;` dan `SELECT measured_at, message_id FROM readings WHERE device_id = :'device_id'::uuid ORDER BY measured_at DESC LIMIT 20;`. Pastikan tidak ada record lama yang diterima dan record baru berhasil masuk; korelasikan satu respons 400 dari log lokal dengan tidak adanya retry/record lama. Jangan query atau mengekspor `credential_hash`.
+
+**Kriteria lulus:** “Alat masuk state Halted, LED menyala terus. Record buffer lama dengan `measuredAt` sebelum `credential_since` baru ditolak 400 `VALIDATION_FAILED`; ini perilaku yang dimaksud, bukan bug”
+
+| Rotasi dashboard (UTC) | State/LED dengan credential lama | Waktu portal/reprovision | Satu 400 VALIDATION_FAILED | Record lama dihapus/tidak diulang | Record baru diterima | Lulus/Gagal |
+| --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |  |
+
+Device ID/serial state/bukti/catatan aman (tanpa secret): ______________________
 
 ## HW-09: provisioning dari ponsel tanpa kabel serial
 
@@ -130,7 +276,8 @@ Bukti/catatan tanpa password atau credential: __________________________________
 
 ## Hasil bench
 
-HW-01: __________  HW-05: __________  HW-09: __________
+HW-01: __________  HW-02: __________  HW-03: __________  HW-04: __________
+HW-05: __________  HW-06: __________  HW-07: __________  HW-08: __________  HW-09: __________
 
 Penguji/tanggal: _____________________________________________________________
 Catatan: _____________________________________________________________________
