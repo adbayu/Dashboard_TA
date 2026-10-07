@@ -71,7 +71,9 @@ Credential disimpan di NVS dan tidak dicetak ke serial. Firmware menerima root C
 
 - Sampel diambil tiap 30 detik. Sensor analog dibaca 15 kali dengan jeda 20 ms, lalu memakai median.
 - Suhu dibaca sebelum TDS untuk kompensasi. Di varian paket, daya modul TDS diputus saat membaca pH.
-- Waktu disinkronkan lewat NTP. Firmware tidak membuat sampel tanpa waktu yang valid.
+- Waktu disinkronkan secara asinkron lewat NTP. Jika konfigurasi sudah valid tetapi WiFi putus saat boot, firmware tidak membuka portal provisioning otomatis: koneksi dicoba ulang di latar belakang, status `waitingForTime` dipakai bila jam belum valid, dan status `connecting` selama jam valid tetapi WiFi belum tersambung. Setelah WiFi dan jam sama-sama siap, status menjadi `running`. Portal tetap dibuka saat konfigurasi belum lengkap atau tombol BOOT ditahan.
+- Tanpa waktu valid, firmware menunggu dan mencoba NTP kembali paling cepat tiap 30 detik; percobaan tidak menahan loop selama 15 detik. Tidak ada sampel baru sebelum waktu valid. Jika jam valid saat WiFi putus, sampel tetap boleh masuk buffer LittleFS; antrean yang sudah valid dikirim setelah WiFi tersambung lagi tanpa menunggu sinkronisasi NTP baru.
+- Reconnect tidak memformat atau menghapus LittleFS. ID pesan dan timestamp record buffer dipertahankan untuk retry yang sama.
 - Setiap sampel ditulis lebih dulu sebagai record 40 byte di LittleFS. Buffer menampung sampai 5.760 sampel, sekitar 230 KB data record. Record 36 byte dari firmware sebelumnya tetap terbaca dan dikirim tanpa `rssi`. Kalau penuh, sampel tertua dibuang dan kejadian dicatat ke serial.
 - Payload menggunakan versi 2 dan endpoint `POST /api/ingest`. `messageId` dan `meta.rssi` dibekukan saat sampel direkam, jadi retry mengirim payload yang sama persis dan server menjawab `duplicate: true`, bukan 409. Sampel yang direkam saat Wi-Fi putus dikirim tanpa `rssi`.
 - Setelah koneksi pulih, firmware mengirim maksimal 2 record antrean per siklus 30 detik. Pada 20 device, batas ini setara paling banyak 80 request per menit dari alat, di bawah batas ingest global 120 request per menit per IP. Sisa antrean diproses pada siklus berikutnya.

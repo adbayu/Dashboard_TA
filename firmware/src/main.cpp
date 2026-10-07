@@ -22,6 +22,7 @@
 #include <esp_system.h>
 #include "hardware_config.h"
 #include "root_ca.h"
+#include "state_policy.h"
 
 #ifndef JF_TYPE
 #error JF_TYPE harus diatur oleh environment PlatformIO
@@ -50,6 +51,8 @@ constexpr uint32_t kSampleIntervalMs = 30000;
 constexpr uint32_t kSendIntervalMs = 30000;
 constexpr uint32_t kMaxRetryMs = 300000;
 constexpr uint32_t kInitialRetryMs = 5000;
+constexpr uint32_t kNtpRetryIntervalMs = 30000;
+constexpr uint32_t kNtpRefreshIntervalMs = 21600000;
 constexpr uint32_t kSuccessLedPulseMs = 120;
 constexpr size_t kMaxMessagesPerSendCycle = 2;  // 20 devices × 4 requests/min stays below the 120/min IP limit.
 constexpr size_t kMaxQueueRecords = 5760;
@@ -95,10 +98,13 @@ uint32_t nextRetryAt = 0;
 uint32_t retryDelayMs = kInitialRetryMs;
 uint32_t lastReconnectAt = 0;
 uint32_t lastNtpSyncAt = 0;
+uint32_t lastNtpAttemptAt = 0;
 uint32_t ledChangedAt = 0;
 uint32_t lastSuccessAt = 0;
 uint8_t ledStep = 0;
 bool ledOn = false;
+bool ntpAttempted = false;
+bool clockSyncObserved = false;
 
 bool isHexSecret(const String& value) {
   if (value.length() != 64) return false;
@@ -260,15 +266,10 @@ bool clockReady() {
   return time(nullptr) > 1735689600;
 }
 
-bool synchronizeClock() {
+void requestClockSync() {
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  const uint32_t started = millis();
-  while (!clockReady() && millis() - started < 15000) delay(200);
-  if (clockReady()) {
-    lastNtpSyncAt = millis();
-    return true;
-  }
-  return false;
+  lastNtpAttemptAt = millis();
+  ntpAttempted = true;
 }
 
 uint64_t currentTimeMs() {
@@ -597,14 +598,50 @@ void updateLed() {
   digitalWrite(kLedPin, successPulse ? HIGH : LOW);
 }
 
-bool reconnectWiFi() {
-  if (WiFi.status() == WL_CONNECTED) return true;
-  state = DeviceState::connecting;
+void reconnectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastReconnectAt >= 10000) {
     lastReconnectAt = millis();
     WiFi.reconnect();
   }
-  return false;
+}
+
+void maintainClockSync() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  const uint32_t now = millis();
+  if (!clockReady()) {
+    if (!ntpAttempted || now - lastNtpAttemptAt >= kNtpRetryIntervalMs) {
+      requestClockSync();
+    }
+    return;
+  }
+
+  ntpAttempted = false;
+  if (!clockSyncObserved) {
+    clockSyncObserved = true;
+    lastNtpSyncAt = now;
+    return;
+  }
+  if (now - lastNtpSyncAt >= kNtpRefreshIntervalMs) {
+    requestClockSync();
+    lastNtpSyncAt = now;
+  }
+}
+
+void applyReadinessState(const FirmwareStatePolicy::Decision& decision) {
+  if (state == DeviceState::halted || state == DeviceState::error || state == DeviceState::provisioning) return;
+  switch (decision.state) {
+    case FirmwareStatePolicy::OperationalState::connecting:
+      state = DeviceState::connecting;
+      break;
+    case FirmwareStatePolicy::OperationalState::waitingForTime:
+      state = DeviceState::waitingForTime;
+      break;
+    case FirmwareStatePolicy::OperationalState::running:
+      state = DeviceState::running;
+      break;
+  }
 }
 
 }
@@ -647,23 +684,15 @@ void setup() {
       state = DeviceState::error;
       return;
     }
-  } else if (WiFi.status() != WL_CONNECTED) {
-    state = DeviceState::connecting;
-    WiFi.begin();
-    const uint32_t started = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - started < 20000) delay(200);
-    if (WiFi.status() != WL_CONNECTED && !runProvisioning(config)) {
-      state = DeviceState::error;
-      return;
-    }
   }
-  if (WiFi.status() == WL_CONNECTED && !clockReady()) {
-    state = DeviceState::waitingForTime;
-    synchronizeClock();
-  }
-  state = DeviceState::running;
+  if (WiFi.status() != WL_CONNECTED) WiFi.begin();
+  state = DeviceState::connecting;
   lastSampleAt = millis();
   lastSendAt = millis() - kSendIntervalMs;
+  maintainClockSync();
+  const FirmwareStatePolicy::Decision readiness = FirmwareStatePolicy::evaluate(
+    WiFi.status() == WL_CONNECTED, clockReady());
+  applyReadinessState(readiness);
   Serial.println("Firmware IoT siap. Credential tidak dicetak ke serial.");
 }
 
@@ -676,8 +705,12 @@ void loop() {
   if (provisionButtonHeld()) {
     if (runProvisioning(config)) {
       state = DeviceState::connecting;
-      synchronizeClock();
-      state = DeviceState::running;
+      ntpAttempted = false;
+      clockSyncObserved = clockReady();
+      if (clockSyncObserved) lastNtpSyncAt = millis();
+      if (WiFi.status() != WL_CONNECTED) WiFi.begin();
+    } else {
+      state = DeviceState::connecting;
     }
   }
   if (state == DeviceState::halted) {
@@ -686,16 +719,12 @@ void loop() {
     return;
   }
   reconnectWiFi();
-  if (WiFi.status() == WL_CONNECTED && state == DeviceState::connecting && clockReady()) {
-    state = DeviceState::running;
-  }
-  if (WiFi.status() == WL_CONNECTED && (!clockReady() || millis() - lastNtpSyncAt >= 21600000U)) {
-    state = DeviceState::waitingForTime;
-    synchronizeClock();
-    state = DeviceState::running;
-  }
+  maintainClockSync();
+  const FirmwareStatePolicy::Decision readiness = FirmwareStatePolicy::evaluate(
+    WiFi.status() == WL_CONNECTED, clockReady());
+  applyReadinessState(readiness);
   const uint32_t now = millis();
-  if (clockReady() && now - lastSampleAt >= kSampleIntervalMs) {
+  if (readiness.samplePermitted && now - lastSampleAt >= kSampleIntervalMs) {
     lastSampleAt = now;
     StoredSample sample{};
     if (sampleSensors(sample) && appendSample(sample)) {
