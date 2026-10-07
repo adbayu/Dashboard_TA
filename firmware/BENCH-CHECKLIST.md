@@ -46,9 +46,28 @@ Sampel diterima backend.
 
 Baris DS18B20 hanya muncul pada varian yang mengaktifkan suhu setelah pembacaan sensor berhasil. Baris sampel memerlukan waktu valid, sedangkan penerimaan backend memerlukan koneksi Wi-Fi dan API.
 
+### Perilaku yang diharapkan saat boot
+
+Matriks ini mengikuti `FirmwareStatePolicy::evaluate()` dan `main.cpp`; prasyaratnya konfigurasi sudah valid dan LittleFS berhasil dimuat. “Wi-Fi tersedia” berarti `WiFi.status() == WL_CONNECTED` saat state dievaluasi, bukan sekadar access point hidup. Buffer terisi berarti setidaknya ada satu record antrean. State tidak dicetak sebagai baris serial tersendiri. Saat boot, Wi-Fi dapat tersambung secara asinkron, jadi state awal dapat `connecting` sebelum evaluasi berikutnya.
+
+Sampel baru hanya dibuat jika jam valid dan sensor berhasil dibaca; baris simpan muncul pada jadwal sampling (setiap 30 detik). Antrean lama tetap boleh dikirim ketika Wi-Fi tersambung meskipun jam saat boot belum valid. Pengiriman sukses menghasilkan baris diterima; jika API membalas error seperti HTTP 429, baris tertunda mencatat kode dan record tetap di buffer.
+
+| Jam (valid/tidak valid) | Wi-Fi (tersedia/tidak) | Buffer (kosong/terisi) | State hasil | Baris serial yang diharapkan |
+| --- | --- | --- | --- | --- |
+| Valid | Tersedia | Kosong | `running` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; setelah sampling: `Sampel disimpan di LittleFS.`; jika POST sukses: `Sampel diterima backend.` |
+| Valid | Tersedia | Terisi | `running` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; record antrean yang diterima menghasilkan `Sampel diterima backend.`; sampel baru menghasilkan `Sampel disimpan di LittleFS.` |
+| Valid | Tidak tersedia | Kosong | `connecting` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; setelah sampling: `Sampel disimpan di LittleFS.`; tidak ada pengiriman saat offline |
+| Valid | Tidak tersedia | Terisi | `connecting` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; sampel baru menghasilkan `Sampel disimpan di LittleFS.`; antrean lama tetap ada dan tidak dikirim saat offline |
+| Tidak valid | Tersedia | Kosong | `waitingForTime` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; tidak ada baris simpan sampai jam valid; tidak ada antrean untuk dikirim |
+| Tidak valid | Tersedia | Terisi | `waitingForTime` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; antrean lama tetap dikirim tanpa menunggu jam; jika POST sukses: `Sampel diterima backend.` |
+| Tidak valid | Tidak tersedia | Kosong | `waitingForTime` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; tidak ada sampling atau pengiriman sampai prasyaratnya pulih |
+| Tidak valid | Tidak tersedia | Terisi | `waitingForTime` | `LittleFS berhasil dimuat.`; `Firmware IoT siap. Credential tidak dicetak ke serial.`; record lama tetap di buffer; tidak ada sampling atau pengiriman saat offline |
+
+Jika pengiriman gagal, string serial yang dipakai firmware adalah `Pengiriman tertunda: HTTP %d. Record tetap di buffer.` (kode `%d` diganti status HTTP aktual); firmware melakukan retry dengan backoff. Pengiriman maksimal dua record per siklus.
+
 ### Preflight API HTTPS sebelum alat dinyalakan
 
-Rute bench host-side memakai **localtunnel HTTPS sementara**, bukan LAN: firmware hanya menerima HTTP untuk loopback dan memerlukan HTTPS untuk host jarak jauh. Jalankan Fastify pada laptop dengan bind `127.0.0.1:3001` saja (jangan bind `0.0.0.0`), lalu jalankan `npx --yes localtunnel --port 3001 --local-host 127.0.0.1` di terminal lain. URL HTTPS `*.loca.lt` yang dicetak hanya berlaku untuk sesi tunnel tersebut; firmware menambahkan `/api/ingest` ke URL API yang dikonfigurasi.
+Rute bench host-side memakai **localtunnel HTTPS sementara**, bukan LAN: firmware hanya menerima HTTP untuk loopback dan memerlukan HTTPS untuk host jarak jauh. Jalankan Fastify pada laptop dengan bind `127.0.0.1:3001` saja (jangan bind `0.0.0.0`), lalu jalankan `npx --yes localtunnel --port 3001 --local-host 127.0.0.1` di terminal lain. Jika layanan menyediakan subdomain stabil, tambahkan `--subdomain <nama-stabil>`. URL HTTPS `*.loca.lt` yang dicetak dapat berubah saat sesi tunnel baru; firmware menambahkan `/api/ingest` ke URL API yang dikonfigurasi.
 
 Sebelum menyalakan ESP32:
 
@@ -56,6 +75,13 @@ Sebelum menyalakan ESP32:
 2. Dari HP yang tersambung ke internet, buka `<URL_HTTPS_LOCA.LT>/api/health`. Respons **HTTP 200 dengan JSON `status: ok`** hanya mengonfirmasi jangkauan host-side; itu bukan bukti rute fisik ESP32.
 3. Sebelum memasukkan URL ke provisioning, verifikasi **hostname HTTPS aktual yang dicetak localtunnel** terhadap ISRG Root X1 yang tertanam di `firmware/include/root_ca.h`. Lanjutkan hanya bila `embeddedRootValidatedTunnelTls` berhasil. Verifikasi host-side terbaru (2026-10-07) berhasil untuk hostname ephemeral yang diuji; hostname baru tetap harus diverifikasi.
 4. Jangan masukkan credential ke URL, catatan, screenshot, atau laporan. Jangan menambahkan header bypass jika muncul interstitial. Gunakan tunnel hanya selama bench dan hentikan proses localtunnel/API setelah selesai.
+
+### Kesiapan tunnel untuk HW-06 dan HW-07
+
+- Untuk seluruh uji HW-06 selama 30 menit dan pemulihan antrean, sambungkan laptop ke daya AC dan nonaktifkan sleep; Fastify dan localtunnel harus tetap berjalan. Sebelum HW-06 maupun HW-07, pastikan proses tunnel sehat dan `GET /api/health` melalui hostname terkini mengembalikan HTTP 200 dengan JSON `status: ok`.
+- Verifikasi ulang hostname tunnel terkini dengan embedded-root TLS sebelum setiap uji. Jika URL berubah, reprovision ESP32 dengan URL API HTTPS yang baru, lalu verifikasi kembali health dan koneksi perangkat sebelum melanjutkan.
+- ESP32 memerlukan akses internet ke tunnel; berada di LAN yang sama saja tidak cukup. Captive portal, DNS terfilter, atau outbound HTTPS yang diblokir dapat mencegah koneksi.
+- Request ESP32 dan dashboard yang melewati tunnel dapat terlihat oleh backend berasal dari satu IP tunnel. Traffic dashboard dapat membuat `POST /api/ingest` mendapat HTTP 429. Ini adalah throttling yang diharapkan, bukan alasan untuk menghapus buffer: firmware mempertahankan record dan mencoba lagi dengan backoff. Pastikan antrean akhirnya terkirim setelah traffic berkurang.
 
 Hotspot, Wi-Fi publik, isolasi client/AP, DNS yang terfilter, atau outbound HTTPS yang diblokir dapat mencegah koneksi lokal maupun tunnel. Dengan rute tunnel, perubahan/perintah firewall **tidak berlaku dan tidak diperlukan**. Jangan ubah `APP_ORIGIN` atau memperluas host allowlist; URL API perangkat diisi terpisah saat provisioning. Tunnel membuat API sementara dapat dijangkau dari internet: gunakan hanya untuk bench, dengan credential uji, lalu hentikan segera.
 
