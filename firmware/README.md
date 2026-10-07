@@ -37,7 +37,7 @@ Gunakan perintah environment yang sesuai dengan firmware dan board yang diuji. S
 | `satuan_tds` | `pio run -d firmware -e satuan_tds -t upload` | `pio device monitor -d firmware -e satuan_tds -b 115200` |
 | `paket_water` | `pio run -d firmware -e paket_water -t upload` | `pio device monitor -d firmware -e paket_water -b 115200` |
 
-> **Perhatian:** `uploadfs` hanya untuk flash pertama pada perangkat kosong. `pio run -d firmware -e <environment> -t uploadfs` menimpa filesystem LittleFS, termasuk sampel yang masih berada di buffer. Jangan jalankan pada perangkat yang sudah digunakan atau berisi data yang perlu dipertahankan.
+> **Inisialisasi LittleFS pertama kali:** firmware memakai `LittleFS.begin(false)` dan tidak memformat otomatis. Jika mount gagal, firmware berhenti pada state error dan mempertahankan data buffer dengan tidak mencoba menghapus filesystem. Untuk perangkat baru yang sudah dipastikan kosong, inisialisasi filesystem secara manual satu kali dengan `pio run -d firmware -e <environment> -t uploadfs`. Perintah ini menulis image filesystem dan menimpa seluruh partisi LittleFS, termasuk sampel yang masih berada di buffer. Jangan jalankan pada perangkat yang sudah digunakan atau memiliki data yang perlu dipertahankan. Jika mount gagal pada perangkat yang pernah digunakan, hentikan proses dan amankan/pulihkan buffer sebelum mempertimbangkan `uploadfs`.
 
 | Environment | Tipe API | Sensor aktif |
 | --- | --- | --- |

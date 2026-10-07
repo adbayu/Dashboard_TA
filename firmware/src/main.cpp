@@ -672,10 +672,11 @@ void setup() {
 #endif
 
   if (!LittleFS.begin(false)) {
-    Serial.println("LittleFS gagal dimuat; buffer tidak dihapus. Lihat firmware/README.md untuk uploadfs flash pertama.");
+    Serial.println("LittleFS gagal dimuat; pemformatan otomatis dinonaktifkan agar buffer tidak terhapus. Perangkat baru/kosong dapat diinisialisasi manual dengan uploadfs; lihat firmware/README.md.");
     state = DeviceState::error;
     return;
   }
+  Serial.println("LittleFS berhasil dimuat.");
   config = loadConfig();
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
