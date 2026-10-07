@@ -117,7 +117,7 @@ Bukti/catatan: _______________________________________________________________
 
 ## HW-02: kalibrasi dan ukur ulang buffer pH
 
-**Status: belum diuji — menunggu uji fisik owner.**
+**Status: belum diuji (menunggu uji fisik owner).**
 
 **Alat:** ESP32 varian `satuan_ph` atau `paket_water`, probe/modul pH, buffer pH 7,00 dan 4,00 yang belum kedaluwarsa, air bilas, wadah bersih, komputer untuk flash/monitor, dan akses dashboard/database uji.
 
@@ -138,7 +138,7 @@ Probe/modul, lot/kedaluwarsa buffer, suhu, bukti/catatan: ______________________
 
 ## HW-03: ukur larutan standar TDS
 
-**Status: belum diuji — menunggu uji fisik owner.**
+**Status: belum diuji (menunggu uji fisik owner).**
 
 **Alat:** ESP32 varian `satuan_tds` atau `paket_water`, modul/probe TDS, larutan standar yang label/SDS-nya tersedia, wadah bersih, air bilas, alat ukur suhu atau DS18B20, komputer untuk flash/monitor, dan akses dashboard/database uji.
 
@@ -159,7 +159,7 @@ Modul/faktor kalibrasi (asumsi Q6/Q7)/bukti/catatan: ___________________________
 
 ## HW-04: bandingkan pH saat TDS menyala dan dimatikan
 
-**Status: belum diuji — menunggu uji fisik owner.**
+**Status: belum diuji (menunggu uji fisik owner).**
 
 **Alat:** ESP32 varian `paket_water`, probe pH dan modul TDS, larutan/buffer yang sama untuk seluruh pasangan, multimeter bila diperlukan untuk memastikan kondisi daya TDS, komputer untuk flash/monitor, serta akses dashboard/database uji.
 
@@ -212,7 +212,7 @@ Varian/instrumen/tanggal/inisial: _____________________________________________
 
 ## HW-06: putuskan Wi-Fi selama 30 menit
 
-**Status: belum diuji — menunggu uji fisik owner.**
+**Status: belum diuji (menunggu uji fisik owner).**
 
 **Alat:** ESP32 yang sudah diprovisioning, Wi-Fi/API uji melalui tunnel HTTPS, laptop dan HP pada SSID 2,4 GHz yang sama, serial monitor untuk mencatat waktu/state tanpa menyalin credential, dashboard, dan akses `psql` ke database bench.
 
@@ -233,7 +233,7 @@ Device ID/cadence/bukti/catatan (tanpa credential): ___________________________
 
 ## HW-07: restart saat Wi-Fi tersambung
 
-**Status: belum diuji — menunggu uji fisik owner.**
+**Status: belum diuji (menunggu uji fisik owner).**
 
 **Alat:** ESP32 yang sudah diprovisioning, Wi-Fi/API bench stabil melalui tunnel HTTPS, catu daya yang aman untuk restart, laptop/serial monitor, dashboard, dan akses `psql` ke database bench.
 
@@ -253,7 +253,7 @@ Device ID/varian/bukti/catatan (tanpa credential): ____________________________
 
 ## HW-08: rotasi credential dan reprovisioning
 
-**Status: belum diuji — menunggu uji fisik owner.**
+**Status: belum diuji (menunggu uji fisik owner).**
 
 **Alat:** akun pengelola dashboard, device live yang sudah diprovisioning, ESP32 dan tombol BOOT, Wi-Fi/API uji melalui tunnel HTTPS, laptop/serial monitor, serta akses PostgreSQL bench. Siapkan hanya credential uji baru di tempat aman; **jangan tulis atau foto credential/kode ke checklist atau laporan**.
 

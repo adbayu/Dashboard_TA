@@ -148,7 +148,7 @@ Gambar: [terang](design/screens/02-detail-device.png), [gelap](design/screens/02
 
 ### 5.3 Monitoring (`/monitoring`), baru
 
-Monitoring memiliki tepat tiga tab kategori: **Per paket**, **Per sensor**, dan **Per area**. Panel **Log kejadian** selalu menyertai tampilan aktif—di sampingnya pada desktop dan di bawahnya pada layar sempit.
+Monitoring memiliki tepat tiga tab kategori: **Per paket**, **Per sensor**, dan **Per area**. Panel **Log kejadian** selalu menyertai tampilan aktif, di sampingnya pada desktop dan di bawahnya pada layar sempit.
 
 Tab **Per paket**: kartu menampilkan device paket dari hasil API yang diizinkan untuk sesi, termasuk sandbox bila dikembalikan API. Setiap record sandbox diberi label teks **Sandbox**. Nilai terbaru, state, ambang efektif, dan waktu ukur berasal dari snapshot bersama yang memuat satu `GET /sensors/:code/overview` untuk setiap kode sensor yang benar-benar dipakai device pada sesi. Monitoring dan sidebar berbagi request katalog/overview yang masih berjalan serta cache singkat 5 detik, dibatasi per pengguna sesi. Nilai, state, threshold, waktu ukur per sensor, metadata kepemilikan, dan label sandbox tetap berasal dari hasil API yang diizinkan.
 
