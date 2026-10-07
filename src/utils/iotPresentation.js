@@ -44,7 +44,12 @@ export function mergeLatestReading(latest, frame) {
     readings: latest.readings.map(reading => {
       const value = frame.readings[reading.sensor];
       if (typeof value !== 'number' || !Number.isFinite(value)) return reading;
-      return { ...reading, value, state: getSensorState(value, reading.threshold) };
+      return {
+        ...reading,
+        value,
+        state: getSensorState(value, reading.threshold),
+        measuredAt: frame.measuredAt || reading.measuredAt,
+      };
     }),
   };
 }

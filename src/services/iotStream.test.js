@@ -224,6 +224,27 @@ test('established stream reconnects sequentially with Last-Event-ID and dispatch
   streams[1].close();
 });
 
+test('stream handshakes use the shared request governor at latest-value priority', async () => {
+  const stream = openResponse();
+  const priorities = [];
+  const client = createIotStreamClient({
+    fetchImpl: async (_url, options) => {
+      assert.equal(options.credentials, 'same-origin');
+      return stream.response;
+    },
+    dispatchRequest: (operation, options) => {
+      priorities.push(options.priority);
+      return operation(options.signal);
+    },
+  });
+  const stop = client.subscribe({});
+
+  await waitFor(() => priorities.length === 1);
+  assert.deepEqual(priorities, ['latest']);
+  stop();
+  stream.close();
+});
+
 test('successful reconnect refreshes latest once and replays each device event once', async () => {
   const timers = createTimers();
   const streams = [openResponse(), openResponse()];

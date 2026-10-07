@@ -396,7 +396,7 @@ test('Monitoring retains a filterable, paginated event panel with four request s
 test('Sandbox is visibly labeled in Monitoring package/sensor/events and device detail', async () => {
   const monitoringSource = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
   const detailSource = await readFile(new URL('./pages/ListIot.jsx', import.meta.url), 'utf8');
-  const packageStart = monitoringSource.indexOf('function renderPackageTab()');
+  const packageStart = monitoringSource.indexOf('function PackageDeviceCard(');
   const sensorStart = monitoringSource.indexOf('function renderSensorTab()');
   const areaStart = monitoringSource.indexOf('function renderAreaTab()');
   const eventStart = monitoringSource.indexOf('function EventLogPanel(');
@@ -414,18 +414,34 @@ test('Sandbox is visibly labeled in Monitoring package/sensor/events and device 
 test('Monitoring keeps authorized sandbox snapshots visible but excludes them from area data', async () => {
   const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
 
-  assert.ok(source.includes('setDevices(result.devices || [])'));
+  assert.ok(source.includes('const devices = hasSessionSnapshot ? monitoringSnapshot.devices : EMPTY_DEVICES'));
   assert.ok(source.includes('const displayDevices = devices;'));
-  assert.ok(source.includes('devicesRef.current = displayDevices'));
   assert.ok(source.includes('const liveDevices = useMemo(() => displayDevices.filter(device => !device.isSandbox && !device.is_sandbox), [displayDevices])'));
   assert.ok(source.includes('const sensors = liveDevices.flatMap(device => deviceSensors(device)'));
 });
 
-test('latest snapshot batch allows 20 live devices plus one sandbox without widening area batch', async () => {
+test('Monitoring and SmartSidebar share one overview-backed monitoring snapshot', async () => {
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const sidebar = await readFile(new URL('./components/SmartSidebar.jsx', import.meta.url), 'utf8');
+  const store = await readFile(new URL('./services/iotMonitoringStore.js', import.meta.url), 'utf8');
+
+  assert.match(source, /useSyncExternalStore\(iotMonitoringStore\.subscribe/);
+  assert.match(source, /iotMonitoringStore\.connect\(currentUser\?\.id\)/);
+  assert.doesNotMatch(source, /getDeviceLatest\(/);
+  assert.match(source, /monitoringSnapshot\.overviewBySensor\?\.\[selectedSensor\]/);
+  assert.match(sidebar, /useSyncExternalStore\(iotMonitoringStore\.subscribe/);
+  assert.match(sidebar, /iotMonitoringStore\.connect\(currentUser\?\.id\)/);
+  assert.match(sidebar, /iotSnapshot\.catalogState !== 'idle'/);
+  assert.doesNotMatch(sidebar, /setInterval|iotApi\.getDeviceList|iotApi\.getSensorOverview/);
+  assert.match(store, /getSensorOverview\(code/);
+  assert.match(store, /cacheMs = SNAPSHOT_CACHE_MS/);
+});
+
+test('Monitoring subtree remounts when the session owner changes', async () => {
   const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
 
-  assert.match(source, /const latestRunner = useRef\(createBoundedBatchRunner\(\{ concurrency: 4, maxRequests: 21 \}\)\);/);
-  assert.match(source, /const \[areaRunner\] = useState\(\(\) => createBoundedBatchRunner\(\{ budget: areaBudget, concurrency: 4, maxRequests: AREA_HISTORY_MAX_REQUESTS \}\)\);/);
+  assert.match(source, /<MonitoringView key=\{String\(currentUser\?\.id \?\? 'anonymous'\)\} currentUser=\{currentUser\} \/>/);
+  assert.match(source, /function MonitoringView\(\{ currentUser \}\)/);
 });
 
 test('Monitoring error panel exposes and invokes its retry action', async t => {
@@ -465,30 +481,47 @@ test('DeviceClaim clears valid manual input and relies on activation memory for 
 test('Monitoring recovery views wire bounded retries for latest, comparison, and area failures', async () => {
   const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
 
-  assert.ok(source.includes('latestRunner.current.isRunning()'));
   assert.ok(source.includes('latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />'));
   assert.ok(source.includes('comparisonRunner.current.isRunning()'));
   assert.ok(source.includes('onClick={retryComparison}>Coba lagi</Button>'));
   assert.ok(source.includes("if (areaState === 'error') return <div className=\"space-y-3\">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;"));
   assert.ok(source.includes('{areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}'));
-  assert.ok(source.includes('areaRefreshActionRef.current = refresh'));
+  assert.ok(source.includes("areaRefreshActionRef.current = () => refresh('user')"));
+  assert.match(source, /priority: eventAttempt \? 'user' : 'latest'/);
 });
 
-test('Per area exposes a manual refresh and keeps the visible-only timer guarded and abortable', async () => {
+test('Per area exposes manual refresh without a separate rate budget', async () => {
   const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
 
   assert.match(source, /Muat ulang/);
   assert.match(source, /onClick=\{\(\) => areaRefreshActionRef\.current\?\.\(\)\}/);
-  assert.match(source, /areaRefreshActionRef\.current = refresh/);
+  assert.match(source, /areaRefreshActionRef\.current = \(\) => refresh\('user'\)/);
   assert.match(source, /areaRunner\.isRunning\(\)/);
   assert.match(source, /areaRunner\.run\(tasks\)/);
-  assert.match(source, /createSlidingWindowBudget\(\{ limit: AREA_HISTORY_BUDGET_LIMIT, windowMs: API_SESSION_WINDOW_MS \}\)/);
   assert.match(source, /if \(document\.visibilityState === 'visible'\)[\s\S]*setInterval\(refresh, AREA_HISTORY_REFRESH_MS\)/);
   assert.match(source, /areaController\.current\?\.abort\(\)/);
   assert.match(source, /clearInterval\(interval\)/);
   assert.match(source, /document\.addEventListener\('visibilitychange', stopWhenHidden\)/);
-  assert.match(source, /Anggaran Per area 60 detik/);
-  assert.match(source, /AREA_HISTORY_BUDGET_LIMIT/);
+  assert.match(source, /priority = 'area'/);
+  assert.doesNotMatch(source, /AREA_HISTORY_BUDGET_LIMIT|createSlidingWindowBudget|Anggaran Per area/);
+});
+
+test('package history waits for card visibility and cancels requests when it leaves', async () => {
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const requestEffect = source.match(/useEffect\(\(\) => \{\n    const sensorCodes = JSON\.parse\(sensorKey\);\n    if \(!visible \|\| !sensorCodes\.length \|\| completed\.current\) return undefined;[\s\S]*?\n  \}, \[([^\]]+)\]\);/);
+
+  assert.match(source, /function PackageDeviceCard\(/);
+  assert.match(source, /new IntersectionObserver/);
+  assert.match(source, /observer\.observe\(node\)/);
+  assert.match(source, /iotApi\.getDeviceReadings\([\s\S]*priority: attempt \? 'user' : 'history'/);
+  assert.match(source, /return \(\) => controller\.abort\(\)/);
+  assert.ok(requestEffect, 'package history request effect should have explicit dependencies');
+  assert.ok(requestEffect[0].includes('const sensorCodes = JSON.parse(sensorKey);'),
+    'package history request effect should derive stable codes from its key');
+  assert.ok(requestEffect[1].includes('sensorKey'), 'request effect should depend on the stable sensor key');
+  assert.ok(!/\bsensors\b/.test(requestEffect[1]), 'request effect should not depend on the recreated sensors array');
+  assert.match(source, /Riwayat sensor akan dimuat saat perangkat terlihat/);
+  assert.doesNotMatch(source, /packageRunner\.current\.run\(/);
 });
 
 test('comparison chart uses statically discoverable token classes for all three series', async t => {

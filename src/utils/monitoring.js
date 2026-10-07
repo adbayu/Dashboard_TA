@@ -1,8 +1,4 @@
 export const AREA_HISTORY_REFRESH_MS = 300_000;
-export const AREA_HISTORY_BUDGET_LIMIT = 60;
-export const AREA_HISTORY_MAX_REQUESTS = 60;
-export const API_SESSION_REQUEST_LIMIT = 120;
-export const API_SESSION_WINDOW_MS = 60_000;
 export const AREA_HISTORY_LABEL = 'Hari ini sejak 00.00 (waktu perangkatmu)';
 
 export function attentionBadgeLabel(count) {
@@ -82,37 +78,7 @@ export function mergeEventPages(current = [], next = []) {
   });
 }
 
-export function createSlidingWindowBudget({
-  limit = API_SESSION_REQUEST_LIMIT,
-  windowMs = API_SESSION_WINDOW_MS,
-  now = () => Date.now(),
-} = {}) {
-  let reservations = [];
-
-  function prune() {
-    const threshold = now() - windowMs;
-    reservations = reservations.filter(timestamp => timestamp > threshold);
-  }
-
-  return {
-    tryReserve(count) {
-      prune();
-      if (!Number.isInteger(count) || count < 0 || reservations.length + count > limit) return false;
-      reservations.push(...Array.from({ length: count }, now));
-      return true;
-    },
-    remaining() {
-      prune();
-      return Math.max(0, limit - reservations.length);
-    },
-    used() {
-      prune();
-      return reservations.length;
-    },
-  };
-}
-
-export function createBoundedBatchRunner({ budget, concurrency = 4, maxRequests = AREA_HISTORY_MAX_REQUESTS } = {}) {
+export function createBoundedBatchRunner({ concurrency = 4, maxRequests = Number.MAX_SAFE_INTEGER } = {}) {
   let running = false;
 
   return {
@@ -122,9 +88,6 @@ export function createBoundedBatchRunner({ budget, concurrency = 4, maxRequests 
     async run(tasks = []) {
       if (running) return { skipped: true, results: [], counters: { started: 0, total: tasks.length, maxActive: 0 } };
       if (tasks.length > maxRequests) throw new Error(`Batch meminta ${tasks.length} route, maksimal ${maxRequests}.`);
-      if (budget && !budget.tryReserve(tasks.length)) {
-        throw new Error(`Anggaran sesi tidak cukup untuk ${tasks.length} permintaan. Coba lagi setelah jendela satu menit berikutnya.`);
-      }
 
       running = true;
       const results = new Array(tasks.length);

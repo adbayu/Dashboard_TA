@@ -34,7 +34,7 @@ test('mergeLatestReading applies only known live sensor values and keeps effecti
   const latest = {
     measuredAt: '2026-10-06T08:00:00.000Z',
     readings: [
-      { sensor: 'ph', value: 7, state: 'normal', threshold: { low: 6.5, high: 7.5, source: 'area' } },
+      { sensor: 'ph', value: 7, state: 'normal', measuredAt: '2026-10-06T08:00:00.000Z', threshold: { low: 6.5, high: 7.5, source: 'area' } },
       { sensor: 'tds', value: 625, state: 'normal', threshold: { low: 500, high: 900, source: 'default' } },
     ],
   };
@@ -45,7 +45,7 @@ test('mergeLatestReading applies only known live sensor values and keeps effecti
   }), {
     measuredAt: '2026-10-06T08:01:00.000Z',
     readings: [
-      { sensor: 'ph', value: 6.4, state: 'low', threshold: { low: 6.5, high: 7.5, source: 'area' } },
+      { sensor: 'ph', value: 6.4, state: 'low', measuredAt: '2026-10-06T08:01:00.000Z', threshold: { low: 6.5, high: 7.5, source: 'area' } },
       { sensor: 'tds', value: 625, state: 'normal', threshold: { low: 500, high: 900, source: 'default' } },
     ],
   });

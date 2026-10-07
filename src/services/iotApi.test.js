@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createIotApi, parseIotInput, resolveIotSource, sanitizePublicPreview } from './iotApi.js';
+import { iotRequestGovernor } from './iotRequestGovernor.js';
 
 test('sumber IoT bawaan API dan menolak nilai konfigurasi yang tidak dikenal', () => {
   assert.equal(resolveIotSource(), 'api');
@@ -175,6 +176,78 @@ test('adapter E2 memakai overview, filter log kejadian, daftar sandbox, dan sken
     { path: '/v1/sandbox/devices', options: undefined },
     { path: '/v1/sandbox/devices/sandbox%2Fid/scenario', options: { method: 'PUT', body: { scenario: 'ph_turun' } } },
   ]);
+});
+
+test('adapter mengirim pembacaan JSON dan biner melalui governor dengan prioritas yang tepat', async () => {
+  const priorities = [];
+  const calls = [];
+  const governor = {
+    async run(operation, options) {
+      priorities.push(options.priority);
+      return operation(options.signal);
+    },
+    observeResponse() {},
+  };
+  const request = async (path, options) => {
+    calls.push({ path, options });
+    return { ok: true };
+  };
+  const api = createIotApi({
+    source: 'api',
+    request,
+    governor,
+    fetchBinary: async (_url, options) => {
+      calls.push({ path: 'binary', options });
+      return { ok: true, blob: async () => new Blob(['image']) };
+    },
+  });
+
+  await api.getSensorOverview('ph');
+  await api.getDeviceReadings('device-1', {
+    sensor: 'ph',
+    from: '2026-10-06T00:00:00.000Z',
+    to: '2026-10-07T00:00:00.000Z',
+    priority: 'area',
+  });
+  await api.createDevice({ typeCode: 'AQ-PH', name: 'Probe' });
+  await api.getQrImage('device-1', 'activation-secret', 'png');
+
+  assert.deepEqual(priorities, ['latest', 'area', 'user', 'user']);
+  assert.equal(calls.length, 4);
+  assert.equal(calls.at(-1).options.credentials, 'same-origin');
+});
+
+test('adapter dengan request khusus memakai governor bersama kecuali governor diinjeksikan', async () => {
+  const originalRun = iotRequestGovernor.run;
+  const sharedPriorities = [];
+  const injectedPriorities = [];
+  iotRequestGovernor.run = async (operation, options) => {
+    sharedPriorities.push(options.priority);
+    return operation(options.signal);
+  };
+
+  try {
+    const request = async () => ({ devices: [] });
+    const sharedApi = createIotApi({ source: 'api', request });
+    await sharedApi.getDeviceList();
+
+    const injectedApi = createIotApi({
+      source: 'api',
+      request,
+      governor: {
+        async run(operation, options) {
+          injectedPriorities.push(options.priority);
+          return operation(options.signal);
+        },
+      },
+    });
+    await injectedApi.getDeviceList();
+
+    assert.deepEqual(sharedPriorities, ['latest']);
+    assert.deepEqual(injectedPriorities, ['latest']);
+  } finally {
+    iotRequestGovernor.run = originalRun;
+  }
 });
 
 test('mode local tidak membuat telemetri atau credential dan menolak rotasi', async () => {

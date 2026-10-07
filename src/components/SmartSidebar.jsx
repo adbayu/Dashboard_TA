@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
-import { IOT_SOURCE, iotApi } from '../services/iotApi.js';
+import { IOT_SOURCE } from '../services/iotApi.js';
+import { iotMonitoringStore } from '../services/iotMonitoringStore.js';
 import { Avatar } from './ui';
 import AttentionBadge from './iot/AttentionBadge.jsx';
 import { countAttentionDevices } from '../utils/monitoring.js';
@@ -71,81 +72,16 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
   const { role: roleCtx, currentUser, points } = useSmart();
   const role = roleProp || roleCtx;
   const menu = MENUS[role] || MENUS.pengguna;
-  const [attentionCount, setAttentionCount] = useState(null);
+  const iotSnapshot = useSyncExternalStore(iotMonitoringStore.subscribe, iotMonitoringStore.getSnapshot, iotMonitoringStore.getSnapshot);
+  const snapshotForUser = iotSnapshot.userId === String(currentUser?.id ?? '') && iotSnapshot.catalogState !== 'idle';
+  const attentionCount = snapshotForUser
+    ? countAttentionDevices(iotSnapshot.devices, iotSnapshot.latestByDevice)
+    : null;
 
   useEffect(() => {
     if (IOT_SOURCE !== 'api') return undefined;
-    let active = true;
-    let generation = 0;
-    let loading = false;
-    let interval = null;
-    let controller = null;
-    let sensorCodes = null;
-
-    const refresh = async () => {
-      if (!active || loading || document.visibilityState !== 'visible') return;
-      loading = true;
-      const requestGeneration = ++generation;
-      controller = new AbortController();
-      try {
-        if (sensorCodes === null) {
-          const result = await iotApi.getSensorTypes({ signal: controller.signal });
-          sensorCodes = (result.sensorTypes || []).map(sensor => sensor.code);
-        }
-        const [deviceResult, ...overviews] = await Promise.all([
-          iotApi.getDeviceList({ signal: controller.signal }),
-          ...sensorCodes.map(code => iotApi.getSensorOverview(code, { signal: controller.signal })),
-        ]);
-        if (!active || requestGeneration !== generation) return;
-        const liveDevices = (deviceResult.devices || []).filter(device => !device.isSandbox && !device.is_sandbox);
-        const liveIds = new Set(liveDevices.map(device => device.id));
-        const latestByDevice = {};
-        for (const overview of overviews) {
-          for (const item of overview.items || []) {
-            if (!liveIds.has(item.deviceId)) continue;
-            const latest = latestByDevice[item.deviceId] || { readings: [] };
-            latest.readings.push({ state: item.state });
-            latestByDevice[item.deviceId] = latest;
-          }
-        }
-        setAttentionCount(countAttentionDevices(liveDevices, latestByDevice));
-      } catch {
-        // Tanpa snapshot lengkap, badge mempertahankan hitungan terakhir atau tetap tersembunyi.
-      } finally {
-        if (requestGeneration === generation) {
-          loading = false;
-          controller = null;
-        }
-      }
-    };
-
-    const startVisibleRefresh = () => {
-      if (document.visibilityState !== 'visible') return;
-      void refresh();
-      if (interval === null) interval = setInterval(() => { void refresh(); }, 60_000);
-    };
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') startVisibleRefresh();
-      else {
-        if (interval !== null) clearInterval(interval);
-        interval = null;
-        generation += 1;
-        controller?.abort();
-        loading = false;
-        controller = null;
-      }
-    };
-
-    startVisibleRefresh();
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      active = false;
-      generation += 1;
-      if (interval !== null) clearInterval(interval);
-      controller?.abort();
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, []);
+    return iotMonitoringStore.connect(currentUser?.id);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

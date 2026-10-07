@@ -1,4 +1,5 @@
 import { pilotApi } from './pilotApi.js';
+import { iotRequestGovernor } from './iotRequestGovernor.js';
 
 const DATA_CONTOH = 'Data contoh';
 const KODE_AKTIVASI_CONTOH = 'contoh-kode-aktivasi';
@@ -85,28 +86,38 @@ function buildTypes(deviceTypes, sensorTypes) {
   }]));
 }
 
-export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBinary = globalThis.fetch } = {}) {
+export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBinary = globalThis.fetch, governor } = {}) {
   if (source !== 'api' && source !== 'local') {
     throw new Error('Sumber IoT harus bernilai "api" atau "local".');
   }
 
   const buatDataContoh = () => [{ ...DEVICE_CONTOH, sensors: DEVICE_CONTOH.sensors.map(sensor => ({ ...sensor })) }];
   let exampleDevices = buatDataContoh();
+  const requestGovernor = governor || iotRequestGovernor;
+
+  function requestJson(path, options, priority = 'latest') {
+    if (request === pilotApi) return request(path, { ...(options || {}), priority });
+    return requestGovernor.run(() => request(path, options), { signal: options?.signal, priority });
+  }
+
+  function dispatchRequest(operation, { signal, priority = 'latest' } = {}) {
+    return requestGovernor.run(operation, { signal, priority });
+  }
 
   function localDevice(idOrCode) {
     return exampleDevices.find(device => device.id === idOrCode || device.code.toUpperCase() === String(idOrCode).toUpperCase());
   }
 
-  async function getDeviceList({ signal } = {}) {
+  async function getDeviceList({ signal, priority = 'latest' } = {}) {
     if (source === 'local') {
       const result = await getDevices();
       return { devices: result.devices, nextCursor: null, source, label: DATA_CONTOH };
     }
-    const result = await request('/v1/devices', signal ? { signal } : undefined);
+    const result = await requestJson('/v1/devices', signal ? { signal } : undefined, priority);
     return { ...result, source, label: null };
   }
 
-  async function getDevices({ userId, signal } = {}) {
+  async function getDevices({ userId, signal, priority = 'latest' } = {}) {
     if (source === 'local') {
       return {
         devices: exampleDevices
@@ -128,9 +139,9 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     }
 
     const [result, typeResult, sensorResult] = await Promise.all([
-      request('/v1/devices', signal ? { signal } : undefined),
-      request('/v1/device-types', signal ? { signal } : undefined),
-      request('/v1/sensor-types', signal ? { signal } : undefined),
+      requestJson('/v1/devices', signal ? { signal } : undefined, priority),
+      requestJson('/v1/device-types', signal ? { signal } : undefined, priority),
+      requestJson('/v1/sensor-types', signal ? { signal } : undefined, priority),
     ]);
     const types = buildTypes(typeResult.deviceTypes || [], sensorResult.sensorTypes || []);
     return {
@@ -159,8 +170,8 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     }
 
     const [result, typeResult] = await Promise.all([
-      request(`/v1/devices/${encodeURIComponent(id)}`, signal ? { signal } : undefined),
-      request('/v1/device-types', signal ? { signal } : undefined),
+      requestJson(`/v1/devices/${encodeURIComponent(id)}`, signal ? { signal } : undefined),
+      requestJson('/v1/device-types', signal ? { signal } : undefined),
     ]);
     const device = result.device;
     const type = (typeResult.deviceTypes || []).find(item => item.code === device.type?.code);
@@ -189,10 +200,10 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
         label: DATA_CONTOH,
       };
     }
-    return { ...(await request(`/v1/devices/${encodeURIComponent(id)}/latest`, signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson(`/v1/devices/${encodeURIComponent(id)}/latest`, signal ? { signal } : undefined, 'latest')), source, label: null };
   }
 
-  async function getDeviceReadings(id, { sensor, from, to, bucket = '5m', signal } = {}) {
+  async function getDeviceReadings(id, { sensor, from, to, bucket = '5m', signal, priority = 'history' } = {}) {
     if (source === 'local') {
       const device = localDevice(id);
       if (!device) throw failedRequest('Device tidak ditemukan.');
@@ -209,7 +220,7 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     }
     const query = new URLSearchParams({ sensor, from, to, bucket });
     return {
-      ...(await request(`/v1/devices/${encodeURIComponent(id)}/readings?${query.toString()}`, signal ? { signal } : undefined)),
+      ...(await requestJson(`/v1/devices/${encodeURIComponent(id)}/readings?${query.toString()}`, signal ? { signal } : undefined, priority)),
       source,
       label: null,
     };
@@ -222,27 +233,27 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     }
     const query = new URLSearchParams({ deviceId: id, limit: String(limit) });
     if (cursor) query.set('cursor', cursor);
-    return { ...(await request(`/v1/events?${query.toString()}`, signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson(`/v1/events?${query.toString()}`, signal ? { signal } : undefined, 'latest')), source, label: null };
   }
 
-  async function getSensorOverview(code, { signal } = {}) {
+  async function getSensorOverview(code, { signal, priority = 'latest' } = {}) {
     if (source === 'local') return { sensor: code, items: [], source, label: DATA_CONTOH };
-    return { ...(await request(`/v1/sensors/${encodeURIComponent(code)}/overview`, signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson(`/v1/sensors/${encodeURIComponent(code)}/overview`, signal ? { signal } : undefined, priority)), source, label: null };
   }
 
-  async function getEvents({ deviceId, type, cursor, limit = 50, signal } = {}) {
+  async function getEvents({ deviceId, type, cursor, limit = 50, signal, priority = 'latest' } = {}) {
     if (source === 'local') return { events: [], nextCursor: null, source, label: DATA_CONTOH };
     const query = new URLSearchParams();
     if (deviceId) query.set('deviceId', deviceId);
     if (type) query.set('type', type);
     query.set('limit', String(limit));
     if (cursor) query.set('cursor', cursor);
-    return { ...(await request(`/v1/events?${query.toString()}`, signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson(`/v1/events?${query.toString()}`, signal ? { signal } : undefined, priority)), source, label: null };
   }
 
   async function getSandboxDevices({ signal } = {}) {
     if (source === 'local') return { devices: [], source, label: DATA_CONTOH };
-    return { ...(await request('/v1/sandbox/devices', signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson('/v1/sandbox/devices', signal ? { signal } : undefined, 'latest')), source, label: null };
   }
 
   function setSandboxScenario(id, scenario, { signal } = {}) {
@@ -253,18 +264,18 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     });
   }
 
-  async function getDeviceTypes({ signal } = {}) {
+  async function getDeviceTypes({ signal, priority = 'latest' } = {}) {
     if (source === 'local') {
       return { deviceTypes: [{ code: 'AQ-CONTOH', name: 'Sensor contoh', kind: 'satuan', sensors: [{ code: 'ph', label: 'Probe pH' }] }], source, label: DATA_CONTOH };
     }
-    return { ...(await request('/v1/device-types', signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson('/v1/device-types', signal ? { signal } : undefined, priority)), source, label: null };
   }
 
-  async function getSensorTypes({ signal } = {}) {
+  async function getSensorTypes({ signal, priority = 'latest' } = {}) {
     if (source === 'local') {
       return { sensorTypes: [{ code: 'ph', name: 'pH Air', unit: 'pH', decimals: 2, min: null, max: null, warnLow: null, warnHigh: null }], source, label: DATA_CONTOH };
     }
-    return { ...(await request('/v1/sensor-types', signal ? { signal } : undefined)), source, label: null };
+    return { ...(await requestJson('/v1/sensor-types', signal ? { signal } : undefined, priority)), source, label: null };
   }
 
   async function getQrPreview(code, activationCode = '') {
@@ -281,7 +292,7 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
 
     const query = new URLSearchParams({ code });
     if (activationCode) query.set('c', activationCode);
-    const result = await request(`/v1/devices?${query.toString()}`);
+    const result = await requestJson(`/v1/devices?${query.toString()}`, undefined, 'user');
     return { device: sanitizePublicPreview(result.device), source, label: null };
   }
 
@@ -298,42 +309,48 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
       return { deviceId: device.id, source, label: DATA_CONTOH };
     }
 
-    return request('/v1/devices/claim', {
+    return requestJson('/v1/devices/claim', {
       method: 'POST',
       body: { code, activationCode },
-    });
+    }, 'user');
   }
 
   function requireApiWrite() {
     if (source !== 'api') throw failedRequest('Perubahan Kelola IoT hanya tersedia dalam mode API.', 405);
   }
 
-  async function getQrImage(id, activationCode, format = 'svg') {
+  async function getQrImage(id, activationCode, format = 'svg', { signal, priority = 'user' } = {}) {
     requireApiWrite();
     if (!['svg', 'png'].includes(format)) throw new TypeError('Format QR harus svg atau png.');
-    let response;
-    try {
-      response = await fetchBinary(`/api/v1/devices/${encodeURIComponent(id)}/qr?format=${format}`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activationCode }),
-        signal: AbortSignal.timeout(15000),
-      });
-    } catch {
-      throw new Error('Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.');
-    }
-    if (!response.ok) {
-      let data;
-      try { data = await response.json(); } catch { data = null; }
-      throw Object.assign(new Error(data?.error?.message ?? 'Permintaan gagal.'), { status: response.status });
-    }
-    return response.blob();
+    return requestGovernor.run(async requestSignal => {
+      let response;
+      try {
+        const timeoutSignal = AbortSignal.timeout(15000);
+        const combinedSignal = requestSignal ? AbortSignal.any([requestSignal, timeoutSignal]) : timeoutSignal;
+        response = await fetchBinary(`/api/v1/devices/${encodeURIComponent(id)}/qr?format=${format}`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activationCode }),
+          signal: combinedSignal,
+        });
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        throw new Error('Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.');
+      }
+      requestGovernor.observeResponse(response);
+      if (!response.ok) {
+        let data;
+        try { data = await response.json(); } catch { data = null; }
+        throw Object.assign(new Error(data?.error?.message ?? 'Permintaan gagal.'), { status: response.status });
+      }
+      return response.blob();
+    }, { signal, priority });
   }
 
   function write(path, options) {
     requireApiWrite();
-    return request(path, options);
+    return requestJson(path, options, options?.priority || 'user');
   }
 
   const createDevice = body => write('/v1/devices', { method: 'POST', body });
@@ -351,6 +368,7 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
   }
 
   return {
+    dispatchRequest,
     canWrite: source === 'api',
     getDeviceList,
     getDevices,

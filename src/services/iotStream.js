@@ -1,3 +1,5 @@
+import { iotApi } from './iotApi.js';
+
 export const IOT_STREAM_POLL_INTERVAL_MS = 30_000;
 const RECONNECT_BASE_DELAY_MS = 1_000;
 const RECONNECT_MAX_DELAY_MS = 30_000;
@@ -87,6 +89,7 @@ export function createIotStreamClient({
   setTimeoutImpl = globalThis.setTimeout,
   clearTimeoutImpl = globalThis.clearTimeout,
   nowImpl = () => Date.now(),
+  dispatchRequest = (operation, { signal } = {}) => operation(signal),
   pollIntervalMs = IOT_STREAM_POLL_INTERVAL_MS,
   url = '/api/v1/stream',
 } = {}) {
@@ -207,7 +210,10 @@ export function createIotStreamClient({
 
       let response;
       try {
-        response = await fetchImpl(url, { credentials: 'same-origin', headers, signal: controller.signal });
+        response = await dispatchRequest(
+          signal => fetchImpl(url, { credentials: 'same-origin', headers, signal }),
+          { signal: controller.signal, priority: 'latest' },
+        );
       } catch {
         if (activeController === controller) activeController = null;
         if (subscribers.size && !controller.signal.aborted) startPolling();
@@ -272,4 +278,4 @@ export function createIotStreamClient({
   return { subscribe, getSubscriberCount: () => subscribers.size };
 }
 
-export const iotStreamClient = createIotStreamClient();
+export const iotStreamClient = createIotStreamClient({ dispatchRequest: iotApi.dispatchRequest });

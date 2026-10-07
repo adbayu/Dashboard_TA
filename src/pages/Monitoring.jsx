@@ -1,29 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { Badge, Button, Card, Empty, Field, SectionTitle, Select } from '../components/ui';
 import { IOT_SOURCE, iotApi } from '../services/iotApi.js';
-import { iotStreamClient } from '../services/iotStream.js';
+import { iotMonitoringStore } from '../services/iotMonitoringStore.js';
 import SensorStateBadge from '../components/iot/SensorStateBadge.jsx';
 import {
   createBoundedBatchRunner,
-  createSlidingWindowBudget,
   getLocalDayRange,
   mergeEventPages,
   summarizeAreaPoints,
   AREA_HISTORY_LABEL,
-  AREA_HISTORY_BUDGET_LIMIT,
-  AREA_HISTORY_MAX_REQUESTS,
   AREA_HISTORY_REFRESH_MS,
-  API_SESSION_REQUEST_LIMIT,
-  API_SESSION_WINDOW_MS,
 } from '../utils/monitoring.js';
 import {
   formatEventMessage,
   formatMeasuredAt,
   formatSensorNumber,
   formatThreshold,
-  mergeLatestReading,
 } from '../utils/iotPresentation.js';
 
 const TABS = [
@@ -59,6 +53,9 @@ const COMPARE_SERIES = [
   { stroke: 'stroke-secondary', text: 'text-secondary' },
 ];
 const SENSOR_HISTORY_LABEL = '24 jam terakhir';
+const EMPTY_DEVICES = [];
+const EMPTY_SENSORS = [];
+const EMPTY_LATEST = {};
 
 function deviceSensors(device) {
   return device?.type?.sensors || device?.sensors || [];
@@ -177,6 +174,107 @@ function Sparkline({ sensor, history }) {
   );
 }
 
+function PackageDeviceCard({ device, latest }) {
+  const [visible, setVisible] = useState(false);
+  const [historyState, setHistoryState] = useState('idle');
+  const [historyError, setHistoryError] = useState('');
+  const [histories, setHistories] = useState({});
+  const [attempt, setAttempt] = useState(0);
+  const cardRef = useRef(null);
+  const completed = useRef(false);
+  const sensors = deviceSensors(device);
+  const sensorKey = JSON.stringify(sensors.map(sensor => sensor.code));
+
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      const timer = setTimeout(() => setVisible(true), 0);
+      return () => clearTimeout(timer);
+    }
+    const observer = new IntersectionObserver(entries => {
+      setVisible(entries.some(entry => entry.isIntersecting));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const sensorCodes = JSON.parse(sensorKey);
+    if (!visible || !sensorCodes.length || completed.current) return undefined;
+    const controller = new AbortController();
+    const range = dateRange24h();
+    setHistoryState('loading');
+    setHistoryError('');
+    Promise.allSettled(sensorCodes.map(sensor => iotApi.getDeviceReadings(device.id, {
+      sensor,
+      ...range,
+      bucket: '5m',
+      signal: controller.signal,
+      priority: attempt ? 'user' : 'history',
+    }))).then(results => {
+      if (controller.signal.aborted) return;
+      completed.current = true;
+      const nextHistories = Object.fromEntries(results.flatMap((result, index) => result.status === 'fulfilled'
+        ? [[sensorCodes[index], result.value]]
+        : []));
+      const failures = results.filter(result => result.status === 'rejected');
+      setHistories(nextHistories);
+      setHistoryError(failures.length
+        ? `${failures.length} dari ${sensorCodes.length} riwayat sensor gagal dimuat. ${failures[0].reason?.message || ''}`.trim()
+        : '');
+      setHistoryState(failures.length && !Object.keys(nextHistories).length ? 'error' : 'ready');
+    });
+    return () => controller.abort();
+  }, [attempt, device.id, sensorKey, visible]);
+
+  const retry = () => {
+    completed.current = false;
+    setHistoryState('loading');
+    setAttempt(value => value + 1);
+  };
+
+  return (
+    <div ref={cardRef}>
+      <Card pad="sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="break-words text-base font-bold text-on-surface">{device.name}</h3>
+            {(device.isSandbox || device.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
+            <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{device.code} · {device.type?.name || device.type?.code}</p>
+            {device.areaRef && <p className="mt-1 text-xs text-on-surface-variant">Area: {device.areaRef}</p>}
+          </div>
+          <div className="flex flex-wrap gap-2"><DeviceStatus status={device.status} /><Link to={`/iot/${encodeURIComponent(device.id)}`} className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">Buka perangkat</Link></div>
+        </div>
+        {historyError && <p role="alert" className="mt-3 text-sm text-red-800 dark:text-red-200">{historyError}</p>}
+        {historyError && <div className="mt-2 flex justify-end"><Button variant="ghost" icon="refresh" onClick={retry}>Coba lagi</Button></div>}
+        <div className="mt-4 divide-y divide-outline-variant/30">
+          {sensors.map(sensor => {
+            const reading = latestReadingFor({ [device.id]: latest }, device.id, sensor.code);
+            const history = histories[sensor.code];
+            return <div key={sensor.code} className="grid min-w-0 gap-3 py-3 md:grid-cols-[minmax(10rem,0.8fr)_minmax(0,1.4fr)] md:items-start">
+              <div className="min-w-0">
+                <p className="font-semibold text-on-surface">{sensorLabel(sensor)}</p>
+                <p className="mt-1 break-words text-xs text-on-surface-variant">{reading?.value == null ? 'Belum ada data' : `${formatSensorNumber(reading.value, sensor.decimals ?? 2)}${sensor.unit ? ` ${sensor.unit}` : ''}`}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {reading && <SensorStateBadge state={reading.state} />}
+                  <span className="break-words text-xs text-on-surface-variant">{reading?.threshold
+                    ? formatThreshold(reading.threshold, sensor.unit || '', sensor.decimals ?? 2)
+                    : 'Ambang efektif belum dimuat'}</span>
+                </div>
+                <p className="mt-1 text-xs text-on-surface-variant">{formatMeasuredAt(reading?.measuredAt)}</p>
+              </div>
+              {historyState === 'loading' ? <p role="status" className="text-xs text-on-surface-variant">Memuat riwayat sensor...</p>
+                : historyState === 'idle' ? <p className="text-xs text-on-surface-variant">Riwayat sensor akan dimuat saat perangkat terlihat.</p>
+                  : <Sparkline sensor={sensor} history={history} />}
+            </div>;
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function ComparisonChart({ series, sensor }) {
   const validSeries = series.map(item => ({ ...item, points: item.history?.points || [] }))
     .filter(item => item.points.some(point => Number.isFinite(Number(point.avg))));
@@ -222,23 +320,12 @@ function latestReadingFor(latestByDevice, deviceId, sensorCode) {
 
 export default function Monitoring() {
   const { currentUser } = useSmart();
+  return <MonitoringView key={String(currentUser?.id ?? 'anonymous')} currentUser={currentUser} />;
+}
+
+function MonitoringView({ currentUser }) {
   const [activeTab, setActiveTab] = useState('package');
-  const [catalogResult, setCatalogResult] = useState({ key: '', state: 'loading', error: '' });
-  const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const [devices, setDevices] = useState([]);
-  const [sensorTypes, setSensorTypes] = useState([]);
-  const [latestByDevice, setLatestByDevice] = useState({});
-  const [latestState, setLatestState] = useState('loading');
-  const [latestError, setLatestError] = useState('');
-  const [packageState, setPackageState] = useState('idle');
-  const [packageError, setPackageError] = useState('');
-  const [packageHistories, setPackageHistories] = useState({});
-  const [packageAttempt, setPackageAttempt] = useState(0);
-  const [selectedSensor, setSelectedSensor] = useState('');
-  const [sensorState, setSensorState] = useState('idle');
-  const [sensorError, setSensorError] = useState('');
-  const [sensorAttempt, setSensorAttempt] = useState(0);
-  const [sensorItems, setSensorItems] = useState([]);
+  const [selectedSensorChoice, setSelectedSensorChoice] = useState('');
   const [selectedCompareIds, setSelectedCompareIds] = useState([]);
   const [comparisonState, setComparisonState] = useState('idle');
   const [comparisonError, setComparisonError] = useState('');
@@ -255,168 +342,67 @@ export default function Monitoring() {
   const [areaState, setAreaState] = useState('idle');
   const [areaError, setAreaError] = useState('');
   const [areaRows, setAreaRows] = useState([]);
-  const [areaCounters, setAreaCounters] = useState({ started: 0, total: 0, used: 0, remaining: AREA_HISTORY_BUDGET_LIMIT });
+  const [areaCounters, setAreaCounters] = useState({ started: 0, total: 0 });
 
-  const latestRef = useRef({});
-  const devicesRef = useRef([]);
-  const eventFiltersRef = useRef({ deviceId: '', type: '' });
-  const refreshLatestRef = useRef(null);
   const areaRefreshActionRef = useRef(null);
-  const latestRunner = useRef(createBoundedBatchRunner({ concurrency: 4, maxRequests: 21 }));
-  const packageRunner = useRef(createBoundedBatchRunner({ concurrency: 4, maxRequests: API_SESSION_REQUEST_LIMIT }));
+  const streamEventCursor = useRef({ userId: null, sequence: 0 });
   const comparisonRunner = useRef(createBoundedBatchRunner({ concurrency: 3, maxRequests: 3 }));
-  const [areaBudget] = useState(() => createSlidingWindowBudget({ limit: AREA_HISTORY_BUDGET_LIMIT, windowMs: API_SESSION_WINDOW_MS }));
-  const [areaRunner] = useState(() => createBoundedBatchRunner({ budget: areaBudget, concurrency: 4, maxRequests: AREA_HISTORY_MAX_REQUESTS }));
+  const areaRunner = useMemo(() => createBoundedBatchRunner({ concurrency: 4, maxRequests: Number.MAX_SAFE_INTEGER }), []);
   const areaController = useRef(null);
 
+  const monitoringSnapshot = useSyncExternalStore(iotMonitoringStore.subscribe, iotMonitoringStore.getSnapshot, iotMonitoringStore.getSnapshot);
+  const hasSessionSnapshot = currentUser?.id !== null && currentUser?.id !== undefined
+    && monitoringSnapshot.userId === String(currentUser.id);
+  const devices = hasSessionSnapshot ? monitoringSnapshot.devices : EMPTY_DEVICES;
+  const sensorTypes = hasSessionSnapshot ? monitoringSnapshot.sensorTypes : EMPTY_SENSORS;
+  const latestByDevice = hasSessionSnapshot ? monitoringSnapshot.latestByDevice : EMPTY_LATEST;
+  const latestState = hasSessionSnapshot ? monitoringSnapshot.latestState : 'loading';
+  const latestError = hasSessionSnapshot ? monitoringSnapshot.latestError : '';
+  const catalogState = IOT_SOURCE !== 'api' ? 'disabled'
+    : hasSessionSnapshot ? monitoringSnapshot.catalogState : 'loading';
+  const catalogError = hasSessionSnapshot ? monitoringSnapshot.catalogError : '';
   const displayDevices = devices;
   const liveDevices = useMemo(() => displayDevices.filter(device => !device.isSandbox && !device.is_sandbox), [displayDevices]);
   const packageDevices = useMemo(() => displayDevices.filter(device => device.type?.kind === 'paket'), [displayDevices]);
-  const packageSensors = useMemo(() => packageDevices.flatMap(device => deviceSensors(device).map(sensor => ({ device, sensor }))), [packageDevices]);
   const deviceById = useMemo(() => new Map(displayDevices.map(device => [device.id, device])), [displayDevices]);
   const sensorOptions = useMemo(() => sensorTypes.map(sensor => ({ value: sensor.code, label: `${sensor.name || sensor.code}${sensor.unit ? ` (${sensor.unit})` : ''}` })), [sensorTypes]);
+  const selectedSensor = sensorTypes.some(sensor => sensor.code === selectedSensorChoice)
+    ? selectedSensorChoice
+    : sensorTypes[0]?.code || '';
   const selectedSensorType = sensorTypes.find(sensor => sensor.code === selectedSensor) || null;
-  const catalogRequestKey = `${currentUser?.id || ''}:${catalogAttempt}`;
-  const catalogState = IOT_SOURCE !== 'api'
-    ? 'disabled'
-    : catalogResult.key === catalogRequestKey ? catalogResult.state : 'loading';
-  const catalogError = catalogResult.key === catalogRequestKey ? catalogResult.error : '';
-
-  useEffect(() => { latestRef.current = latestByDevice; }, [latestByDevice]);
-  useEffect(() => { devicesRef.current = displayDevices; }, [displayDevices]);
-  useEffect(() => { eventFiltersRef.current = { deviceId: eventDeviceId, type: eventType }; }, [eventDeviceId, eventType]);
+  const sensorState = !selectedSensor ? 'ready' : latestState;
+  const sensorError = latestError;
+  const sensorItems = (hasSessionSnapshot ? monitoringSnapshot.overviewBySensor?.[selectedSensor]?.items : null) || EMPTY_DEVICES;
+  const currentSensorItems = sensorItems
+    .filter(item => deviceById.has(item.deviceId))
+    .map(item => ({ ...item, device: deviceById.get(item.deviceId) }))
+    .map(item => {
+      const latest = latestReadingFor(latestByDevice, item.deviceId, selectedSensor);
+      return latest ? { ...item, value: latest.value, state: latest.state, threshold: latest.threshold, measuredAt: latest.measuredAt } : item;
+    })
+    .sort((left, right) => Number(right.state === 'low' || right.state === 'high') - Number(left.state === 'low' || left.state === 'high')
+      || String(left.device?.code || '').localeCompare(String(right.device?.code || ''), 'id'));
 
   useEffect(() => {
     if (IOT_SOURCE !== 'api') return undefined;
-    let active = true;
-    const controller = new AbortController();
-    iotApi.getDevices({ userId: currentUser?.id, signal: controller.signal }).then(result => {
-      if (!active) return;
-      setDevices(result.devices || []);
-      setSensorTypes(result.sensorTypes || []);
-      setSelectedSensor(current => current || result.sensorTypes?.[0]?.code || '');
-      setCatalogResult({ key: catalogRequestKey, state: 'ready', error: '' });
-    }).catch(error => {
-      if (!active || controller.signal.aborted) return;
-      setCatalogResult({ key: catalogRequestKey, state: 'error', error: error.message || 'Daftar perangkat tidak dapat dimuat.' });
-    });
-    return () => { active = false; controller.abort(); };
-  }, [catalogRequestKey, currentUser?.id]);
-
-  const refreshLatest = useCallback(async (signal) => {
-    const targets = devicesRef.current;
-    if (!targets.length) {
-      setLatestByDevice({});
-      setLatestState('ready');
-      setLatestError('');
-      return;
-    }
-    const tasks = targets.map(device => () => iotApi.getDeviceLatest(device.id, { signal }));
-    const result = await latestRunner.current.run(tasks);
-    if (result.skipped || signal?.aborted) return;
-    const failed = result.results.filter(item => item.status === 'rejected');
-    const updates = result.results.flatMap((item, index) => item.status === 'fulfilled' ? [[targets[index].id, item.value]] : []);
-    if (updates.length) {
-      setLatestByDevice(current => ({ ...current, ...Object.fromEntries(updates) }));
-      setLatestState('ready');
-    } else if (failed.length) setLatestState('error');
-    setLatestError(failed.length ? `${failed.length} dari ${targets.length} pembacaan gagal dimuat. ${failed[0].reason?.message || ''}`.trim() : '');
-  }, []);
+    return iotMonitoringStore.connect(currentUser?.id);
+  }, [currentUser?.id]);
 
   const retryLatest = useCallback(() => {
-    if (latestRunner.current.isRunning()) return;
-    setLatestError('');
-    setLatestState('loading');
-    void refreshLatest();
-  }, [refreshLatest]);
-
-  useEffect(() => { refreshLatestRef.current = refreshLatest; }, [refreshLatest]);
+    void iotMonitoringStore.refreshLatest({ priority: 'user' });
+  }, []);
 
   useEffect(() => {
-    if (catalogState === 'ready') void refreshLatest();
-  }, [catalogState, refreshLatest]);
-
-  useEffect(() => {
-    if (catalogState !== 'ready' || IOT_SOURCE !== 'api') return undefined;
-    const stop = iotStreamClient.subscribe({
-      onReading: frame => {
-        const previous = latestRef.current[frame.deviceId];
-        const next = mergeLatestReading(previous, frame);
-        if (!next || next === previous) return;
-        latestRef.current = { ...latestRef.current, [frame.deviceId]: next };
-        setLatestByDevice(latestRef.current);
-      },
-      onDeviceEvent: (event, id) => {
-        const value = { ...event, id: id ?? event?.id };
-        if (!value.id) return;
-        const filter = eventFiltersRef.current;
-        if (filter.deviceId && value.deviceId !== filter.deviceId) return;
-        if (filter.type && value.type !== filter.type) return;
-        setEvents(current => mergeEventPages([value], current));
-      },
-      onRefresh: () => { void refreshLatestRef.current?.(); },
-    });
-    return stop;
-  }, [catalogState]);
-
-  useEffect(() => {
-    if (catalogState !== 'ready' || activeTab !== 'package') return undefined;
-    let active = true;
-    const controller = new AbortController();
-    const sensors = packageSensors;
-    if (!sensors.length) return () => { active = false; controller.abort(); };
-    const range = dateRange24h();
-    const tasks = sensors.map(({ device, sensor }) => () => iotApi.getDeviceReadings(device.id, {
-      sensor: sensor.code,
-      ...range,
-      bucket: '5m',
-      signal: controller.signal,
-    }));
-    packageRunner.current.run(tasks).then(result => {
-      if (!active || controller.signal.aborted) return;
-      if (result.skipped) {
-        setPackageError('Riwayat sensor sedang dimuat oleh permintaan lain. Coba lagi.');
-        setPackageState('error');
-        return;
-      }
-      const fulfilled = result.results.flatMap((entry, index) => entry.status === 'fulfilled'
-        ? [[`${sensors[index].device.id}:${sensors[index].sensor.code}`, entry.value]]
-        : []);
-      const failures = result.results.filter(entry => entry.status === 'rejected');
-      if (fulfilled.length) setPackageHistories(current => ({ ...current, ...Object.fromEntries(fulfilled) }));
-      if (!fulfilled.length && failures.length) setPackageState('error');
-      else setPackageState('ready');
-      setPackageError(failures.length
-        ? `${failures.length} dari ${sensors.length} riwayat sensor gagal dimuat. ${failures[0].reason?.message || ''}`.trim()
-        : '');
-    }).catch(error => {
-      if (!active || controller.signal.aborted) return;
-      setPackageError(error.message || 'Riwayat sensor paket tidak dapat dimuat.');
-      setPackageState('error');
-    });
-    return () => { active = false; controller.abort(); };
-  }, [activeTab, catalogState, packageAttempt, packageSensors]);
-
-  useEffect(() => {
-    if (catalogState !== 'ready' || activeTab !== 'sensor' || !selectedSensor) return undefined;
-    let active = true;
-    const controller = new AbortController();
-    iotApi.getSensorOverview(selectedSensor, { signal: controller.signal }).then(result => {
-      if (!active) return;
-      const items = (result.items || []).filter(item => deviceById.has(item.deviceId)).map(item => ({
-        ...item,
-        device: deviceById.get(item.deviceId),
-      }));
-      setSensorItems(items);
-      setSensorState('ready');
-      setSelectedCompareIds(current => current.filter(id => items.some(item => item.deviceId === id)).slice(0, 3));
-    }).catch(error => {
-      if (!active || controller.signal.aborted) return;
-      setSensorError(error.message || 'Ringkasan sensor tidak dapat dimuat.');
-      setSensorState('error');
-    });
-    return () => { active = false; controller.abort(); };
-  }, [activeTab, catalogState, selectedSensor, deviceById, sensorAttempt]);
+    if (!hasSessionSnapshot || !monitoringSnapshot.deviceEvents.length) return;
+    const userId = String(currentUser?.id);
+    if (streamEventCursor.current.userId !== userId) streamEventCursor.current = { userId, sequence: 0 };
+    const unseen = monitoringSnapshot.deviceEvents.filter(item => item.sequence > streamEventCursor.current.sequence);
+    if (!unseen.length) return;
+    streamEventCursor.current.sequence = unseen.at(-1).sequence;
+    const values = unseen.map(item => item.event).filter(event =>
+      (!eventDeviceId || event.deviceId === eventDeviceId) && (!eventType || event.type === eventType));
+    if (values.length) setEvents(current => mergeEventPages(current, values));
+  }, [currentUser?.id, eventDeviceId, eventType, hasSessionSnapshot, monitoringSnapshot.deviceEvents]);
 
   useEffect(() => {
     if (catalogState !== 'ready' || activeTab !== 'sensor' || selectedCompareIds.length === 0) {
@@ -430,6 +416,7 @@ export default function Monitoring() {
       ...range,
       bucket: '5m',
       signal: controller.signal,
+      priority: 'user',
     }));
     comparisonRunner.current.run(tasks).then(result => {
       if (!active || controller.signal.aborted) return;
@@ -462,6 +449,7 @@ export default function Monitoring() {
         cursor: cursor || undefined,
         limit: 50,
         signal,
+        priority: append || eventAttempt ? 'user' : 'latest',
       });
       if (signal?.aborted) return;
       setEvents(current => append ? mergeEventPages(current, result.events || []) : mergeEventPages([], result.events || []));
@@ -475,7 +463,7 @@ export default function Monitoring() {
     } finally {
       if (!signal?.aborted) setLoadingMoreEvents(false);
     }
-  }, [eventDeviceId, eventType]);
+  }, [eventAttempt, eventDeviceId, eventType]);
 
   useEffect(() => {
     if (catalogState !== 'ready') return undefined;
@@ -486,6 +474,7 @@ export default function Monitoring() {
       type: eventType || undefined,
       limit: 50,
       signal: controller.signal,
+      priority: eventAttempt ? 'user' : 'latest',
     }).then(result => {
       if (!active || controller.signal.aborted) return;
       setEvents(mergeEventPages([], result.events || []));
@@ -503,7 +492,7 @@ export default function Monitoring() {
     };
   }, [catalogState, eventDeviceId, eventType, eventAttempt]);
 
-  const refreshArea = useCallback(async ({ signal, active = () => true } = {}) => {
+  const refreshArea = useCallback(async ({ signal, active = () => true, priority = 'area' } = {}) => {
     const range = getLocalDayRange();
     const sensors = liveDevices.flatMap(device => deviceSensors(device)
       .filter(_sensor => device.areaRef?.trim())
@@ -512,7 +501,7 @@ export default function Monitoring() {
       setAreaRows([]);
       setAreaState('ready');
       setAreaError('');
-      setAreaCounters({ started: 0, total: 0, used: areaBudget.used(), remaining: areaBudget.remaining() });
+      setAreaCounters({ started: 0, total: 0 });
       return;
     }
     if (areaRunner.isRunning()) {
@@ -531,6 +520,7 @@ export default function Monitoring() {
       to: range.to,
       bucket: '5m',
       signal,
+      priority,
     }));
     try {
       const batch = await areaRunner.run(tasks);
@@ -567,20 +557,20 @@ export default function Monitoring() {
       setAreaError(errors.length
         ? `${errors.length} dari ${sensors.length} permintaan riwayat gagal. ${errors[0].reason?.message || ''}`.trim()
         : '');
-      setAreaCounters({ started: batch.counters.started, total: batch.counters.total, used: areaBudget.used(), remaining: areaBudget.remaining() });
+      setAreaCounters({ started: batch.counters.started, total: batch.counters.total });
     } catch (error) {
       if (signal?.aborted || !active()) return;
       setAreaState('error');
       setAreaError(error.message || 'Riwayat area tidak dapat dimuat.');
-      setAreaCounters({ started: 0, total: tasks.length, used: areaBudget.used(), remaining: areaBudget.remaining() });
+      setAreaCounters({ started: 0, total: tasks.length });
     }
-  }, [areaBudget, areaRunner, liveDevices]);
+  }, [areaRunner, liveDevices]);
 
   useEffect(() => {
     if (catalogState !== 'ready' || activeTab !== 'area') return undefined;
     let active = true;
     let interval = null;
-    const refresh = () => {
+    const refresh = (priority = 'area') => {
       if (!active || document.visibilityState !== 'visible') return;
       if (areaRunner.isRunning()) {
         setAreaState('waiting');
@@ -589,11 +579,11 @@ export default function Monitoring() {
       }
       const controller = new AbortController();
       areaController.current = controller;
-      void refreshArea({ signal: controller.signal, active: () => active }).finally(() => {
+      void refreshArea({ signal: controller.signal, active: () => active, priority }).finally(() => {
         if (areaController.current === controller) areaController.current = null;
       });
     };
-    areaRefreshActionRef.current = refresh;
+    areaRefreshActionRef.current = () => refresh('user');
     const stopWhenHidden = () => {
       if (document.visibilityState === 'visible') {
         refresh();
@@ -618,7 +608,7 @@ export default function Monitoring() {
   }, [activeTab, areaRunner, catalogState, refreshArea]);
 
   const retryCatalog = () => {
-    setCatalogAttempt(value => value + 1);
+    void iotMonitoringStore.reloadCatalog(currentUser?.id);
   };
 
   function resetEventQuery() {
@@ -636,11 +626,13 @@ export default function Monitoring() {
 
   function changeEventDevice(value) {
     resetEventQuery();
+    setEventAttempt(attempt => attempt + 1);
     setEventDeviceId(value);
   }
 
   function changeEventType(value) {
     resetEventQuery();
+    setEventAttempt(attempt => attempt + 1);
     setEventType(value);
   }
 
@@ -650,25 +642,6 @@ export default function Monitoring() {
     setComparisonState('loading');
     setComparisonAttempt(value => value + 1);
   }
-
-  function retrySensor() {
-    setSensorError('');
-    setSensorState('loading');
-    setSensorAttempt(value => value + 1);
-  }
-
-  function retryPackage() {
-    if (packageRunner.current.isRunning()) return;
-    setPackageError('');
-    setPackageState('loading');
-    setPackageAttempt(value => value + 1);
-  }
-
-  const currentSensorItems = sensorItems.map(item => {
-    const latest = latestReadingFor(latestByDevice, item.deviceId, selectedSensor);
-    return latest ? { ...item, value: latest.value, state: latest.state, threshold: latest.threshold, measuredAt: latestByDevice[item.deviceId]?.measuredAt } : item;
-  }).sort((left, right) => Number(right.state === 'low' || right.state === 'high') - Number(left.state === 'low' || left.state === 'high')
-    || String(left.device?.code || '').localeCompare(String(right.device?.code || ''), 'id'));
 
   function toggleComparison(deviceId) {
     const next = selectedCompareIds.includes(deviceId)
@@ -680,66 +653,30 @@ export default function Monitoring() {
   }
 
   function renderPackageTab() {
-    if (!packageSensors.length) return <Empty
+    if (!packageDevices.some(device => deviceSensors(device).length)) return <Empty
       title={packageDevices.length ? 'Sensor paket belum tersedia' : 'Belum ada perangkat paket live'}
       hint={packageDevices.length ? 'Sensor paket akan muncul setelah tersedia pada daftar API.' : 'Perangkat paket yang terpasang akan muncul di sini.'}
       icon="deployed_code"
     />;
-    if (packageState === 'loading' || packageState === 'idle') return <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat riwayat sensor paket...</p>;
-    if (packageState === 'error') return <ErrorPanel message={packageError} onRetry={retryPackage} />;
-    return <div className="space-y-4">
-      {packageError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{packageError}</p>}
-      {packageDevices.map(device => {
-        const latest = latestByDevice[device.id];
-        return <Card key={device.id} pad="sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="break-words text-base font-bold text-on-surface">{device.name}</h3>
-              {(device.isSandbox || device.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
-              <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{device.code} · {device.type?.name || device.type?.code}</p>
-              {device.areaRef && <p className="mt-1 text-xs text-on-surface-variant">Area: {device.areaRef}</p>}
-            </div>
-            <div className="flex flex-wrap gap-2"><DeviceStatus status={device.status} /><Link to={`/iot/${encodeURIComponent(device.id)}`} className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">Buka perangkat</Link></div>
-          </div>
-          <div className="mt-4 divide-y divide-outline-variant/30">
-            {deviceSensors(device).map(sensor => {
-              const reading = latestReadingFor(latestByDevice, device.id, sensor.code);
-              const history = packageHistories[`${device.id}:${sensor.code}`];
-              return <div key={sensor.code} className="grid min-w-0 gap-3 py-3 md:grid-cols-[minmax(10rem,0.8fr)_minmax(0,1.4fr)] md:items-start">
-                <div className="min-w-0">
-                  <p className="font-semibold text-on-surface">{sensorLabel(sensor)}</p>
-                  <p className="mt-1 break-words text-xs text-on-surface-variant">{reading?.value == null ? 'Belum ada data' : `${formatSensorNumber(reading.value, sensor.decimals ?? 2)}${sensor.unit ? ` ${sensor.unit}` : ''}`}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    {reading && <SensorStateBadge state={reading.state} />}
-                    <span className="break-words text-xs text-on-surface-variant">{reading?.threshold
-                      ? formatThreshold(reading.threshold, sensor.unit || '', sensor.decimals ?? 2)
-                      : 'Ambang efektif belum dimuat'}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-on-surface-variant">{formatMeasuredAt(latest?.measuredAt)}</p>
-                </div>
-                <Sparkline sensor={sensor} history={history} />
-              </div>;
-            })}
-          </div>
-        </Card>;
-      })}
-    </div>;
+    return <div className="space-y-4">{packageDevices.map(device => <PackageDeviceCard
+      key={`${currentUser?.id}:${device.id}`}
+      device={device}
+      latest={latestByDevice[device.id]}
+    />)}</div>;
   }
 
   function renderSensorTab() {
     if (!sensorOptions.length) return <Empty title="Jenis sensor belum tersedia" hint="Jenis sensor akan muncul setelah tersedia di daftar API." icon="sensors" />;
     return <div className="space-y-4">
       <Card pad="sm"><Field label="Jenis sensor"><Select value={selectedSensor} onChange={value => {
-        setSelectedSensor(value);
-        setSensorState('loading');
-        setSensorError('');
+        setSelectedSensorChoice(value);
         setSelectedCompareIds([]);
         setComparisonState('idle');
         setComparisonError('');
         setComparisonHistories({});
       }} options={sensorOptions} /></Field></Card>
       {sensorState === 'loading' || sensorState === 'idle' ? <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat ringkasan sensor...</p>
-        : sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retrySensor} />
+         : sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retryLatest} />
           : <>
             {sensorError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{sensorError}</p>}
             {currentSensorItems.length === 0 ? <Empty title="Belum ada perangkat dengan sensor ini" hint="Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang." icon="sensors" /> : (
@@ -808,7 +745,7 @@ export default function Monitoring() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h3 className="font-semibold text-on-surface">Ringkasan pembacaan area</h3><p className="mt-1 text-sm text-on-surface-variant">{AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel.</p></div>
         </div>
-        <p className="mt-3 text-xs tabular-nums text-on-surface-variant">Request batch: {areaCounters.started}/{areaCounters.total} · Anggaran Per area 60 detik: {areaCounters.remaining}/{AREA_HISTORY_BUDGET_LIMIT}</p>
+        <p className="mt-3 text-xs tabular-nums text-on-surface-variant">Request area: {areaCounters.started}/{areaCounters.total}</p>
       </Card>
       {areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}
       {areaRows.length === 0 ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="query_stats" />

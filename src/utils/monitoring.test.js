@@ -3,7 +3,6 @@ import { test } from 'node:test';
 import {
   AREA_HISTORY_REFRESH_MS,
   createBoundedBatchRunner,
-  createSlidingWindowBudget,
   countAttentionDevices,
   attentionBadgeLabel,
   getLocalDayRange,
@@ -82,9 +81,7 @@ test('badge koneksi sandbox mengikuti label, ikon, dan tone UX 6.1', () => {
 });
 
 test('scheduler membatasi konkurensi, menolak batch berlebih, dan tidak overlap', async () => {
-  let now = 0;
-  const budget = createSlidingWindowBudget({ limit: 120, windowMs: 60_000, now: () => now });
-  const runner = createBoundedBatchRunner({ budget, concurrency: 2, maxRequests: 60 });
+  const runner = createBoundedBatchRunner({ concurrency: 2, maxRequests: 60 });
   let active = 0;
   let maxActive = 0;
   let release;
@@ -105,18 +102,13 @@ test('scheduler membatasi konkurensi, menolak batch berlebih, dan tidak overlap'
   assert.equal(result.counters.started, 2);
   assert.equal(maxActive, 2);
   assert.equal(runner.isRunning(), false);
-  assert.equal(budget.remaining(), 118);
   await assert.rejects(runner.run(Array.from({ length: 61 }, async () => null)), /maksimal 60/);
-
-  now = 60_001;
-  assert.equal(budget.remaining(), 120);
 });
 
-test('batch area untuk 20 device standar memakai 58 route dan anggaran khusus 60/menit', async () => {
+test('batch area untuk 20 device standar hanya membatasi konkurensi', async () => {
   let active = 0;
   let maxActive = 0;
-  const budget = createSlidingWindowBudget({ limit: 60, windowMs: 60_000 });
-  const runner = createBoundedBatchRunner({ budget, concurrency: 4, maxRequests: 60 });
+  const runner = createBoundedBatchRunner({ concurrency: 4, maxRequests: Number.MAX_SAFE_INTEGER });
   const tasks = Array.from({ length: 58 }, () => async () => {
     active += 1;
     maxActive = Math.max(maxActive, active);
@@ -129,17 +121,12 @@ test('batch area untuk 20 device standar memakai 58 route dan anggaran khusus 60
   assert.equal(result.counters.total, 58);
   assert.equal(result.counters.maxActive, 4);
   assert.equal(maxActive, 4);
-  assert.equal(budget.used(), 58);
-  assert.equal(budget.remaining(), 2);
-  await assert.rejects(runner.run(Array.from({ length: 58 }, () => async () => undefined)), /Anggaran sesi tidak cukup/);
-  assert.equal(budget.used(), 58);
 });
 
-test('Monitoring area memakai cadence lima menit dan batas sub-anggaran 60 request', async () => {
+test('Monitoring area memakai cadence lima menit dan membiarkan governor global membatasi request', async () => {
   const monitoring = await import('./monitoring.js');
 
   assert.equal(monitoring.AREA_HISTORY_REFRESH_MS, 300_000);
-  assert.equal(monitoring.AREA_HISTORY_BUDGET_LIMIT, 60);
   assert.equal(AREA_HISTORY_REFRESH_MS, 300_000);
 });
 

@@ -17,6 +17,7 @@ import {
 } from '../data/seed';
 import { pilotApi } from '../services/pilotApi.js';
 import { IOT_SOURCE, iotApi } from '../services/iotApi.js';
+import { iotMonitoringStore } from '../services/iotMonitoringStore.js';
 import { mapSessionUser } from '../services/sessionUser.js';
 import { activationCodeMemory, beginActivationCodeLogout } from '../utils/activationCodeMemory.js';
 
@@ -538,12 +539,14 @@ export function SmartProvider({ children }) {
             setSessionError('');
             setSessionStatus('unauthenticated');
             setState(prev => ({ ...prev, sessionUserId: null }));
+            iotMonitoringStore.clearSession();
             return { ok: true };
           } catch (error) {
             return { ok: false, pesan: error.message };
           }
         }
         setState((prev) => ({ ...prev, sessionUserId: null }));
+        iotMonitoringStore.clearSession();
         return { ok: true };
       },
       // ── Pendaftaran akun sendiri (halaman /daftar) ──────────────────────────
