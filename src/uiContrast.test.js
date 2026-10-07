@@ -9,7 +9,8 @@ const adminIot = readFileSync(new URL('./pages/admin/AdminIotPage.jsx', import.m
 
 function rule(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const matches = [...css.matchAll(new RegExp(`(?:^|})\\s*${escaped}\\s*\\{([^}]*)\\}`, 'gs'))];
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const matches = [...source.matchAll(new RegExp(`(?:^|[{}])\\s*${escaped}\\s*\\{([^}]*)\\}`, 'gs'))];
   assert.ok(matches.length, `Missing CSS rule for ${selector}`);
   return matches.at(-1)[1];
 }
@@ -80,6 +81,29 @@ test('ghost buttons have visible boundaries in both themes', () => {
   assertBoundary('.dark .button-ghost:hover', '#1D221F', 'border-color');
 });
 
+test('IoT control boundaries meet 3:1 after compositing over the page gradient', () => {
+  const cases = [
+    { selector: '.iot-touch-targets .button-ghost', fill: '.panel-inset', border: 'border-color', page: '#C4D3DB' },
+    { selector: '.dark .iot-touch-targets .button-ghost', fill: '.dark .panel-inset', border: 'border-color', page: '#0D1210' },
+    { selector: '.iot-touch-targets .glass-input', fill: '.glass-input', fillProperty: 'background', border: 'border-color', page: '#C4D3DB' },
+    { selector: '.dark .iot-touch-targets .glass-input', fill: '.dark .glass-input', fillProperty: 'background', border: 'border-color', page: '#0D1210' },
+  ];
+
+  for (const { selector, fill: fillSelector, fillProperty = 'background-color', border: borderProperty, page: pageColor } of cases) {
+    const page = parseColor(pageColor);
+    const fill = parseColor(declaration(fillSelector, fillProperty));
+    const borderDeclaration = declaration(selector, borderProperty);
+    const borderColor = borderDeclaration.match(/rgba?\([^)]+\)/)?.[0];
+    assert.ok(borderColor, `Missing border color in ${selector}`);
+    const border = parseColor(borderColor);
+    const fillOnPage = composite(fill.slice(0, 3), page, fill[3]);
+    const borderOnFill = composite(border.slice(0, 3), fillOnPage, border[3]);
+
+    assert.ok(contrast(borderOnFill, fillOnPage) >= 3, `${selector} border must reach 3:1 against its composited fill`);
+    assert.ok(contrast(borderOnFill, page) >= 3, `${selector} border must reach 3:1 against the page surface`);
+  }
+});
+
 test('shared primary, ghost, and danger variants opt into the measured theme rules', () => {
   for (const variant of ['primary', 'ghost', 'danger']) {
     const pattern = new RegExp(`${variant}:\\s*'[^']*\\bbutton-${variant}\\b`);
@@ -90,4 +114,22 @@ test('shared primary, ghost, and danger variants opt into the measured theme rul
 test('IoT primary actions and selected controls use the accessible dark fill', () => {
   assert.ok(listIot.includes('button-primary'), 'List IoT actions and selected controls need the dark primary rule');
   assert.ok(adminIot.includes('button-primary'), 'Kelola IoT selected tabs need the dark primary rule');
+});
+
+test('primary control fill is owned by the theme-aware component rule', () => {
+  const primaryVariant = ui.match(/primary:\s*'([^']+)'/)?.[1];
+  assert.ok(primaryVariant?.includes('button-primary'), 'Primary buttons need the component fill class');
+  assert.doesNotMatch(primaryVariant, /(?:hover:)?bg-primary(?:-container)?\b/, 'Primary buttons must not layer generic fill utilities over the component fill');
+
+  for (const [name, source] of [['List IoT', listIot], ['Kelola IoT', adminIot]]) {
+    const primaryClasses = [...source.matchAll(/'([^']*button-primary[^']*)'|"([^"]*button-primary[^"]*)"|`([^`]*button-primary[^`]*)`/g)]
+      .map(([, singleQuoted, doubleQuoted, templateLiteral]) => singleQuoted || doubleQuoted || templateLiteral);
+    assert.ok(primaryClasses.length, `${name} must retain its primary controls`);
+    assert.ok(primaryClasses.every(className => !/(?:^|\s)(?:hover:)?bg-primary(?:-container)?(?=\s|$)/.test(className)), `${name} primary controls must not layer generic fill utilities over the component fill`);
+  }
+
+  assert.equal(declaration('.button-primary', 'background-color'), '#0f5238');
+  assert.equal(declaration('.button-primary:hover', 'background-color'), '#2d6a4f');
+  assert.equal(declaration('.dark .button-primary', 'background-color'), '#3b7559');
+  assert.equal(declaration('.dark .button-primary:hover', 'background-color'), '#41795b');
 });

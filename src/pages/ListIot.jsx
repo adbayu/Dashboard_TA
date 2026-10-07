@@ -222,7 +222,7 @@ export default function ListIot() {
           <StreamStatus status={streamStatus} />
           <Link
             to="/detail-informasi"
-            className="inline-flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-xl bg-primary button-primary px-3.5 text-sm font-semibold text-white hover:bg-primary-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
+            className="inline-flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-xl button-primary px-3.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
           >
             <span className="material-symbols-outlined text-[18px]" aria-hidden="true">qr_code_scanner</span>
             Scan QR alat
@@ -511,7 +511,7 @@ export function DeviceDetail() {
                   type="button"
                   aria-pressed={selected?.code === sensor.code}
                   onClick={() => setSelectedSensor(sensor.code)}
-                  className={`min-h-11 rounded-xl border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${selected?.code === sensor.code ? 'border-primary bg-primary button-primary text-white' : 'border-outline-variant/50 text-on-surface hover:bg-primary/5'}`}
+                  className={`min-h-11 rounded-xl border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${selected?.code === sensor.code ? 'border-primary button-primary text-white' : 'border-outline-variant/50 text-on-surface hover:bg-primary/5'}`}
                 >
                   {sensor.name || sensor.label || sensor.code}
                 </button>

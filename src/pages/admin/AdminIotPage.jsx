@@ -455,7 +455,7 @@ export default function AdminIotPage() {
               type="button"
               aria-pressed={tab === key}
               onClick={() => setTab(key)}
-              className={`min-h-10 shrink-0 rounded-xl px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${tab === key ? 'bg-primary button-primary text-white' : 'text-on-surface hover:bg-primary/10'}`}
+              className={`min-h-10 shrink-0 rounded-xl px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${tab === key ? 'button-primary text-white' : 'text-on-surface hover:bg-primary/10'}`}
             >
               {label} <span className="ml-1 text-xs opacity-80">{count}</span>
             </button>

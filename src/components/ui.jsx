@@ -148,7 +148,7 @@ export function StatCard({ label, value, unit, icon, hint, tone = 'brand' }) {
 }
 
 const VARIAN_TOMBOL = {
-  primary: 'bg-primary button-primary text-white hover:bg-primary-container shadow-emerald-glow',
+  primary: 'button-primary text-white shadow-emerald-glow',
   ghost: 'panel-inset button-ghost text-on-surface hover:border-primary/40',
   danger: 'bg-red-600 button-danger text-white hover:bg-red-700',
   soft: 'bg-primary/10 text-primary hover:bg-primary/20 dark:text-emerald-glow',

@@ -196,10 +196,34 @@
   .button-ghost:hover {
     border-color: rgba(15, 82, 56, 0.60);
   }
+  .button-primary {
+    background-color: #0f5238;
+  }
+  .button-primary:hover {
+    background-color: #2d6a4f;
+  }
   .dark .button-ghost {
     border-color: rgba(255, 255, 255, 0.40);
   }
   .dark .button-ghost:hover {
+    border-color: rgba(255, 255, 255, 0.40);
+  }
+  .iot-touch-targets .button-ghost {
+    border-color: rgba(15, 82, 56, 0.80);
+  }
+  .iot-touch-targets .button-ghost:hover {
+    border-color: rgba(15, 82, 56, 0.80);
+  }
+  .dark .iot-touch-targets .button-ghost {
+    border-color: rgba(255, 255, 255, 0.40);
+  }
+  .dark .iot-touch-targets .button-ghost:hover {
+    border-color: rgba(255, 255, 255, 0.40);
+  }
+  .iot-touch-targets .glass-input {
+    border-color: rgba(15, 82, 56, 0.75);
+  }
+  .dark .iot-touch-targets .glass-input {
     border-color: rgba(255, 255, 255, 0.40);
   }
   .dark .button-primary {
