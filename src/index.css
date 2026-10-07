@@ -178,17 +178,38 @@
      terpisah tanpa mengubah nuansa kaca. */
   .panel-inset {
     background-color: rgba(15, 82, 56, 0.05);
-    border: 1px solid rgba(15, 82, 56, 0.22);
+    border: 1px solid rgba(15, 82, 56, 0.60);
   }
   .dark .panel-inset {
     background-color: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.40);
   }
   .panel-inset:hover {
     background-color: rgba(15, 82, 56, 0.10);
   }
   .dark .panel-inset:hover {
     background-color: rgba(255, 255, 255, 0.11);
+  }
+  .button-ghost {
+    border-color: rgba(15, 82, 56, 0.60);
+  }
+  .button-ghost:hover {
+    border-color: rgba(15, 82, 56, 0.60);
+  }
+  .dark .button-ghost {
+    border-color: rgba(255, 255, 255, 0.40);
+  }
+  .dark .button-ghost:hover {
+    border-color: rgba(255, 255, 255, 0.40);
+  }
+  .dark .button-primary {
+    background-color: #3b7559;
+  }
+  .dark .button-primary:hover {
+    background-color: #41795b;
+  }
+  .dark .button-danger:hover {
+    background-color: #d32f2f;
   }
 }
 
@@ -254,13 +275,13 @@
 
 .glass-input {
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(15, 82, 56, 0.20);
+  border: 1px solid rgba(15, 82, 56, 0.60);
   backdrop-filter: blur(10px);
 }
 
 .dark .glass-input {
   background: rgba(40, 48, 44, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.40);
   color: #ffffff;
 }
 
