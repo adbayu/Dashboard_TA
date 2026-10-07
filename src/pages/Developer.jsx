@@ -200,7 +200,7 @@ export default function Developer() {
   }
 
   return (
-    <div className="min-w-0 space-y-5">
+    <div className="iot-touch-targets min-w-0 space-y-5">
       {notice && <p role="status" className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm text-on-surface">{notice}</p>}
 
       <Card className="min-w-0" pad="sm">

@@ -773,7 +773,7 @@ function MonitoringView({ currentUser }) {
   if (catalogState === 'error') return <ErrorPanel message={catalogError} onRetry={retryCatalog} />;
 
   return (
-    <div className="min-w-0 space-y-4">
+    <div className="iot-touch-targets min-w-0 space-y-4">
       {latestState === 'loading' && <p role="status" className="text-sm text-on-surface-variant">Memuat nilai terbaru...</p>}
       {latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />}
       <Card pad="sm">

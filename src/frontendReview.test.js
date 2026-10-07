@@ -464,6 +464,26 @@ test('Monitoring error panel exposes and invokes its retry action', async t => {
   assert.equal(attempts, 1);
 });
 
+test('IoT control surfaces scope 44px hit areas without changing shared defaults', async () => {
+  const [css, ui, developer, monitoring, adminIot] = await Promise.all([
+    readFile(new URL('./index.css', import.meta.url), 'utf8'),
+    readFile(new URL('./components/ui.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./pages/Developer.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./pages/admin/AdminIotPage.jsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(css, /\.iot-touch-targets\s+:where\([^}]+\)\s*\{[^}]*min-height:\s*44px;/s);
+  assert.match(css, /\.iot-touch-targets\s+:where\(button,\s*a\[href\]\)\s*\{[^}]*min-width:\s*44px;/s);
+  assert.match(css, /\.iot-touch-targets\s+label:has\(>\s*input:is\(\[type=['"]checkbox['"]\],\s*\[type=['"]radio['"]\]\)\)\s*\{[^}]*min-height:\s*44px;/s);
+
+  for (const [name, source] of [['Developer', developer], ['Monitoring', monitoring], ['Kelola IoT', adminIot]]) {
+    assert.match(source, /iot-touch-targets/, `${name} should opt into scoped touch sizing`);
+  }
+  assert.match(ui, /sm:\s*\{\s*kontrol:\s*'h-8/);
+  assert.match(ui, /md:\s*\{\s*kontrol:\s*'h-10/);
+});
+
 test('DeviceClaim clears valid manual input and relies on activation memory for claim state', async () => {
   const source = await readFile(new URL('./pages/DeviceClaim.jsx', import.meta.url), 'utf8');
   const submit = source.match(/function submitActivationCode\(event\) \{([\s\S]*?)\n  \}/)?.[1] || '';

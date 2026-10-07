@@ -416,12 +416,12 @@ export default function AdminIotPage() {
   );
 
   if (loading) {
-    return <Card><p role="status" className="text-sm text-on-surface-variant">Memuat data Kelola IoT...</p></Card>;
+    return <Card className="iot-touch-targets"><p role="status" className="text-sm text-on-surface-variant">Memuat data Kelola IoT...</p></Card>;
   }
 
   if (loadError) {
     return (
-      <Card className="min-w-0">
+      <Card className="iot-touch-targets min-w-0">
         <div role="alert" className="space-y-3">
           <p className="text-sm text-on-surface">{loadError}</p>
           <Button icon="refresh" onClick={() => load()}>Coba lagi</Button>
@@ -439,7 +439,7 @@ export default function AdminIotPage() {
   const hasUnsavedProvision = provision && !provisionSaved && !((!provision.credential || copied.credential) && copied.activation);
 
   return (
-    <div className="min-w-0 space-y-5">
+    <div className="iot-touch-targets min-w-0 space-y-5">
       {data?.label === 'Data contoh' && (
         <p className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">Data contoh</p>
       )}

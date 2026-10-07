@@ -213,6 +213,24 @@
   }
 }
 
+.iot-touch-targets :where(button, a[href]) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.iot-touch-targets a[href] {
+  display: inline-flex;
+  align-items: center;
+}
+
+.iot-touch-targets :where(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  min-height: 44px;
+}
+
+.iot-touch-targets label:has(> input:is([type='checkbox'], [type='radio'])) {
+  min-height: 44px;
+}
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   display: inline-block;
