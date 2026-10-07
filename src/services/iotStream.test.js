@@ -224,11 +224,12 @@ test('established stream reconnects sequentially with Last-Event-ID and dispatch
   streams[1].close();
 });
 
-test('reconnect replays an event persisted during the gap exactly once and ignores duplicate IDs', async () => {
+test('successful reconnect refreshes latest once and replays each device event once', async () => {
   const timers = createTimers();
   const streams = [openResponse(), openResponse()];
   const requests = [];
   const events = [];
+  const refreshes = [0, 0];
   const statuses = [];
   const replay = 'id: 89\nevent: device_event\ndata: {"deviceId":"device-1","type":"threshold_low"}\n\n';
   const client = createIotStreamClient({
@@ -247,22 +248,31 @@ test('reconnect replays an event persisted during the gap exactly once and ignor
     clearTimeoutImpl: timers.clearTimeout,
     nowImpl: timers.now,
   });
-  const stop = client.subscribe({ onStatus: status => statuses.push(status), onDeviceEvent: (event, id) => events.push({ event, id }) });
+  const stop = client.subscribe({
+    onStatus: status => statuses.push(status),
+    onDeviceEvent: (event, id) => events.push({ event, id }),
+    onRefresh: () => { refreshes[0] += 1; },
+  });
+  const stopSecond = client.subscribe({ onRefresh: () => { refreshes[1] += 1; } });
 
   await waitFor(() => requests.length === 1);
+  assert.deepEqual(refreshes, [0, 0]);
   streams[0].send('id: 88\nevent: device_event\ndata: {"deviceId":"device-1","type":"offline"}\n\n');
   await waitFor(() => events.length === 1);
   streams[0].close();
   await waitFor(() => requests.length === 2 && statuses.includes('polling'));
+  assert.deepEqual(refreshes, [0, 0]);
   timers.advance(1_000);
   await waitFor(() => requests.length === 3 && events.length >= 2);
 
   assert.equal(requests[2].options.headers['Last-Event-ID'], '88');
+  assert.deepEqual(refreshes, [1, 1]);
   assert.deepEqual(events, [
     { event: { deviceId: 'device-1', type: 'offline' }, id: '88' },
     { event: { deviceId: 'device-1', type: 'threshold_low' }, id: '89' },
   ]);
   stop();
+  stopSecond();
   streams[1].close();
 });
 

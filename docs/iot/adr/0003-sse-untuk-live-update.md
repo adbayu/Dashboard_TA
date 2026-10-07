@@ -12,9 +12,9 @@ Pakai Server-Sent Events di `GET /api/v1/stream`. Hub koneksi disimpan di memori
 
 ## Konsekuensi
 
-- Browser menyambung ulang otomatis dan bisa mengirim `Last-Event-ID`.
-- Cookie sesi ikut terkirim dengan `withCredentials`, jadi tidak perlu protokol autentikasi tambahan.
-- `EventSource` di browser tidak bisa mengirim header `Authorization`, jadi klien API key perlu library SSE lain atau polling.
+- Klien browser memakai `fetch` dan `ReadableStream`, lalu mengelola parser SSE, reconnect berurutan, backoff, dan pembatalan dengan `AbortController`. `credentials: 'same-origin'` mengirim cookie sesi same-origin.
+- Reconnect memakai `Last-Event-ID`. Server hanya mereplay frame `device_event`; frame `reading` tidak memiliki ID dan tidak direplay. Setelah koneksi yang sudah terbentuk tersambung kembali dengan HTTP 200, subscriber me-refresh nilai latest tepat satu kali.
+- Berbeda dari `EventSource`, fetch client dapat memeriksa status HTTP dan `Retry-After` serta menentukan header request. Sebagai tradeoff, reconnect dan pembatalan lifecycle harus dikelola klien.
 - Hanya cocok untuk satu instance API. Kalau lebih, butuh `LISTEN/NOTIFY` PostgreSQL atau Redis pub/sub.
 
 ## Alternatif yang ditolak

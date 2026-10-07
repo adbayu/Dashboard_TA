@@ -226,11 +226,13 @@ export function createIotStreamClient({
         return;
       }
 
+      const isReconnect = hasConnected;
       hasConnected = true;
       retryAttempt = 0;
       clearPolling();
       clearRetry();
       setStatus('live');
+      if (isReconnect) notify('onRefresh');
       try {
         await consume(response, controller);
       } catch {
