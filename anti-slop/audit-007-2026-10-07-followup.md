@@ -176,3 +176,7 @@ Status: PASS pada HEAD `75ea004`. Sepuluh PNG berhasil dibuat, dua tema untuk Mo
 ## Hasil skrip D, baseline responsif
 
 Run pada HEAD `48098d1` mencakup 8 pengukuran, empat lebar × dua tema. Page overflow 0 px dan chart figure/SVG overflow 0 px pada semua lebar. Wrapper tabel Per sensor memiliki overflow internal 134 px pada 841, 207 px pada 768, 79 px pada 640, dan 343 px pada 360, sama pada kedua tema. Ini mengonfirmasi temuan visual C: tabel 620 px lebih lebar daripada wrapper di seluruh ukuran yang diuji. Error browser 0, schema disposable dan proses uji dibersihkan; PostgreSQL 55432 yang sudah aktif tetap dipertahankan.
+
+## Skrip C, retest setelah koreksi Per sensor
+
+Run pada HEAD `b538cfb` menghasilkan kembali 10/10 screenshot, dua tema pada lima permukaan. State verifikasi lengkap, sandbox pH/event dan modal rotasi tanpa secret tampil. Pemeriksaan visual ulang pada Per sensor light/dark mengonfirmasi kolom `Waktu ukur` kini membungkus tanggal agar terbaca tanpa terpotong. Error browser 0 dan cleanup lulus.
