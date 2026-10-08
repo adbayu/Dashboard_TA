@@ -172,3 +172,7 @@ Status: FAIL pada HEAD `ba9b85f`; delapan dari sepuluh PNG tersimpan untuk Monit
 ## Hasil skrip C, final
 
 Status: PASS pada HEAD `75ea004`. Sepuluh PNG berhasil dibuat, dua tema untuk Monitoring Per paket, Per sensor pH, Per area, Developer Sandbox, dan dialog konfirmasi rotasi, semuanya pada viewport 1280×1200 dengan state terverifikasi. Semua sepuluh gambar diperiksa secara visual. Sandbox menampilkan pH numerik dan event threshold; dialog rotasi tampil di kedua tema tanpa nilai credential. Tidak ada error browser; cleanup Chrome, Vite, Fastify, pool, schema, profil, dan port 3001/5173 lulus. Visual finding untuk skrip D: kolom `Waktu ukur` Per sensor memperlihatkan tanggal terpotong di tepi kanan pada kedua tema; Per area memiliki scrollbar horizontal internal tetapi semua kolomnya terlihat. Screenshot/report berada di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-c-*`.
+
+## Hasil skrip D, baseline responsif
+
+Run pada HEAD `48098d1` mencakup 8 pengukuran, empat lebar × dua tema. Page overflow 0 px dan chart figure/SVG overflow 0 px pada semua lebar. Wrapper tabel Per sensor memiliki overflow internal 134 px pada 841, 207 px pada 768, 79 px pada 640, dan 343 px pada 360, sama pada kedua tema. Ini mengonfirmasi temuan visual C: tabel 620 px lebih lebar daripada wrapper di seluruh ukuran yang diuji. Error browser 0, schema disposable dan proses uji dibersihkan; PostgreSQL 55432 yang sudah aktif tetap dipertahankan.
