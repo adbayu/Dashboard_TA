@@ -43,22 +43,86 @@ Capture browser pertama membaca tombol pada awal transisi warna 200 ms, sehingga
 ## Bukti browser lain
 
 - Focused CDP run berstatus PASS: 105 target sentuh Kelola IoT memenuhi 44 x 44 px; rotasi credential, copy, modal focus, Escape, dan pengembalian fokus lulus; alur login lalu klaim QR menghasilkan HTTP 200 dan satu ownership row.
-- Error console/runtime: 0. Cleanup schema, pool, Chrome, Fastify, Vite, PostgreSQL disposable, dan port berstatus selesai.
-- Per area bukan temuan: run E2 sebelumnya mengukur 58 route, mengikuti governor global maksimum 50 request dalam rolling 60 detik, tanpa 429; agregat cocok dengan PostgreSQL. Durasi batch sekitar 60 detik tidak memerlukan perubahan produk.
-- File JSON scratch saat ini berisi focused rotation-tail run. Bukti full E2 sebelumnya berasal dari output sesi dan tidak tersedia lagi sebagai JSON tersimpan.
+- Error console/runtime: 0. Schema dan pool disposable dihapus; Chrome, Fastify, Vite, serta port aplikasi 3001/5173 ditutup. Listener PostgreSQL khusus yang sudah aktif pada port 55432 tetap berjalan untuk tes berikutnya.
+- Per area: run browser mengukur 58 route per batch, tanpa 429, dan agregat cocok dengan PostgreSQL.
+- Laporan JSON terbaru ada di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-e2-real-browser-report.json`; durasi run 568.777 ms dan status FAIL karena harness menuntut admin membuka detail Sandbox milik user. Detail Sandbox owner serta jalur UI-07/UI-10 yang diminta lulus. Laporan focused sebelumnya disimpan sebagai `audit-007-e2-real-browser-report-before-latest.json`.
 
-## Belum diuji
+## Verifikasi ulang M3 pada HEAD 73cb1ef
 
-- Matriks lengkap loading, kosong, error, dan berisi untuk setiap tab Monitoring, Log kejadian, panel Sandbox, modal rotasi, dan alur klaim: **belum diuji**. Interaksi dan jalur berhasil tertentu sudah diuji, tetapi itu bukan pengganti matriks penuh per permukaan.
-- Pengujian bench perangkat fisik Minggu 3, termasuk HW-02 sampai HW-08: **belum diuji** pada follow-up ini.
-- Keputusan owner apakah bukti software cukup untuk penerimaan sementara atau gate Minggu 3 harus menunggu verifikasi perangkat fisik: **menunggu keputusan**.
+Pengujian memakai Chrome 154.0.8037.98, Fastify, dan PostgreSQL 18 pada schema disposable. Schema, pool, Fastify, Vite, dan Chrome ditutup setelah run; cluster port 55432 yang sudah berjalan sebelum harness dibiarkan hidup untuk verifikasi berikutnya.
 
-## Keputusan produk dan status gate
+| ID/cakupan | Status | Bukti |
+| --- | --- | --- |
+| UI-07 | PASS | Klik kontrol skenario `ph_turun` sungguhan; PUT berhasil HTTP 200. UI dan PostgreSQL menunjukkan pH low serta satu event threshold. Waktu dari perubahan skenario sampai state/event teramati sekitar 3,106 detik. |
+| UI-10 | PASS | Pilih sensor pH di Monitoring Per sensor; overview HTTP 200 mengembalikan 21 entri, termasuk device satu-sensor dan paket. |
+| Tab Monitoring, filter kejadian/sensor, refresh Per area | PASS pada cakupan yang direkam | Chrome mengklik tiga tab Monitoring, memilih pH, menerapkan filter device/jenis kejadian, cursor, dan tombol `Muat ulang`. Request terkait berstatus 200. Per area memakai 58 request per batch dan cocok dengan agregat PostgreSQL. |
+| Skenario Sandbox | FAIL | `ph_turun` lulus; `normal`, `suhu_naik`, dan `offline` belum diuji melalui kontrol browser. |
+| Rotasi dan salin | PASS pada alur sukses | Modal konfirmasi/reveal, focus entry, batas Shift+Tab/Tab, Escape, kembali ke pemicu, klik `Salin`, clipboard, pembersihan secret, dan response rotasi diverifikasi. |
+| Target sentuh | PASS pada pengukuran yang direkam | Chrome mengukur 105 target Kelola IoT; minimum 44 x 44 px. Developer dan Monitoring juga terukur dengan tinggi minimum 44 px. |
+| R-03 responsive | FAIL, cakupan parsial | Tidak ada overflow pada pemeriksaan Monitoring 360 px dan desktop 1280 px, tema terang/gelap. Matriks spesifik 841, 768, 640, 360 untuk bounding box halaman, chart, tabel Per sensor belum lengkap; field ukuran khusus pada report kosong. |
+| R-25/R-34 visual | FAIL, cakupan parsial | Computed style dibaca pada halaman ter-render untuk Developer, Monitoring, dan Kelola IoT pada terang/gelap. Screenshot dan pengamatan visual belum dilakukan, jadi persyaratan visual belum terpenuhi. |
+| R-32 keyboard | FAIL, cakupan parsial | Developer merekam lima fokus awal; modal rotasi lolos focus trap/Shift+Tab/Tab/Escape/return. Urutan Tab penuh halaman Monitoring belum direkam. |
+### R-27 matriks state
 
-Keputusan produk **menunggu keputusan owner**. Opsi:
+| Permukaan | Loading | Kosong | Error | Berisi |
+| --- | --- | --- | --- | --- |
+| Monitoring Per paket | belum diuji | belum diuji | belum diuji | PASS, kartu paket render pada akun dengan device |
+| Monitoring Per sensor | belum diuji | belum diuji | belum diuji | PASS, pH tampil untuk perangkat satu-sensor dan paket |
+| Monitoring Per area | belum diuji | belum diuji | belum diuji | PASS, batch API dan agregat PostgreSQL cocok |
+| Log kejadian | belum diuji | belum diuji | belum diuji | PASS, hasil filter dan pagination tampil |
+| Panel Sandbox | belum diuji | belum diuji | belum diuji | PASS, sandbox nyata dan telemetry/event pH rendah terlihat |
+| Modal rotasi credential | belum diuji | belum diuji | belum diuji | PASS, konfirmasi, rotasi, reveal, salin, dan cleanup |
+| Alur klaim `/d/:code` | belum diuji | belum diuji | belum diuji | PASS, preview claimable, login, reload, klaim manual HTTP 200 |
 
-1. **Rekomendasi:** pertahankan gate Minggu 3 belum lulus penuh sampai uji bench perangkat fisik dan matriks state UI selesai.
-2. Terima status software-only untuk temuan audit ini, tetapi catat gate Minggu 3 tetap belum lulus penuh dan semua pemeriksaan fisik/UI yang belum dilakukan tetap pending.
-3. Ajukan penjadwalan ulang pemeriksaan fisik melalui revisi rencana yang disetujui owner. Follow-up ini tidak mengubah kriteria Test Plan bagian 7.
+Akun tanpa live device belum digunakan untuk memaksa state kosong. Backend tidak dihentikan saat halaman aktif untuk memaksa state error. Loading sengaja tidak diperlambat pada response real. Karena itu matriks ini belum memenuhi penerimaan R-27.
 
-Status akhir: AS-007-01 sampai AS-007-03 **PASS** dalam cakupan follow-up. Gate Minggu 3 secara keseluruhan **belum dinyatakan PASS** karena pemeriksaan fisik dan matriks state lengkap masih belum diuji serta keputusan produk masih menunggu owner.
+### R-32, tema/kontras, klik, dan responsif
+
+| Pemeriksaan | Status | Bukti |
+| --- | --- | --- |
+| Tab order Developer | PASS terbatas | Chrome merekam lima fokus awal: Referensi API, dua tombol Buat key, skenario Sandbox, Salin curl. Urutan seluruh halaman belum dicatat. |
+| Tab order Monitoring | belum diuji | Harness menguji fokus tab/roving key, bukan urutan Tab penuh antar seluruh kontrol. |
+| Modal rotasi focus entry, Tab/Shift+Tab wrap, Escape, return | PASS | Modal memindahkan fokus ke dalam, kedua tepi trap teruji, Escape menutup, fokus kembali ke tombol pemicu. |
+| Tema terang/gelap pada DOM yang dirender | PASS parsial | Computed style dibaca pada halaman Developer, Monitoring, dan Kelola IoT di Chrome setelah tema settle. Screenshot dan pengamatan visual belum dilakukan, jadi R-34/R-25 belum lengkap. |
+| Klik tab Per paket, Per sensor, Per area | PASS | Tiga tab diklik sungguhan; panel ready tampil. |
+| Filter sensor pH dan filter device/jenis event | PASS | Pilihan pH serta filter event mengirim request HTTP 200 dan memperbarui daftar. |
+| Tombol Muat ulang Per area | PASS | Menghasilkan batch API berhasil, tanpa 429 pada run. |
+| Skenario `ph_turun` | PASS | PUT HTTP 200, pH low dan event threshold terlihat dalam 3.106 ms. |
+| Skenario `normal`, `suhu_naik`, `offline` | belum diuji | Belum diklik dalam Chrome. |
+| Rotasi credential dan Salin | PASS | POST rotasi, klik Salin, clipboard cocok, secret dibersihkan setelah dialog tutup; nilainya tidak dicatat. |
+| Lebar Monitoring 360 px dan 1280 px | PASS terbatas | Run menyatakan tanpa overflow horizontal untuk layout Monitoring pada terang/gelap. |
+| Lebar 841, 768, 640 px; batas halaman, chart, tabel Per sensor pada keempat lebar | belum diuji | `responsiveWidths` pada report kosong; belum ada pengukuran bounding-box chart/tabel. |
+
+Run penuh `audit-007-e2-real-browser-check.mjs` berstatus FAIL karena assertion harness juga mewajibkan admin membuka detail device Sandbox milik user; route mengarahkan admin ke halaman admin. Sandbox detail berhasil diperiksa pada sesi owner. Ini temuan ketidakcocokan assertion/role scope, bukan bukti bahwa admin boleh melewati ownership. HTTP/runtime console errors yang tidak diharapkan: 0. R-27 dan audit browser keseluruhan tetap belum diterima sampai matriks yang diminta selesai.
+
+## Preflight tunnel host-side
+
+Tiga hostname localtunnel ephemeral baru dicoba, dengan verifikasi DNS dan TLS standar terhadap ISRG Root X1 yang tertanam di firmware. URL tidak disimpan dalam laporan ini.
+
+| Percobaan | DNS | TLS embedded root | Catatan |
+| --- | --- | --- | --- |
+| 1 | PASS | PASS | Sertifikat tervalidasi dengan `rejectUnauthorized=true`. |
+| 2 | PASS | PASS | Sertifikat tervalidasi dengan `rejectUnauthorized=true`. |
+| 3 | PASS | PASS | Sertifikat tervalidasi dengan `rejectUnauthorized=true`. |
+
+Pemeriksaan ini hanya menguji DNS dan rantai TLS. Upstream sementara bukan Fastify, sehingga `/api/health` tidak diverifikasi melalui tunnel. Tidak ada credential provisioning atau flashing ESP32.
+
+## Verifikasi build filesystem
+
+`board_build.filesystem = littlefs` pada `firmware/platformio.ini`. `pio run -d firmware -e paket_water -t buildfs` dan `pio run -d firmware -e satuan_ph -t buildfs` sama-sama SUCCESS. Kedua image `littlefs.bin` berukuran 1.441.792 byte; partition table hasil build untuk `paket_water` memiliki partisi `spiffs` di offset `0x290000` berukuran `0x160000` (1.441.792 byte). Target PlatformIO `uploadfs` tersedia untuk kedua environment. Target `uploadfs` tidak dijalankan karena itu menulis ke ESP32 dan instruksi meminta berhenti sebelum flashing; karena itu keberhasilan transfer ke perangkat belum diverifikasi.
+
+## Catatan keputusan owner dan status gate
+
+Keputusan owner: **opsi 1**. Gate Minggu 3 tetap belum lulus penuh sampai bench fisik HW-02, HW-03, HW-04, HW-06, HW-07, HW-08 dan matriks state R-27 lengkap dinyatakan lulus. Tidak ada keputusan produk yang menunggu owner. Kriteria gate bagian 7 tidak diubah.
+
+Bench fisik HW-02/03/04/06/07/08 belum dilakukan dan hanya boleh ditutup dengan bukti alat asli. Meskipun UI-07/UI-10 dan sebagian pemeriksaan browser lulus, R-27, R-32, R-34/R-25 visual, dan R-03 responsive lengkap masih terbuka. Karena itu gate M3 keseluruhan **belum lulus penuh**.
+
+## Catatan commit
+
+Commit SSE yang terlewat pada daftar sebelumnya: `d08b9f5 fix(iot): segarkan nilai setelah SSE tersambung kembali`. Commit ini memakai fetch streaming, membawa kredensial sesi same-origin, membatalkan stream saat logout/unmount, dan memperbarui nilai sekali setelah reconnect berhasil. Commit ini dipertahankan terpisah dan tidak diubah.
+
+## Status audit
+
+AS-007-01 sampai AS-007-03 tetap PASS untuk perbaikan yang sudah diverifikasi. Verifikasi ulang tidak mengubah laporan awal. Audit browser M3 dan gate keseluruhan tidak dinyatakan PASS karena matriks R-27 serta beberapa pemeriksaan wajib masih belum lengkap.
+
+Harness tambahan untuk matriks belum dapat dibuat: OpenCode mengembalikan `Your authentication token has expired`. Tidak ada model pengganti yang digunakan dan tidak ada kode produk yang diubah. Perlu autentikasi ulang OpenCode sebelum melanjutkan pemeriksaan browser yang tersisa.
