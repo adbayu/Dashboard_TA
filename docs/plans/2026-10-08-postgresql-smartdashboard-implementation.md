@@ -16,7 +16,7 @@ Tech Stack: PostgreSQL 17, Fastify 5, `pg`, Node.js built-in test runner, React 
 - Current worktree has unrelated local changes in Docker, `server/app.ts`, `server/index.ts`, `server/pilot.test.ts`, V-Pet and documentation. Never stage them accidentally. Commit only exact plan/spec/code hunks for this work.
 - The active PostgreSQL schema is version 1. It contains 4 users (1 Pilot admin, 3 Pilot users), 4 devices, 4 ownerships, and 2,086 readings. Preserve all records and identifiers.
 - Existing schema is `server/schema.sql`; `server/db.ts` currently runs it as one transaction. `server/app.ts` uses the `pilot_session` cookie, scrypt password hashes, Origin checks, and Pilot-specific 10-account/20-device limits.
-- `origin/feat/iot-system` has numbered migrations 001/002, `sensor_types`, `device_types`, `device_type_sensors`, `area_thresholds`, `device_events`, API key/usage tables, and reading ingestion metadata. Migration 002 contains a pending TDS-range TODO and inserts three sample device rows. Port the schema contract, review ranges against the current app and hardware definitions, remove the unresolved TODO, and do not insert sample devices during schema upgrade.
+- `origin/feat/iot-system` has numbered migrations 001/002, `sensor_types`, `device_types`, `device_type_sensors`, `area_thresholds`, `device_events`, API key/usage tables, and reading ingestion metadata. Migration 002's warning defaults match the current SmartDashboard seed. Its TDS 0-5000 ppm envelope is explicitly provisional upstream, so preserve it as catalog metadata but do not present or enforce it as a verified hardware maximum until the sensor specification is confirmed. Omit its three sample device inserts during schema upgrade.
 - Existing dashboard identifiers are strings such as `AR-01`, `IOT-001`, `U-001`, `MON-1`, `H-1`, `HV-1`, and `PET-*`; Pilot IDs are UUIDs. Preserve dashboard IDs in `legacy_id` fields or a deterministic import map. `temp` in SmartDashboard maps to canonical IoT sensor code `water_temperature`.
 - Preserve Pilot role meanings (`admin/user`) and Pilot quota semantics. Add separate dashboard role/status and a Pilot-scope marker so Dashboard-only users/devices do not consume Pilot caps. Do not trust role, status, area assignment, points, or IDs sent by the browser.
 - Existing client simulation is not real telemetry. Persist it only with an explicit simulator/source marker; do not label it physical device data.
@@ -57,7 +57,7 @@ Objective: Replace the monolithic runner with ordered, transactional numbered mi
 Files:
 - Create `server/migrations/001_pilot.sql` from the verified current Pilot baseline in `server/schema.sql`.
 - Modify `server/db.ts` to discover `NNN_name.sql`, acquire advisory lock `90260909`, run each pending migration in its own transaction, and record each version after successful SQL.
-- Modify `server/index.ts` to report the applied migration range without claiming that only version 1 exists.
+- Modify `server/index.ts` to report versions newly applied in this invocation separately from the current schema version, including no-op reruns.
 - Remove `server/schema.sql` only after the new baseline and tests prove equivalent; otherwise leave it documented as a frozen legacy reference and ensure runtime no longer executes it.
 
 Steps:
@@ -77,7 +77,7 @@ Files:
 Steps:
 1. Add migration tests for the catalog tables, device/readings columns, legacy model-to-type mapping, and 4 existing Pilot devices/readings retained.
 2. Run `npm run test:pilot`; confirm the new contract tests fail before the migration exists.
-3. Port the schema changes and canonical sensor/device-type catalog. Remove unresolved TODO comments and sample `devices` INSERTs. Keep Pilot models and credentials nullable only as required for catalog-driven non-Pilot devices.
+3. Port the schema changes and canonical sensor/device-type catalog. Keep warning defaults aligned with the current app, retain the upstream TDS 0-5000 ppm value only as provisional catalog metadata, and do not enforce it as a hardware limit until the sensor specification is confirmed. Remove the TODO and sample `devices` INSERTs. Keep Pilot models and credentials nullable only as required for catalog-driven non-Pilot devices.
 4. Run `npm run test:pilot` and `npm run typecheck`; verify existing Pilot provision, ingest, history, quota and ownership tests still pass.
 
 ### Task 4: Add Dashboard domain migration 003
@@ -301,6 +301,116 @@ Steps:
 5. Exercise loopback browser flows for manager and user roles. Do not use real credentials on HTTP LAN. Confirm visible empty/loading/error behavior and cross-role read-back.
 6. Run `git diff --check`; inspect staged paths and ensure no unrelated pre-existing changes are committed. Never push.
 
+## Amandemen Task 4, 9, 10, 12, 15, 16, dan 18 — Batch Bibit, Pertumbuhan, dan Ekonomi Ikan
+
+Amandemen ini tidak menambah fase bernomor baru. Jalankan tiap kelompok di dalam parent task-nya: skema pada Task 4 sebelum Task 5, pembuatan area/stok dan harga oleh pengelola pada Task 9, operasi area pada Task 10, impor pada Task 12, layar pengguna pada Task 15, layar pengelola pada Task 16, dan verifikasi pada Task 18. Spesifikasi perilaku dan rumus: `docs/superpowers/specs/2026-10-09-fish-batch-economics-design.md`.
+
+### Task 4 amendment — tambahkan model batch ke migration 003
+
+**Objective:** Persistensikan spesies/harga, batch tebar, bobot, mortalitas, panen, dan biaya tertaut tanpa menghitung bibit dua kali.
+
+**Files:**
+- Modify `server/migrations/003_dashboard_domain.sql`.
+- Modify `server/db.test.ts`.
+
+**Steps:**
+1. Tambahkan failing isolated migration tests untuk tabel/constraint: `fish_species`, `fish_species_prices`, `fish_stocking_batches`, `fish_growth_samples`, `fish_mortality_events`, `fish_batch_harvests`, dan `fish_batch_adjustments`; selaraskan nama final dengan domain tables Task 4. Uji jumlah awal/sampel positif, harga nonnegatif, unique sampel per batch/tanggal, mortalitas per batch/tanggal, histori legacy per area/tanggal, FK, dan indeks.
+2. Jalankan `npm run test:pilot`; pastikan tes baru gagal karena tabel/constraint batch belum tersedia.
+3. Implementasikan DDL aditif dan FK `batch_id` nullable pada tabel HPP Task 4 (atau nama ekuivalennya), bukan tabel HPP duplikat. Penyesuaian jumlah batch hanya negatif; penambahan ikan menjadi batch restock baru. Jangan menambah perangkat contoh atau merekonstruksi batch historis.
+4. Jalankan `npm run test:pilot` dan `npm run typecheck` pada schema acak kosong dan schema upgrade 001/002; pastikan rerun aman dan seluruh data Pilot fixture tetap identik. Jangan menjalankan migration pada database aktif.
+
+### Task 9 amendment — pembuatan kolam, batch awal, dan harga spesies
+
+**Objective:** Buat kolam aktif dan batch tebar pertamanya dalam satu transaksi serta izinkan hanya pengelola mengubah harga/kg.
+
+**Files:**
+- Modify `server/dashboardRoutes.ts` and `server/dashboard.test.ts`.
+
+**Steps:**
+1. Tulis failing API tests: kolam ikan aktif baru tanpa batch ditolak; kolam aktif baru dengan spesies/tanggal/jumlah/harga bibit membuat area dan batch bersama-sama; kegagalan batch membatalkan area; kolam istirahat boleh tanpa batch; area legacy aktif yang belum diinisialisasi tetap dapat dibaca; restock membuat batch baru; hanya pengelola dapat mengubah harga efektif per spesies; snapshot lama tetap utuh.
+2. Jalankan `npm run test:pilot`; pastikan test baru gagal pada route/kontrak yang belum ada.
+3. Implementasikan transaksi create-area untuk kolam aktif baru, katalog spesies ternormalisasi, dan endpoint harga/kg khusus pengelola. Area legacy tidak dipaksa memiliki batch sintetis.
+4. Jalankan `npm run test:pilot` dan `npm run typecheck`; pastikan test lulus termasuk rollback area+batch dan otorisasi role.
+
+### Task 10 amendment — aturan hitung dan operasi area di server
+
+**Objective:** Simpan harga dan aktivitas batch melalui API dengan otorisasi area, transaksi, snapshot harga, dan hasil ekonomi yang konsisten.
+
+**Files:**
+- Create `server/fishEconomics.ts` dan `server/fishEconomics.test.ts`.
+- Modify `server/dashboardRoutes.ts` (dibuat pada Task 6–8), `server/dashboard.test.ts`, dan `package.json` agar test baru masuk `npm run test:pilot`.
+
+**Steps:**
+1. Tulis failing unit tests untuk umur batch, laju gram/hari, estimasi nilai stok hidup, kerugian langsung bibit, snapshot estimasi nilai yang tidak jadi diperoleh, margin sementara, dan laba/rugi batch tertutup. Uji harga/bobot kosong, bobot menurun, dan harga nol.
+2. Jalankan `npm run test:pilot`; pastikan tes helper gagal karena `server/fishEconomics.ts` belum dibuat.
+3. Implementasikan helper murni di `server/fishEconomics.ts` memakai hitungan ikan integer, nilai uang/bobot decimal, dan tanggal eksplisit. Estimasi nilai kematian tidak boleh menjadi biaya kedua pada margin batch.
+4. Tambahkan failing API tests untuk sampel, mortalitas, panen, snapshot harga/bobot, HPP tertaut/tidak tertaut, akses silang area, idempotensi retry, koreksi delta hari yang sama, populasi negatif, serta transaksi atomik.
+5. Jalankan `npm run test:pilot`; pastikan API tests gagal sebelum endpoint/domain transaction diimplementasikan.
+6. Implementasikan API dan transaksi. Batch hanya dapat ditutup saat jumlah tersisa nol; sisa yang tidak dipanen memerlukan pengurangan bertanggal dan beralasan. Koreksi harga historis meninggalkan audit.
+7. Jalankan `npm run test:pilot` dan `npm run typecheck`; pastikan sesi hilang, role salah, dan area tidak tertugaskan ditolak.
+
+### Task 12 amendment — impor legacy tanpa asumsi batch historis
+
+**Objective:** Tampilkan data lama di preview tanpa menciptakan umur, biaya, atau pertumbuhan yang tidak diketahui.
+
+**Files:**
+- Modify `server/dashboardImport.ts` (dibuat pada Task 12), `server/dashboard.test.ts`, dan komponen preview Task 17 bila diperlukan.
+
+**Steps:**
+1. Tambahkan failing import tests: populasi lama tetap menjadi baseline legacy tanpa tanggal tebar sintetis; mortalitas area/tanggal lama tidak ditautkan otomatis; HPP “Benih …” tidak menjadi biaya bibit batch kedua; konflik/beban yang belum dipetakan muncul di preview.
+2. Jalankan API tests dan pastikan kasus legacy gagal sebelum implementasi.
+3. Implementasikan pemetaan opt-in. Kolam lama tetap menyimpan populasi/histori area; pengelola secara eksplisit membuat batch baseline dengan tanggal/jumlah/harga yang diketahui. Histori mortalitas tetap tak tertaut sampai pemetaan sadar dilakukan.
+4. Tampilkan jumlah record yang tidak dipetakan dan tindakan yang diperlukan; uji konfirmasi serta retry idempotent.
+5. Jalankan `npm run test:pilot`; pastikan Pilot dan sumber localStorage tetap utuh.
+
+### Task 15 amendment — alur pengguna untuk pertumbuhan dan ekonomi
+
+**Objective:** Pengguna melihat dan mencatat data batch hanya pada area tugasnya, dengan label estimasi/aktual yang jelas.
+
+**Files:**
+- Modify `src/services/dashboardApi.js`, `src/store/SmartStore.jsx`, `src/pages/AreaDetail.jsx`, dan kontrak terkait di `server/dashboard.test.ts`.
+
+**Steps:**
+1. Tambahkan failing API/bootstrap tests di `server/dashboard.test.ts` untuk batch, spesies, harga terbaru, bobot, mortalitas, panen, dan HPP tertaut; sertakan API error/empty responses.
+2. Jalankan `npm run test:pilot`; pastikan kontrak baru gagal sebelum client/store terhubung.
+3. Implementasikan service/store actions async; state diubah dari respons server dan mutasi memakai idempotency key. API failure tidak fallback ke seed/localStorage sebagai kebenaran.
+4. Ubah `src/pages/AreaDetail.jsx` untuk menampilkan umur, jumlah hidup, sampel terbaru/tanggal, laju pertumbuhan bila ada dua sampel, nilai stok berlabel estimasi, kerugian bibit langsung, dan panen aktual. Tambahkan form sampel, mortalitas, serta panen (ekor, kg, harga aktual diawali harga acuan); bila ada beberapa batch, pengguna wajib memilih batch.
+5. Uji empty/loading/error state, akses direct-ID, dan mutasi pada browser lokal; pastikan pengguna area lain tidak melihat data.
+6. Jalankan `npm run test:pilot`, `npm run test:vpet`, `npm run typecheck`, dan `node node_modules/vite/bin/vite.js build`.
+
+### Task 16 amendment — alur pengelola untuk stok awal dan harga/kg
+
+**Objective:** Pengelola membuat batch tebar awal untuk kolam aktif dan mengatur harga per spesies tanpa mengubah histori transaksi.
+
+**Files:**
+- Modify `src/pages/admin/AdminAreas.jsx`, `src/pages/AreaDetail.jsx`, `src/store/SmartStore.jsx`, `src/services/dashboardApi.js`, dan `server/dashboard.test.ts`.
+
+**Steps:**
+1. Pastikan API tests Task 9 mencakup role dan validasi kolam; tambahkan regression test HPP tertaut/umum di `server/dashboard.test.ts`.
+2. Jalankan `npm run test:pilot` dan pastikan regression test gagal sebelum HPP batch linking selesai.
+3. Implementasikan form kolam aktif di `src/pages/admin/AdminAreas.jsx` dengan spesies, tanggal tebar, jumlah bibit, harga/ekor, total otomatis, dan populasi turunan; status istirahat boleh kosong.
+4. Tampilkan spesies dipelihara dan form harga/kg bertanggal berlaku; perubahan harga tersimpan sebagai histori. Tambahkan pilihan batch opsional di form HPP pada `src/pages/AreaDetail.jsx`; bibit awal hanya dihitung melalui batch.
+5. Jalankan `npm run test:pilot`, `npm run typecheck`, `npm run lint`, dan `node node_modules/vite/bin/vite.js build`; uji alur pengelola serta visibilitas update lintas role di browser lokal.
+
+### Task 18 amendment — verifikasi ekonomi dan audit UI AFTER
+
+**Objective:** Buktikan perhitungan batch dan akses kedua role konsisten tanpa menyentuh database aktif sebelum preflight migration utama lulus.
+
+**Files:**
+- Tests: `server/db.test.ts`, `server/dashboard.test.ts`, `server/fishEconomics.test.ts`.
+- UI: `src/pages/admin/AdminAreas.jsx`, `src/pages/AreaDetail.jsx`.
+
+**Steps:**
+1. Jalankan schema/API suite pada schema uji: `docker compose --env-file docker.env.example --env-file .env.docker.lan exec -T api sh -lc 'TEST_DATABASE_URL="$DATABASE_URL" npm run test:pilot'`.
+2. Jalankan `npm run test:vpet`, `npm run typecheck`, `npm run lint`, `node node_modules/vite/bin/vite.js build`, dan `npm run cek:aset`.
+3. Uji browser lokal: pengelola membuat kolam/batch dan memperbarui harga; pengguna area merekam sampel, mortalitas, dan panen; keduanya melihat populasi sama setelah refresh; pengguna area lain tidak dapat membaca data.
+4. Cocokkan hasil dengan unit test: biaya bibit satu kali, HPP tertaut/umum terpisah, estimasi kematian tidak dihitung dua kali, dan laba aktual hanya memakai transaksi panen saat batch ditutup.
+5. Setelah fitur UI berfungsi, jalankan audit antislop mode AFTER dan laporkan temuan bernomor. Jangan lakukan polish di luar syarat fungsi sebelum pengguna memilih temuan.
+6. Migration aktif tetap mengikuti backup, preflight, dan verifikasi salinan yang diwajibkan Task 18; minta konfirmasi eksplisit pengguna untuk target/waktu sebelum menjalankannya. Tidak ada `down -v`, reset, atau akses DB publik.
+7. Jalankan `git diff --check`, pastikan staging hanya mencakup file tugas, dan jangan push.
+
+**Tambahan Definition of done:** Batch awal/restock dapat ditelusuri terpisah; umur, laju bobot, mortalitas, panen, dan snapshot harga konsisten; estimasi jelas dibedakan dari aktual; hanya HPP tertaut masuk ekonomi batch; data legacy/HPP bibit tidak diduplikasi; otorisasi area diverifikasi di server.
+
 ## Definition of done
 
 - Numbered migrations are repeatable and upgrade both empty schemas and v1 without losing existing Pilot data.
@@ -308,5 +418,6 @@ Steps:
 - PostgreSQL stores all mutable role data listed in the approved design; dashboard aggregates are derived.
 - Server, not the browser, authorizes roles/area assignments and computes points/mortality effects.
 - SmartDashboard no longer treats the full localStorage blob as live truth; opt-in import is safe, idempotent, auditable, and leaves the original untouched until verified.
+- Fish batch economics records stocking, sample growth, mortality, harvest, and price snapshots without duplicate seed/HPP costs or fabricated historic values.
 - Both role flows build and pass tests; Pilot API contracts and quotas remain intact.
 - No real credentials pass over the current HTTP LAN URL; no database volume or existing data is deleted.
