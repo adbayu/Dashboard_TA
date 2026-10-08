@@ -164,3 +164,7 @@ Run pada HEAD `97ede0e` lulus lagi untuk urutan Tab 16/16 dan 18/18 serta skenar
 ## Hasil skrip B, final
 
 Status: PASS pada HEAD `771fce5`. Monitoring mengunjungi 16/16 target Tab sesuai urutan aktual; `/developer` mengunjungi 18/18. Klik `normal` menghasilkan state API normal dan event `threshold_clear`; klik `suhu_naik` menghasilkan state sensor suhu high di API dan event suhu di atas ambang tampil pada panel, sementara badge pH tetap normal; klik `offline` menghasilkan status API dan UI `offline` serta event `offline`. Ketiga PUT berstatus HTTP 200. Preparasi `ph_turun` menghasilkan low dan `threshold_low`. Offline fixture mengonfirmasi skenario persisted, menunggu 61 detik tanpa bacaan baru, lalu menua-kan ketiga row bacaan sandbox di schema disposable; runner 30 detik dan scanner 60 detik tidak diubah. Error browser 0 dan semua cleanup lulus. Durasi 181,3 detik.
+
+## Hasil skrip C, percobaan awal
+
+Status: FAIL pada HEAD `ba9b85f`; delapan dari sepuluh PNG tersimpan untuk Monitoring Per paket, Per sensor, Per area, dan Sandbox pada dua tema. Dialog rotasi belum terverifikasi atau dicapture; error umum terjadi pada fase capture akhir. Semua cleanup lulus dan error browser 0. Pemeriksaan visual dapat dilakukan pada delapan gambar: Per sensor tema gelap menunjukkan kolom waktu terpotong di tepi kanan; Per area memiliki scrollbar horizontal di dalam tabel. Screenshot Developer hanya memperlihatkan judul Sandbox di bagian bawah viewport, bukan isi panel, jadi bukti Sandbox belum memadai. Ukuran/overflow akan diukur lagi pada skrip D.
