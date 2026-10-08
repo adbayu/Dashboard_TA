@@ -399,3 +399,4 @@ Job terjadwal untuk query retensi belum dibuat.
 | Event ambang berulang kalau nilai naik-turun di sekitar batas | Tambahkan histeresis 2% dari rentang ambang sebelum status kembali normal (usulan) |
 | Store rate limit di memori hilang saat restart | Bisa diterima untuk satu instance. Dicatat di ADR-0004 |
 | `date_bin` butuh PostgreSQL 14 ke atas | `compose.yaml` memakai `postgres:17` |
+| `trustProxy` belum dikonfigurasi | Di belakang reverse proxy atau hosting, semua pengguna dan semua alat berbagi satu bucket rate limit IP 120 request/menit sampai `trustProxy` diatur hanya untuk proxy tepercaya. Catatan implementasi Minggu 4; jangan ubah kode sekarang. |

@@ -69,12 +69,13 @@ Jika pengiriman gagal, string serial yang dipakai firmware adalah `Pengiriman te
 
 Rute bench host-side memakai **localtunnel HTTPS sementara**, bukan LAN: firmware hanya menerima HTTP untuk loopback dan memerlukan HTTPS untuk host jarak jauh. Jalankan Fastify pada laptop dengan bind `127.0.0.1:3001` saja (jangan bind `0.0.0.0`), lalu jalankan `npx --yes localtunnel --port 3001 --local-host 127.0.0.1` di terminal lain. Jika layanan menyediakan subdomain stabil, tambahkan `--subdomain <nama-stabil>`. URL HTTPS `*.loca.lt` yang dicetak dapat berubah saat sesi tunnel baru; firmware menambahkan `/api/ingest` ke URL API yang dikonfigurasi.
 
-Sebelum menyalakan ESP32:
+Jalankan langkah preflight 1 sampai 3 sebelum menyentuh atau menyalakan ESP32:
 
-1. Sambungkan laptop dan ESP32 ke SSID Wi-Fi uji **2,4 GHz** yang sama; pastikan API aktif di `127.0.0.1:3001`, lalu jalankan localtunnel di atas.
+1. Sambungkan laptop ke Wi-Fi uji **2,4 GHz**; pastikan API aktif di `127.0.0.1:3001`, lalu jalankan localtunnel di atas. Jangan sentuh atau nyalakan ESP32 pada langkah ini.
 2. Dari HP yang tersambung ke internet, buka `<URL_HTTPS_LOCA.LT>/api/health`. Respons **HTTP 200 dengan JSON `status: ok`** hanya mengonfirmasi jangkauan host-side; itu bukan bukti rute fisik ESP32.
-3. Sebelum memasukkan URL ke provisioning, verifikasi **hostname HTTPS aktual yang dicetak localtunnel** terhadap ISRG Root X1 yang tertanam di `firmware/include/root_ca.h`. Lanjutkan hanya bila `embeddedRootValidatedTunnelTls` berhasil. Verifikasi host-side terbaru (2026-10-07) berhasil untuk hostname ephemeral yang diuji; hostname baru tetap harus diverifikasi.
-4. Jangan masukkan credential ke URL, catatan, screenshot, atau laporan. Jangan menambahkan header bypass jika muncul interstitial. Gunakan tunnel hanya selama bench dan hentikan proses localtunnel/API setelah selesai.
+3. Sebelum memasukkan URL ke provisioning, verifikasi **hostname HTTPS aktual yang dicetak localtunnel** terhadap ISRG Root X1 yang tertanam di `firmware/include/root_ca.h`. Lanjutkan hanya bila `embeddedRootValidatedTunnelTls` berhasil. Pemeriksaan 8 Oktober 2026 memvalidasi DNS dan embedded-root TLS pada tiga hostname baru; API health dan ingest tidak diuji melalui tunnel pada run tersebut. Setiap hostname yang akan dipakai tetap harus menjalani langkah 1 sampai 3.
+4. Setelah langkah 1 sampai 3 lulus, sambungkan ESP32 ke SSID Wi-Fi uji **2,4 GHz** dan mulai bench sesuai instruksi hardware.
+5. Jangan masukkan credential ke URL, catatan, screenshot, atau laporan. Jangan menambahkan header bypass jika muncul interstitial. Gunakan tunnel hanya selama bench dan hentikan proses localtunnel/API setelah selesai.
 
 ### Kesiapan tunnel untuk HW-06 dan HW-07
 
@@ -85,7 +86,13 @@ Sebelum menyalakan ESP32:
 
 Hotspot, Wi-Fi publik, isolasi client/AP, DNS yang terfilter, atau outbound HTTPS yang diblokir dapat mencegah koneksi lokal maupun tunnel. Dengan rute tunnel, perubahan/perintah firewall **tidak berlaku dan tidak diperlukan**. Jangan ubah `APP_ORIGIN` atau memperluas host allowlist; URL API perangkat diisi terpisah saat provisioning. Tunnel membuat API sementara dapat dijangkau dari internet: gunakan hanya untuk bench, dengan credential uji, lalu hentikan segera.
 
-**Peringatan kompatibilitas firmware:** verifikasi host-side terbaru berhasil memvalidasi sertifikat localtunnel aktual dengan ISRG Root X1 tertanam, health JSON, dan satu ingest v2 yang terbaca di PostgreSQL. Hasil ini tidak memverifikasi Wi-Fi, DNS, TLS, atau rute fisik ESP32. Untuk setiap hostname tunnel yang akan dipakai, DNS dan embedded-root TLS harus berhasil; **berhenti sebelum provisioning atau flashing** bila validasi gagal atau belum dilakukan. Jangan menambahkan root CA, header bypass, atau melemahkan verifikasi TLS. Rute fisik belum diverifikasi.
+### Jika preflight tunnel gagal
+
+Jika DNS atau verifikasi TLS dengan ISRG Root X1 gagal, jangan menyentuh ESP32, jangan memasukkan URL ke provisioning, dan jangan flash firmware maupun LittleFS. Tutup sesi tunnel yang gagal, lalu coba hostname baru pada sesi terpisah, maksimal tiga hostname total atau sampai ada yang lulus DNS dan TLS. Untuk setiap percobaan catat nomor percobaan, DNS (`PASS`/`FAIL` dan kelas error), TLS embedded-root (`PASS`/`FAIL` dan kode error), serta waktu. Jangan salin URL tunnel, credential, atau data akun ke log/screenshot.
+
+Jika tiga hostname gagal, hentikan preflight dan laporkan hasilnya. Jika DNS dan TLS lulus, pastikan Fastify yang asli dapat dijangkau lewat `GET /api/health` dengan HTTP 200 dan JSON `status: ok`; hasil host-side tidak membuktikan rute ESP32. Jangan lanjut provisioning atau flashing pada sesi pemeriksaan ini sebelum hasil dilaporkan. Jangan menambah root CA, menonaktifkan validasi sertifikat, memakai header bypass, mengubah `APP_ORIGIN`, atau memperluas allowlist untuk memaksa tunnel lulus.
+
+**Peringatan kompatibilitas firmware:** run host-side 7 Oktober 2026 sebelumnya berhasil memvalidasi satu hostname, health JSON, dan satu ingest v2 ke PostgreSQL; hal itu tidak memverifikasi rute fisik ESP32. Run 8 Oktober 2026 memeriksa tiga hostname baru dan DNS serta TLS embedded-root lulus pada ketiganya, tetapi upstream bukan Fastify sehingga health dan ingest tidak diuji melalui tunnel. Untuk setiap hostname yang akan dipakai, DNS, TLS embedded-root, dan API health harus lulus sebelum provisioning; **berhenti sebelum provisioning atau flashing** bila salah satunya gagal atau belum dilakukan. Jangan menambahkan root CA, header bypass, atau melemahkan verifikasi TLS. Rute fisik belum diverifikasi.
 
 ## HW-01: periksa tegangan keluaran modul analog
 
