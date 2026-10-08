@@ -138,3 +138,9 @@ Autentikasi OpenCode telah diperbarui dan smoke-tested; pemeriksaan browser seda
 `docs/superpowers/plans/2026-10-06-jagofarm-iot-e1-live-ui.md` dan `docs/superpowers/specs/2026-10-06-jagofarm-iot-e1-live-ui-design.md` tetap berada di `docs/superpowers` karena keduanya dibuat untuk workflow implementasi Superpowers. Keduanya sekarang ditandai sebagai catatan historis, bukan backlog atau spesifikasi aktif. `docs/iot` tetap menjadi sumber kebenaran untuk kontrak, UX, sistem desain, dan kriteria uji.
 
 Usulan pemeliharaan: pertahankan kedua arsip dan tautkan ke dokumen kanonis. Jika keputusan implementasi unik masih berlaku, pindahkan keputusan itu ke dokumen `docs/iot` yang sesuai saat ada revisi produk. Jangan menyalin ulang rincian layar, state, atau API yang sudah tercatat di sana.
+
+## Hasil skrip A, matriks R-27
+
+Status: FAIL, matriks belum terverifikasi. Skrip browser nyata A berjalan sampai batas 420 detik terminal tanpa mengeluarkan laporan akhir; tahap yang macet tidak dapat ditentukan dari output yang tersisa. Tidak ada bukti yang cukup untuk menandai sel mana pun PASS. Run dihentikan oleh batas terminal, bukan oleh watchdog skrip.
+
+Pembersihan setelah penghentian diverifikasi: proses Node/Chrome audit tidak tersisa, port 3001 dan 5173 tertutup, satu schema disposable yang dibuat run dihapus dan jumlah schema sejenis tersisa nol. PostgreSQL khusus port 55432 tetap berjalan. Tidak ada perubahan produk. R-27 tetap terbuka.
