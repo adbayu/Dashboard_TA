@@ -160,3 +160,7 @@ Run pada HEAD `a0e14d6` mengonfirmasi lagi urutan Tab Monitoring 16/16 dan `/dev
 ## Hasil skrip B, stabilisasi fixture offline
 
 Run pada HEAD `97ede0e` lulus lagi untuk urutan Tab 16/16 dan 18/18 serta skenario pH turun, normal, dan suhu naik. Scenario offline tersimpan dan tidak muncul bacaan baru selama 61,4 detik, tetapi fixture hanya mengubah timestamp row terbaru; row sebelumnya membuat umur maksimum tetap 91,8 detik, sehingga fixture belum mencapai ambang offline. Ini kesalahan setup harness, belum menjadi temuan produk. Cleanup seluruhnya lulus; percobaan berhenti sebelum pemindai offline diuji.
+
+## Hasil skrip B, final
+
+Status: PASS pada HEAD `771fce5`. Monitoring mengunjungi 16/16 target Tab sesuai urutan aktual; `/developer` mengunjungi 18/18. Klik `normal` menghasilkan state API normal dan event `threshold_clear`; klik `suhu_naik` menghasilkan state sensor suhu high di API dan event suhu di atas ambang tampil pada panel, sementara badge pH tetap normal; klik `offline` menghasilkan status API dan UI `offline` serta event `offline`. Ketiga PUT berstatus HTTP 200. Preparasi `ph_turun` menghasilkan low dan `threshold_low`. Offline fixture mengonfirmasi skenario persisted, menunggu 61 detik tanpa bacaan baru, lalu menua-kan ketiga row bacaan sandbox di schema disposable; runner 30 detik dan scanner 60 detik tidak diubah. Error browser 0 dan semua cleanup lulus. Durasi 181,3 detik.
