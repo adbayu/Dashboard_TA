@@ -45,7 +45,7 @@ Capture browser pertama membaca tombol pada awal transisi warna 200 ms, sehingga
 - Focused CDP run berstatus PASS: 105 target sentuh Kelola IoT memenuhi 44 x 44 px; rotasi credential, copy, modal focus, Escape, dan pengembalian fokus lulus; alur login lalu klaim QR menghasilkan HTTP 200 dan satu ownership row.
 - Error console/runtime: 0. Schema dan pool disposable dihapus; Chrome, Fastify, Vite, serta port aplikasi 3001/5173 ditutup. Listener PostgreSQL khusus yang sudah aktif pada port 55432 tetap berjalan untuk tes berikutnya.
 - Per area: run browser mengukur 58 route per batch, tanpa 429, dan agregat cocok dengan PostgreSQL.
-- Laporan JSON terbaru ada di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-e2-real-browser-report.json`; durasi run 568.777 ms dan status FAIL karena harness menuntut admin membuka detail Sandbox milik user. Detail Sandbox owner serta jalur UI-07/UI-10 yang diminta lulus. Laporan focused sebelumnya disimpan sebagai `audit-007-e2-real-browser-report-before-latest.json`.
+- Laporan JSON terbaru ada di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-e2-real-browser-report.json`; durasi run 9 menit 28,8 detik dan status FAIL karena harness menuntut admin membuka detail Sandbox milik user. Detail Sandbox owner serta jalur UI-07/UI-10 yang diminta lulus. Laporan focused sebelumnya disimpan sebagai `audit-007-e2-real-browser-report-before-latest.json`.
 
 ## Verifikasi ulang M3 pada HEAD 73cb1ef
 
