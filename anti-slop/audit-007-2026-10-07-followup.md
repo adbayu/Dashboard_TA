@@ -180,3 +180,7 @@ Run pada HEAD `48098d1` mencakup 8 pengukuran, empat lebar × dua tema. Page ove
 ## Skrip C, retest setelah koreksi Per sensor
 
 Run pada HEAD `b538cfb` menghasilkan kembali 10/10 screenshot, dua tema pada lima permukaan. State verifikasi lengkap, sandbox pH/event dan modal rotasi tanpa secret tampil. Pemeriksaan visual ulang pada Per sensor light/dark mengonfirmasi kolom `Waktu ukur` kini membungkus tanggal agar terbaca tanpa terpotong. Error browser 0 dan cleanup lulus.
+
+## Skrip D, retest setelah koreksi Per sensor
+
+Status: PASS pada HEAD `b538cfb`, 8/8 ukuran dan tema. Page overflow 0 px dan chart figure/SVG overflow 0 px pada 841, 768, 640, dan 360. Tabel Per sensor tampil tanpa overflow internal pada 841, 768, dan 640. Pada 360, tabel beralih ke tiga kartu responsif; card list overflow 0 px. Cleanup seluruhnya lulus.
