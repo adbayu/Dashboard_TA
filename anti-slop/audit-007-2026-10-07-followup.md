@@ -152,3 +152,7 @@ Status: FAIL. Skrip berhenti karena exception umum setelah 24,7 detik; report be
 ## Hasil skrip B, run lanjutan
 
 HEAD `27c5c29` diuji. Urutan Tab Monitoring lulus: 16/16 target fokus terlihat dikunjungi sesuai urutan DOM; `/developer` lulus 18/18. Persiapan `ph_turun` menghasilkan state low dan event `threshold_low`; klik `normal` menghasilkan HTTP 200, state normal melalui API, dan event `threshold_clear`. `suhu_naik` gagal pada fase skenario; sebab detail belum tercatat, dan `offline` belum dijalankan. Durasi 161,3 detik, error browser 0, seluruh cleanup lulus. Runner tetap pada default 30 detik dan pemindai offline 60 detik. Run ini juga memperbaiki fixture sesi harness dari token 72 karakter ke format 64 karakter yang diterima autentikasi; bukan perubahan produk.
+
+## Hasil skrip B, verifikasi offline
+
+Run pada HEAD `a0e14d6` mengonfirmasi lagi urutan Tab Monitoring 16/16 dan `/developer` 18/18. `ph_turun`, `normal`, dan `suhu_naik` lulus; untuk `suhu_naik`, API menunjukkan state sensor high dan kartu Sandbox menampilkan event suhu di atas ambang. Offline menerima PUT HTTP 200, event tersimpan, dan UI sempat menunjukkan perubahan, tetapi pada verifikasi akhir API masih `online`; umur bacaan terbaru hanya 61,3 detik, sehingga fixture umur 181 detik tidak bertahan. Skrip berhenti pada verifikasi API, bukan timeout. Semua cleanup lulus; status offline belum lulus dan penyebab race belum dipastikan.
