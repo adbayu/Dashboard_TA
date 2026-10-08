@@ -5,10 +5,16 @@ import { roleCanOpenPath } from './roleAccess.js';
 import * as roleAccess from './roleAccess.js';
 
 test('monitoring is shared by both roles while role-only routes stay protected', () => {
+  const deviceId = '123e4567-e89b-12d3-a456-426614174000';
+
   assert.equal(roleCanOpenPath('pengguna', '/monitoring'), true);
   assert.equal(roleCanOpenPath('pengelola', '/monitoring'), true);
   assert.equal(roleCanOpenPath('pengguna', '/admin/iot'), false);
   assert.equal(roleCanOpenPath('pengelola', '/iot'), false);
+  assert.equal(roleCanOpenPath('pengelola', `/iot/${deviceId}`), true);
+  assert.equal(roleCanOpenPath('pengelola', `/iot/${deviceId}/readings`), false);
+  assert.equal(roleCanOpenPath('pengelola', '/iot/not-a-uuid'), false);
+  assert.equal(roleCanOpenPath('pengguna', `/iot/${deviceId}`), true);
   assert.equal(roleCanOpenPath('pengelola', '/profil'), true);
   assert.equal(roleCanOpenPath('pengelola', '/developer'), true);
 });
