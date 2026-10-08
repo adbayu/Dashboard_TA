@@ -1,6 +1,6 @@
 # Desain PostgreSQL untuk SmartDashboard JagoFarm
 
-Status: rancangan disetujui untuk ditulis, menunggu tinjauan dokumen sebelum rencana implementasi.
+Status: disetujui pengguna pada 2026-10-08; implementasi berjalan berdasarkan rencana bertahap.
 
 ## Tujuan
 
