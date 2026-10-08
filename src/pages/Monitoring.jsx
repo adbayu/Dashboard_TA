@@ -682,30 +682,47 @@ function MonitoringView({ currentUser }) {
             {currentSensorItems.length === 0 ? <Empty title="Belum ada perangkat dengan sensor ini" hint="Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang." icon="sensors" /> : (
               <Card pad="sm">
                 <SectionTitle title={selectedSensorType?.name || selectedSensor} subtitle="Perangkat satuan dan paket ditampilkan bersama. Nilai ambang dan waktu berasal dari API." />
-                <div className="overflow-x-auto rounded-xl border border-outline-variant/40">
-                  <table className="w-full min-w-[620px] text-sm">
+                <div className="hidden min-w-0 overflow-hidden rounded-xl border border-outline-variant/40 sm:block">
+                  <table className="w-full min-w-0 table-fixed text-sm">
+                    <colgroup><col className="w-[24%]" /><col className="w-[14%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[18%]" /></colgroup>
                     <thead className="bg-surface-container-high/70 text-left text-xs text-on-surface-variant"><tr>
-                      <th className="px-3 py-2.5">Perangkat</th><th className="px-3 py-2.5">Area</th><th className="px-3 py-2.5">Nilai</th><th className="px-3 py-2.5">Ambang</th><th className="px-3 py-2.5">Waktu ukur</th>
+                      <th className="break-words px-3 py-2.5">Perangkat</th><th className="break-words px-3 py-2.5">Area</th><th className="break-words px-3 py-2.5">Nilai</th><th className="break-words px-3 py-2.5">Ambang</th><th className="break-words px-3 py-2.5">Waktu ukur</th>
                     </tr></thead>
                     <tbody className="divide-y divide-outline-variant/30">{currentSensorItems.map(item => {
                       const sensor = deviceSensors(item.device).find(value => value.code === selectedSensor) || selectedSensorType || {};
                       return <tr key={item.deviceId}>
-                        <td className="px-3 py-3">
-                          <Link to={`/iot/${encodeURIComponent(item.deviceId)}`} className="font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">{item.device?.name || item.deviceCode}</Link>
+                        <td className="break-words px-3 py-3 [overflow-wrap:anywhere]">
+                          <Link to={`/iot/${encodeURIComponent(item.deviceId)}`} className="break-words font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">{item.device?.name || item.deviceCode}</Link>
                           {(item.device?.isSandbox || item.device?.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
                           <span className="mt-1 block break-all font-mono text-[11px] text-on-surface-variant">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</span>
                         </td>
-                        <td className="px-3 py-3 text-on-surface-variant">{item.areaRef || 'Area belum diatur'}</td>
-                        <td className="px-3 py-3">
+                        <td className="break-words px-3 py-3 text-on-surface-variant [overflow-wrap:anywhere]">{item.areaRef || 'Area belum diatur'}</td>
+                        <td className="px-3 py-3 [overflow-wrap:anywhere]">
                           <span className="block font-bold tabular-nums text-on-surface">{item.value == null ? 'Belum ada data' : `${formatSensorNumber(item.value, sensor.decimals ?? 2)}${item.unit ? ` ${item.unit}` : ''}`}</span>
                           <span className="mt-1 inline-flex"><SensorStateBadge state={item.state} /></span>
                         </td>
-                        <td className="max-w-48 px-3 py-3 text-xs text-on-surface-variant">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-xs text-on-surface-variant">{dateLabel(item.measuredAt)}</td>
+                        <td className="break-words px-3 py-3 text-xs text-on-surface-variant [overflow-wrap:anywhere]">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</td>
+                        <td className="break-words px-3 py-3 text-xs text-on-surface-variant [overflow-wrap:anywhere]"><time dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time></td>
                       </tr>;
                     })}</tbody>
                   </table>
                 </div>
+                <ul aria-label={`Daftar perangkat dengan sensor ${selectedSensorType?.name || selectedSensor}`} className="space-y-3 sm:hidden">{currentSensorItems.map(item => {
+                  const sensor = deviceSensors(item.device).find(value => value.code === selectedSensor) || selectedSensorType || {};
+                  return <Card as="li" key={item.deviceId} pad="sm" className="[overflow-wrap:anywhere]">
+                    <div className="min-w-0">
+                      <Link to={`/iot/${encodeURIComponent(item.deviceId)}`} className="break-words font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">{item.device?.name || item.deviceCode}</Link>
+                      {(item.device?.isSandbox || item.device?.is_sandbox) && <span className="ml-2 inline-flex align-middle"><Badge tone="info">Sandbox</Badge></span>}
+                      <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</p>
+                    </div>
+                    <dl className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 text-sm">
+                      <div><dt className="text-xs text-on-surface-variant">Area</dt><dd className="break-words text-on-surface [overflow-wrap:anywhere]">{item.areaRef || 'Area belum diatur'}</dd></div>
+                      <div><dt className="text-xs text-on-surface-variant">Nilai</dt><dd className="break-words font-bold tabular-nums text-on-surface">{item.value == null ? 'Belum ada data' : `${formatSensorNumber(item.value, sensor.decimals ?? 2)}${item.unit ? ` ${item.unit}` : ''}`}</dd><dd className="mt-1"><SensorStateBadge state={item.state} /></dd></div>
+                      <div><dt className="text-xs text-on-surface-variant">Ambang</dt><dd className="break-words text-on-surface-variant [overflow-wrap:anywhere]">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</dd></div>
+                      <div><dt className="text-xs text-on-surface-variant">Waktu ukur</dt><dd className="break-words text-on-surface-variant [overflow-wrap:anywhere]"><time dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time></dd></div>
+                    </dl>
+                  </Card>;
+                })}</ul>
               </Card>
             )}
             {currentSensorItems.length > 0 && <Card pad="sm">
