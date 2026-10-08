@@ -184,3 +184,9 @@ Run pada HEAD `b538cfb` menghasilkan kembali 10/10 screenshot, dua tema pada lim
 ## Skrip D, retest setelah koreksi Per sensor
 
 Status: PASS pada HEAD `b538cfb`, 8/8 ukuran dan tema. Page overflow 0 px dan chart figure/SVG overflow 0 px pada 841, 768, 640, dan 360. Tabel Per sensor tampil tanpa overflow internal pada 841, 768, dan 640. Pada 360, tabel beralih ke tiga kartu responsif; card list overflow 0 px. Cleanup seluruhnya lulus.
+
+## Hasil skrip E, final
+
+Status: PASS pada HEAD `0f511ca`. UI-07 PUT berstatus 200; interval runner tetap default 30.000 ms, state pH low dan event `threshold_low` teramati melalui API, UI, dan PostgreSQL. Latensi klik-ke-state/event 26,966 s; klik terjadi 3,169 s sesudah runner mulai, dengan perkiraan 26,831 s menuju tick berikutnya. UI-10 mengembalikan 21 item pH via HTTP 200 dan merender 21 baris, terdiri dari 1 device satuan dan 20 paket. Error browser 0 dan cleanup lulus.
+
+Timing UI-07 lama 20,342 s dan 3,106 s berbeda karena posisi klik terhadap jadwal tick 30 detik. Source `server/v1/sandbox.ts` hanya memperbarui `sandbox_scenario` lalu mengembalikan response; tidak memanggil runner. `server/sandbox/runner.ts` menetapkan interval 30.000 ms dan menjalankan cycle pada scheduler, jadi PUT tidak memicu tick langsung.
