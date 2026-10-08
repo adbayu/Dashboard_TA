@@ -56,6 +56,8 @@ Publik
 
 Gambarnya ada di [design/README.md](design/README.md).
 
+Di Monitoring, Pengelola dapat membuka Detail device (`/iot/:id`) melalui aksi **Buka perangkat** yang terlihat pada kartu device. Izin route detail di client tidak mengubah otorisasi akses data yang ditegakkan backend.
+
 Menu Developer tampil untuk pengguna dan pengelola. Pengguna hanya dapat membuat key Test tanpa scope `admin`; pengelola dapat membuat key Test atau Live. Backend tetap menjadi penegak akhir kebijakan Q2 dan Q3.
 
 ## 4. Alur utama

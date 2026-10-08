@@ -93,7 +93,13 @@ Akun tanpa live device belum digunakan untuk memaksa state kosong. Backend tidak
 | Lebar Monitoring 360 px dan 1280 px | PASS terbatas | Run menyatakan tanpa overflow horizontal untuk layout Monitoring pada terang/gelap. |
 | Lebar 841, 768, 640 px; batas halaman, chart, tabel Per sensor pada keempat lebar | belum diuji | `responsiveWidths` pada report kosong; belum ada pengukuran bounding-box chart/tabel. |
 
-Run penuh `audit-007-e2-real-browser-check.mjs` berstatus FAIL karena assertion harness juga mewajibkan admin membuka detail device Sandbox milik user; route mengarahkan admin ke halaman admin. Sandbox detail berhasil diperiksa pada sesi owner. Ini temuan ketidakcocokan assertion/role scope, bukan bukti bahwa admin boleh melewati ownership. HTTP/runtime console errors yang tidak diharapkan: 0. R-27 dan audit browser keseluruhan tetap belum diterima sampai matriks yang diminta selesai.
+Run penuh `audit-007-e2-real-browser-check.mjs` berstatus FAIL. Temuan yang benar: tautan **Buka perangkat** untuk device Sandbox milik user muncul melalui Monitoring yang diizinkan dan menavigasi ke `/iot/:id`, tetapi guard client Pengelola sebelumnya mengalihkan route detail UUID tersebut ke `/admin`. Ini cacat allowlist route client, bukan assertion harness yang keliru dan bukan alasan untuk melemahkan otorisasi backend. Perbaikan allowlist UUID-only ada pada commit kode `8237ea2`. Detail Sandbox tetap berhasil diperiksa pada sesi owner. Pada sesi awal, fokus bukti Chrome terpisah tersedia di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-manager-detail.mjs`; `.env` berisi `TEST_DATABASE_URL` untuk cluster disposable pada port 55432. Percobaan pertama terhalang karena cluster berhenti; setelah dinyalakan, run berikutnya gagal saat fixture seeding karena argumen bind array UUID salah (`SQLSTATE 08P01`). Setelah diperbaiki, focused Chrome proof lulus untuk kasus perangkat normal dan Sandbox milik user. R-27 dan audit browser keseluruhan tetap belum diterima sampai matriks yang diminta selesai.
+
+### Hasil tahap 1a: Buka Detail dari Monitoring
+
+Run independen dengan Chrome 154.0.8037.98, Fastify, dan PostgreSQL disposable merekam Pengelola mengklik aksi **Buka perangkat** pada kartu asli di Monitoring untuk perangkat normal dan perangkat Sandbox milik user. Kedua GET API detail mengembalikan HTTP 200. Heading perangkat normal adalah “Audit 007 normal package”. Heading Sandbox adalah “Audit 007 Sandbox package” dan badge teks **Sandbox** terlihat. Shell Monitoring juga mengembalikan HTTP 200. Route dicatat sebagai `/iot/[REDACTED]`. Output dijalankan ulang secara independen dan dikonfirmasi PASS untuk kedua kasus.
+
+Cleanup Chrome beserta profile, Vite, Fastify, pool database, dan schema disposable lulus. PostgreSQL disposable dipertahankan. Catatan ini tidak memuat UUID, cookie, credential, atau URL database.
 
 ## Preflight tunnel host-side
 
@@ -113,9 +119,9 @@ Pemeriksaan ini hanya menguji DNS dan rantai TLS. Upstream sementara bukan Fasti
 
 ## Catatan keputusan owner dan status gate
 
-Keputusan owner: **opsi 1**. Gate Minggu 3 tetap belum lulus penuh sampai bench fisik HW-02, HW-03, HW-04, HW-06, HW-07, HW-08 dan matriks state R-27 lengkap dinyatakan lulus. Tidak ada keputusan produk yang menunggu owner. Kriteria gate bagian 7 tidak diubah.
+Keputusan owner: **opsi 1**. Gate Minggu 3 tetap belum lulus penuh sampai bench fisik HW-02 sampai HW-08 dan matriks state R-27 lengkap dinyatakan lulus. Bench fisik HW-02 sampai HW-08 masih menunggu user. Tidak ada keputusan produk lain yang menunggu owner. Kriteria gate bagian 7 tidak diubah.
 
-Bench fisik HW-02/03/04/06/07/08 belum dilakukan dan hanya boleh ditutup dengan bukti alat asli. Meskipun UI-07/UI-10 dan sebagian pemeriksaan browser lulus, R-27, R-32, R-34/R-25 visual, dan R-03 responsive lengkap masih terbuka. Karena itu gate M3 keseluruhan **belum lulus penuh**.
+Bench fisik HW-02 sampai HW-08 belum dilakukan dan hanya boleh ditutup dengan bukti alat asli. Meskipun UI-07/UI-10 dan sebagian pemeriksaan browser lulus, R-27, R-32, R-34/R-25 visual, dan R-03 responsive lengkap masih terbuka. Karena itu R-27 dan audit browser penuh tetap **belum lengkap**, dan gate M3 keseluruhan **belum lulus penuh**.
 
 ## Catatan commit
 
@@ -125,4 +131,10 @@ Commit SSE yang terlewat pada daftar sebelumnya: `d08b9f5 fix(iot): segarkan nil
 
 AS-007-01 sampai AS-007-03 tetap PASS untuk perbaikan yang sudah diverifikasi. Verifikasi ulang tidak mengubah laporan awal. Audit browser M3 dan gate keseluruhan tidak dinyatakan PASS karena matriks R-27 serta beberapa pemeriksaan wajib masih belum lengkap.
 
-Harness tambahan untuk matriks belum dapat dibuat: OpenCode mengembalikan `Your authentication token has expired`. Tidak ada model pengganti yang digunakan dan tidak ada kode produk yang diubah. Perlu autentikasi ulang OpenCode sebelum melanjutkan pemeriksaan browser yang tersisa.
+Autentikasi OpenCode telah diperbarui dan smoke-tested; pemeriksaan browser sedang dilanjutkan. Tidak ada model fallback yang digunakan dan `auth.json` tidak diubah.
+
+## Arsip plan dan spec E1
+
+`docs/superpowers/plans/2026-10-06-jagofarm-iot-e1-live-ui.md` dan `docs/superpowers/specs/2026-10-06-jagofarm-iot-e1-live-ui-design.md` tetap berada di `docs/superpowers` karena keduanya dibuat untuk workflow implementasi Superpowers. Keduanya sekarang ditandai sebagai catatan historis, bukan backlog atau spesifikasi aktif. `docs/iot` tetap menjadi sumber kebenaran untuk kontrak, UX, sistem desain, dan kriteria uji.
+
+Usulan pemeliharaan: pertahankan kedua arsip dan tautkan ke dokumen kanonis. Jika keputusan implementasi unik masih berlaku, pindahkan keputusan itu ke dokumen `docs/iot` yang sesuai saat ada revisi produk. Jangan menyalin ulang rincian layar, state, atau API yang sudah tercatat di sana.
