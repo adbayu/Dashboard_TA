@@ -168,3 +168,7 @@ Status: PASS pada HEAD `771fce5`. Monitoring mengunjungi 16/16 target Tab sesuai
 ## Hasil skrip C, percobaan awal
 
 Status: FAIL pada HEAD `ba9b85f`; delapan dari sepuluh PNG tersimpan untuk Monitoring Per paket, Per sensor, Per area, dan Sandbox pada dua tema. Dialog rotasi belum terverifikasi atau dicapture; error umum terjadi pada fase capture akhir. Semua cleanup lulus dan error browser 0. Pemeriksaan visual dapat dilakukan pada delapan gambar: Per sensor tema gelap menunjukkan kolom waktu terpotong di tepi kanan; Per area memiliki scrollbar horizontal di dalam tabel. Screenshot Developer hanya memperlihatkan judul Sandbox di bagian bawah viewport, bukan isi panel, jadi bukti Sandbox belum memadai. Ukuran/overflow akan diukur lagi pada skrip D.
+
+## Hasil skrip C, final
+
+Status: PASS pada HEAD `75ea004`. Sepuluh PNG berhasil dibuat, dua tema untuk Per paket, Per sensor pH, Per area, Sandbox, dan dialog konfirmasi rotasi, semuanya pada viewport 1280×1200 dengan state terverifikasi. Semua gambar diperiksa secara visual. Sandbox menampilkan pH dan event terbaru; dialog rotasi tampil di kedua tema tanpa nilai credential. Tidak ada error browser; cleanup Chrome, Vite, Fastify, pool, schema, profil, dan port 3001/5173 lulus. Visual finding yang perlu diukur di D: kolom `Waktu ukur` Per sensor tampak terpotong di tepi kanan pada 1280 px; tabel Per area menampilkan scrollbar horizontal internal, tetapi semua kolomnya masih terlihat.
