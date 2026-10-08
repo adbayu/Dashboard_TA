@@ -144,3 +144,7 @@ Usulan pemeliharaan: pertahankan kedua arsip dan tautkan ke dokumen kanonis. Jik
 Status: FAIL, matriks belum terverifikasi. Skrip browser nyata A berjalan sampai batas 420 detik terminal tanpa mengeluarkan laporan akhir; tahap yang macet tidak dapat ditentukan dari output yang tersisa. Tidak ada bukti yang cukup untuk menandai sel mana pun PASS. Run dihentikan oleh batas terminal, bukan oleh watchdog skrip.
 
 Pembersihan setelah penghentian diverifikasi: proses Node/Chrome audit tidak tersisa, port 3001 dan 5173 tertutup, satu schema disposable yang dibuat run dihapus dan jumlah schema sejenis tersisa nol. PostgreSQL khusus port 55432 tetap berjalan. Tidak ada perubahan produk. R-27 tetap terbuka.
+
+## Hasil skrip B, percobaan awal
+
+Status: FAIL. Skrip berhenti karena exception umum setelah 24,7 detik; report belum merekam fase gagal. Tidak ada bukti urutan Tab atau perubahan skenario. Cleanup Chrome, Vite, Fastify, pool, schema, dan profil browser lulus. PostgreSQL yang sudah aktif pada port 55432 tetap berjalan. Belum ada temuan produk yang dapat disimpulkan dari percobaan ini.
