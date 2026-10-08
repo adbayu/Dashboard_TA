@@ -148,3 +148,7 @@ Pembersihan setelah penghentian diverifikasi: proses Node/Chrome audit tidak ter
 ## Hasil skrip B, percobaan awal
 
 Status: FAIL. Skrip berhenti karena exception umum setelah 24,7 detik; report belum merekam fase gagal. Tidak ada bukti urutan Tab atau perubahan skenario. Cleanup Chrome, Vite, Fastify, pool, schema, dan profil browser lulus. PostgreSQL yang sudah aktif pada port 55432 tetap berjalan. Belum ada temuan produk yang dapat disimpulkan dari percobaan ini.
+
+## Hasil skrip B, run lanjutan
+
+HEAD `27c5c29` diuji. Urutan Tab Monitoring lulus: 16/16 target fokus terlihat dikunjungi sesuai urutan DOM; `/developer` lulus 18/18. Persiapan `ph_turun` menghasilkan state low dan event `threshold_low`; klik `normal` menghasilkan HTTP 200, state normal melalui API, dan event `threshold_clear`. `suhu_naik` gagal pada fase skenario; sebab detail belum tercatat, dan `offline` belum dijalankan. Durasi 161,3 detik, error browser 0, seluruh cleanup lulus. Runner tetap pada default 30 detik dan pemindai offline 60 detik. Run ini juga memperbaiki fixture sesi harness dari token 72 karakter ke format 64 karakter yang diterima autentikasi; bukan perubahan produk.
