@@ -205,7 +205,7 @@ Matrix audit-007 mencakup 21 cell untuk tujuh surface dan tiga state. Hasil akhi
 | Per sensor, error | PASS. Render test alert, pesan, dan retry serta mapping sensorState error. `Monitoring.jsx:691,128-134`; `frontendReview.test.js:447-469`. | Tidak diukur |
 | Per area, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per area; render test memverifikasi teks. `Monitoring.jsx:290,775`; `frontendReview.test.js:660-677`. | Browser 0 px pada 1280 |
 | Per area, kosong | PASS. Render test mencakup tidak ada area dan area tanpa readings. `Monitoring.jsx:298-302,784,794`; `frontendReview.test.js:678-697`. | Tidak diukur |
-| Per area, error | PASS. Render test alert dan retry serta branch areaState error. `Monitoring.jsx:783,128-134`; `frontendReview.test.js:447-475`. | Tidak diukur |
+| Per area, error | PASS. Browser pada clean code HEAD `bfd9562`: overview HTTP 500 menghasilkan 0 alert/retry/status di Per area. Pada run terpisah, satu history area HTTP 500 menghasilkan 1 alert dan 1 retry aktif; satu klik memicu retry `/readings` HTTP 200, lalu 0 alert/retry/status dan konten tetap ada. `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-per-area-final.jsonl`. | Tidak diukur |
 | Log kejadian, loading | PASS. Browser HTTP 200, teks loading di panel log, plus static render test. `Monitoring.jsx:105`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
 | Log kejadian, kosong | PASS. Browser HTTP 200 dan `Belum ada kejadian`, plus static render test. `Monitoring.jsx:108`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
 | Log kejadian, error | PASS. Browser HTTP 500, alert dan `Coba lagi`, plus static render test. `Monitoring.jsx:106,128-134`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
@@ -219,10 +219,29 @@ Matrix audit-007 mencakup 21 cell untuk tujuh surface dan tiga state. Hasil akhi
 | Klaim `/d/:code`, kosong | PASS. Render test form kosong, input password, dan tombol `Periksa kode`. `DeviceClaim.jsx:290-316,212-216`; `DeviceClaim.test.js:26-48`. | Tidak diukur |
 | Klaim `/d/:code`, error | PASS. Browser HTTP 500, alert dan `Coba lagi`. `DeviceClaim.jsx:275-280`. | Browser 0 px pada 1280 |
 
-Tidak ada FAIL produk. R-27 applicable cells kini tuntas. Modal rotasi kosong N/A sesuai kriteria. HW-02 sampai HW-08 tetap belum diuji, jadi gate M3 belum lulus penuh; Minggu 4 tidak dimulai.
+tidak ada FAIL tersisa. R-27 applicable cells kini tuntas. Modal rotasi kosong N/A sesuai kriteria. HW-02 sampai HW-08 tetap belum diuji, jadi gate M3 belum lulus penuh; Minggu 4 tidak dimulai.
 
 ## Regression final
 
 Kode dan test R-27 berada di HEAD `8bff693`; regression penuh dijalankan kembali pada HEAD dokumentasi `25574a3`: `test:pilot` 16/16, `test:v1` 58/58, frontend unit tests 124/124, typecheck exit 0, lint exit 0, build exit 0, `git diff --check` exit 0. Build firmware `satuan_ph`, `satuan_tmp`, `satuan_tds`, dan `paket_water` semuanya SUCCESS. Output mentah stdout/stderr dari regression dan pengulangan final tersimpan di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-final-regression.log`. Sesudah regression, hanya referensi file:baris pada tabel dokumentasi R-27 yang dikoreksi; kode dan test tidak berubah.
 
 Dua `ExperimentalWarning: localStorage is not available` berasal dari `src/frontendReview.test.js` saat SSR test Developer links ke OpenAPI di bawah SmartProvider, dan `src/utils/activationCodeMemory.test.js` saat test logout membaca `globalThis.localStorage`. Kedua pemicu sudah ada di `b538cfb`; `activationCodeMemory.test.js` identik dengan versi commit itu, dan test Developer links sudah ada saat itu. Akses `localStorage` terkait di `src/store/SmartStore.jsx` juga sudah ada.
+
+## Koreksi penutupan audit-007, 9 Oktober 2026
+
+| Commit | Kondisi sebelum | Kondisi sesudah |
+| --- | --- | --- |
+| `c5fc6d2` | Loading/error Per paket berada pada shared content di luar tabpanel aktifnya. | Loading dan error dirender di panel Per paket sendiri; shared notice tidak ditampilkan untuk Per paket. |
+| `b4049b4` | Rotasi credential mengatur busy dan menonaktifkan kontrol tanpa status loading yang polite. | `RotationBusyState` mengumumkan `Merotasi credential` dengan `role=status` selama rotasi. |
+| `738d05a` | Latest loading/error bersama pada tab non-paket menggandakan status/alert/retry lokal Per sensor. | Per sensor menampilkan satu status atau alert yang scoped dan satu retry. |
+| `c4f83af` | Error overview parsial (`latestState=ready` plus `latestError`) menampilkan alert biasa tanpa retry. | Menggunakan `ErrorPanel` dengan satu retry `Coba lagi` yang berfungsi. |
+| `721f3c9` | Retry pengguna yang datang saat `latestPromise` masih settle dikembalikan/dideduplikasi terhadap promise itu sehingga tindak lanjut hilang. | Satu refresh prioritas pengguna diantrekan/digabung setelah settle dengan user/generation guards, dicakup regression test store. |
+| `bfd9562` | Per area menampilkan loading/error overview melalui `AreaLatestFeedback`, walau tabelnya memakai `/devices/:id/readings` dan tidak memakai data overview latest. | Komponen dan dedicated test dihapus; `areaError` khusus area dan retry `areaRefreshActionRef` tetap ada. |
+
+Diagnosis browser pada `721f3c9`: hanya `GET /sensors/ph/overview` yang dipaksa menghasilkan 500; empat response history Per area berstatus 200. Teks alert yang diklik adalah `1 dari 3 ringkasan sensor gagal dimuat. Permintaan gagal.` Satu-satunya `Coba lagi` adalah feedback overview, bukan retry area. Dalam capture CDP 15 detik, URL pertama `/api/v1/sensors/ph/overview` pada +3 ms, disusul request overview TDS dan suhu air; ketiganya berstatus 200. `refreshLatest` dipanggil sekali dengan priority `user`, promise settle dalam 29 ms, error store terhapus, dan jendela 60 detik sebelumnya berisi 14 request API. Tidak terlihat token exhaustion atau promise yang menggantung. Bukti: `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-per-area-diagnosis.jsonl`.
+
+Alasan feedback overview dihapus dari Per area: `renderAreaTab` tidak memakai `latestByDevice` atau nilai overview untuk rows, badges, maupun nama device. Rows dibangun hanya dari `getDeviceReadings`, sesuai kontrak UX `/devices/:id/readings`; satu-satunya penggunaan overview adalah `AreaLatestFeedback`.
+
+Pada final browser run di clean code HEAD `bfd9562`, skenario overview HTTP 500 menghasilkan empat history area HTTP 200 dan 0 alert/0 retry/0 status di Per area. Pada skenario terpisah, satu history area HTTP 500 menghasilkan 1 alert/1 retry; satu klik memicu keempat retry history request berstatus 200 dalam jendela 15 detik, dengan request pertama pada +4 ms. Setelah pulih, ada 0 alert/0 retry/0 status dan konten tetap ada. Bukti: `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-per-area-final.jsonl`.
+
+Tidak ada angka M3 yang berubah, sehingga `docs/iot/07-test-plan.md` dan gate table-nya dibiarkan tanpa perubahan. M3 tetap belum lulus penuh sampai HW-02 sampai HW-08 diuji secara fisik. Minggu 4 tidak dimulai.
