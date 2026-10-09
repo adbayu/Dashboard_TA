@@ -13,6 +13,28 @@ const SCENARIOS = [
   { value: 'suhu_naik', label: 'Suhu naik' },
   { value: 'offline', label: 'Tidak terhubung' },
 ];
+
+export function SandboxLoadingState() {
+  return <p role="status" className="py-3 text-sm text-on-surface-variant">Memuat device sandbox...</p>;
+}
+
+export function SandboxReadingValue({ reading }) {
+  return reading?.value == null ? 'Belum ada data' : `${formatSensorNumber(reading.value, 2)} pH`;
+}
+
+export function SandboxEventMessage({ event }) {
+  return event ? formatEventMessage(event, { ph: 'pH Air' }) : 'Belum ada kejadian';
+}
+
+export function SandboxErrorAlert({ error, onRetry }) {
+  return (
+    <div role="alert" className="mb-3 space-y-2 rounded-xl border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">
+      <p>{error}</p>
+      {onRetry && <Button variant="ghost" icon="refresh" onClick={onRetry}>Coba lagi</Button>}
+    </div>
+  );
+}
+
 export default function SandboxPanel({ apiKeyPrefix = '' }) {
   const { currentUser, isLoggedIn } = useSmart();
   const [sandbox, setSandbox] = useState(null);
@@ -149,8 +171,8 @@ export default function SandboxPanel({ apiKeyPrefix = '' }) {
     <Card pad="sm">
       <SectionTitle eyebrow="Sandbox Test" title="Uji skenario tanpa mengubah device live" subtitle="Skenario memengaruhi device sandbox milik akun ini saja." />
       {notice && <p role="status" className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">{notice}</p>}
-      {error && <div role="alert" className="mb-3 space-y-2 rounded-xl border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100"><p>{error}</p>{status === 'error' && <Button variant="ghost" icon="refresh" onClick={() => { setStatus('loading'); setError(''); void refresh(); }}>Coba lagi</Button>}</div>}
-      {status === 'loading' && <p role="status" className="py-3 text-sm text-on-surface-variant">Memuat device sandbox...</p>}
+      {error && <SandboxErrorAlert error={error} onRetry={status === 'error' ? () => { setStatus('loading'); setError(''); void refresh(); } : undefined} />}
+      {status === 'loading' && <SandboxLoadingState />}
       {status === 'error' && !sandbox && <Empty title="Device sandbox tidak tersedia" hint="Periksa koneksi API lalu coba lagi." icon="science" />}
       {status === 'ready' && !sandbox && <Empty title="Device sandbox belum tersedia" hint="Endpoint Sandbox akan menyiapkan device untuk akun ini." icon="science" />}
       {sandbox && <div className="space-y-4">
@@ -166,7 +188,7 @@ export default function SandboxPanel({ apiKeyPrefix = '' }) {
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-surface-container-low p-3">
             <p className="text-xs font-semibold text-on-surface-variant">pH terakhir</p>
-            <p className="mt-1 font-bold tabular-nums text-on-surface">{phReading?.value == null ? 'Belum ada data' : `${formatSensorNumber(phReading.value, 2)} pH`}</p>
+            <p className="mt-1 font-bold tabular-nums text-on-surface"><SandboxReadingValue reading={phReading} /></p>
             <div className="mt-2"><SensorStateBadge state={phReading?.state} /></div>
             <p className="mt-2 text-xs text-on-surface-variant">{formatMeasuredAt(sandbox.latest?.measuredAt)}</p>
           </div>
@@ -176,7 +198,7 @@ export default function SandboxPanel({ apiKeyPrefix = '' }) {
           </div>
           <div className="rounded-xl bg-surface-container-low p-3">
             <p className="text-xs font-semibold text-on-surface-variant">Kejadian terakhir</p>
-            <p className="mt-1 break-words text-sm font-semibold text-on-surface">{latestEvent ? formatEventMessage(latestEvent, { ph: 'pH Air' }) : 'Belum ada kejadian'}</p>
+            <p className="mt-1 break-words text-sm font-semibold text-on-surface"><SandboxEventMessage event={latestEvent} /></p>
             <p className="mt-2 text-xs text-on-surface-variant">{latestEvent?.at ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(latestEvent.at)) : 'Waktu tidak tersedia'}</p>
           </div>
         </div>
