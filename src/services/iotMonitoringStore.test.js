@@ -336,3 +336,51 @@ test('final disconnect and logout abort in-flight startup requests', async () =>
   assert.deepEqual(logoutStore.getSnapshot().devices, []);
   logoutLease();
 });
+
+test('user retry requested while a failed latest refresh settles starts one new overview request', async () => {
+  const failedOverview = deferred();
+  const retriedOverview = deferred();
+  let overviewCalls = 0;
+  const api = {
+    async getDevices() {
+      return {
+        devices: [{ id: 'device-1', sensors: [{ code: 'ph' }] }],
+        sensorTypes: [{ code: 'ph', name: 'pH' }],
+      };
+    },
+    getSensorOverview() {
+      overviewCalls += 1;
+      if (overviewCalls === 1) return Promise.resolve({ items: [] });
+      if (overviewCalls === 2) return failedOverview.promise;
+      if (overviewCalls === 3) return retriedOverview.promise;
+      assert.fail(`Unexpected overview request ${overviewCalls}`);
+    },
+  };
+  const store = createIotMonitoringStore({ api, streamClient: streamClient() });
+  const stop = store.connect('owner-1');
+  await waitFor(() => store.getSnapshot().latestState === 'ready');
+  assert.equal(overviewCalls, 1);
+
+  let retryRequested = false;
+  let retryPromise;
+  const unsubscribe = store.subscribe(() => {
+    const { latestError } = store.getSnapshot();
+    if (latestError && !retryRequested) {
+      retryRequested = true;
+      retryPromise = store.refreshLatest({ priority: 'user' });
+    }
+  });
+
+  const failedRefresh = store.refreshLatest({ priority: 'user' });
+  assert.equal(overviewCalls, 2);
+  failedOverview.reject(new Error('overview unavailable'));
+
+  await waitFor(() => overviewCalls === 3);
+  retriedOverview.resolve({ items: [] });
+  await Promise.all([failedRefresh, retryPromise]);
+
+  assert.equal(store.getSnapshot().latestError, '');
+  assert.equal(store.getSnapshot().latestState, 'ready');
+  unsubscribe();
+  stop();
+});

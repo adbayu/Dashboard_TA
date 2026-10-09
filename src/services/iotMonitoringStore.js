@@ -95,6 +95,7 @@ export function createIotMonitoringStore({
   let latestController = null;
   let catalogPromise = null;
   let latestPromise = null;
+  let queuedUserRefresh = null;
   let stopStream = null;
   let initialLatestReady = false;
   let replayingPendingFrames = false;
@@ -115,6 +116,7 @@ export function createIotMonitoringStore({
     latestController = null;
     catalogPromise = null;
     latestPromise = null;
+    queuedUserRefresh = null;
     stopStream?.();
     stopStream = null;
     initialLatestReady = false;
@@ -135,6 +137,7 @@ export function createIotMonitoringStore({
     latestController = null;
     catalogPromise = null;
     latestPromise = null;
+    queuedUserRefresh = null;
     stopStream?.();
     stopStream = null;
     pendingFrames = [];
@@ -264,7 +267,19 @@ export function createIotMonitoringStore({
   function refreshLatest({ priority = 'latest' } = {}) {
     if (!currentUserId) return Promise.resolve(snapshot);
     if (catalogPromise) return catalogPromise.then(() => refreshLatest({ priority }));
-    if (latestPromise) return latestPromise;
+    if (latestPromise) {
+      if (priority !== 'user') return latestPromise;
+      if (queuedUserRefresh) return queuedUserRefresh.promise;
+      const queued = { generationAtStart: generation, userId: currentUserId, promise: null };
+      queuedUserRefresh = queued;
+      const runQueuedRefresh = () => {
+        if (queuedUserRefresh === queued) queuedUserRefresh = null;
+        if (queued.generationAtStart !== generation || queued.userId !== currentUserId) return snapshot;
+        return refreshLatest({ priority: 'user' });
+      };
+      queued.promise = latestPromise.then(runQueuedRefresh, runQueuedRefresh);
+      return queued.promise;
+    }
     if (snapshot.catalogState !== 'ready') return loadCatalog({ priority });
     const sensorCodes = [...new Set(snapshot.devices.flatMap(deviceSensors).map(sensor => sensor.code).filter(Boolean))];
     if (!sensorCodes.length) {
