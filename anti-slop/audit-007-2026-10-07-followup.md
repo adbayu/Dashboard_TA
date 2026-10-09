@@ -197,32 +197,32 @@ Matrix audit-007 mencakup 21 cell untuk tujuh surface dan tiga state. Hasil akhi
 
 | Surface/state | Hasil dan jenis bukti | Overflow |
 | --- | --- | --- |
-| Per paket, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel aktif; render test memverifikasi teks. `Monitoring.jsx:286,690-692`; `frontendReview.test.js:627-647`. | Browser 0 px pada 1280 |
-| Per paket, kosong | PASS. Render test untuk judul dan hint no-package. `Monitoring.jsx:278-284,690`; `frontendReview.test.js:608-624`. | Tidak diukur |
-| Per paket, error | PASS. Render test alert dan `Coba lagi` serta branch latestError dalam tab aktif. `Monitoring.jsx:692,128-134`; `frontendReview.test.js:447-481`. | Tidak diukur |
-| Per sensor, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per sensor; render test memverifikasi teks. `Monitoring.jsx:290,710`; `frontendReview.test.js:648-665`. | Browser 0 px pada 1280 |
-| Per sensor, kosong | PASS. Render test pesan tidak ada device dengan sensor terpilih. `Monitoring.jsx:308,714`; `frontendReview.test.js:666-683`. | Tidak diukur |
-| Per sensor, error | PASS. Render test alert, pesan, dan retry serta mapping sensorState error. `Monitoring.jsx:711,128-134`; `frontendReview.test.js:447-481`. | Tidak diukur |
-| Per area, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per area; render test memverifikasi teks. `Monitoring.jsx:294,787`; `frontendReview.test.js:684-700`. | Browser 0 px pada 1280 |
-| Per area, kosong | PASS. Render test mencakup tidak ada area dan area tanpa readings. `Monitoring.jsx:302,790,800`; `frontendReview.test.js:702-724`. | Tidak diukur |
-| Per area, error | PASS. Render test alert dan retry serta branch areaState error. `Monitoring.jsx:789,128-134`; `frontendReview.test.js:447-481`. | Tidak diukur |
+| Per paket, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel aktif; render test memverifikasi teks. `Monitoring.jsx:285-287,691`; `frontendReview.test.js:627-647`. | Browser 0 px pada 1280 |
+| Per paket, kosong | PASS. Render test untuk judul dan hint no-package. `Monitoring.jsx:278-285`; `frontendReview.test.js:598-613`. | Tidak diukur |
+| Per paket, error | PASS. Render test alert dan `Coba lagi` serta branch latestError dalam tab aktif. `Monitoring.jsx:692,128-134`; `frontendReview.test.js:447-478`. | Tidak diukur |
+| Per sensor, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per sensor; render test memverifikasi teks. `Monitoring.jsx:286,686`; `frontendReview.test.js:623-644`. | Browser 0 px pada 1280 |
+| Per sensor, kosong | PASS. Render test pesan tidak ada device dengan sensor terpilih. `Monitoring.jsx:290,694`; `frontendReview.test.js:641-659`. | Tidak diukur |
+| Per sensor, error | PASS. Render test alert, pesan, dan retry serta mapping sensorState error. `Monitoring.jsx:691,128-134`; `frontendReview.test.js:447-469`. | Tidak diukur |
+| Per area, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per area; render test memverifikasi teks. `Monitoring.jsx:290,775`; `frontendReview.test.js:660-677`. | Browser 0 px pada 1280 |
+| Per area, kosong | PASS. Render test mencakup tidak ada area dan area tanpa readings. `Monitoring.jsx:298-302,784,794`; `frontendReview.test.js:678-697`. | Tidak diukur |
+| Per area, error | PASS. Render test alert dan retry serta branch areaState error. `Monitoring.jsx:783,128-134`; `frontendReview.test.js:447-475`. | Tidak diukur |
 | Log kejadian, loading | PASS. Browser HTTP 200, teks loading di panel log, plus static render test. `Monitoring.jsx:105`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
 | Log kejadian, kosong | PASS. Browser HTTP 200 dan `Belum ada kejadian`, plus static render test. `Monitoring.jsx:108`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
 | Log kejadian, error | PASS. Browser HTTP 500, alert dan `Coba lagi`, plus static render test. `Monitoring.jsx:106,128-134`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
-| Sandbox, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam panel Sandbox; render test memverifikasi teks. `SandboxPanel.jsx:17,175`; `SandboxPanel.test.js:8-24`. | Browser 0 px pada 1280 |
-| Sandbox, kosong | PASS. Render test untuk placeholder `Belum ada data` dan `Belum ada kejadian`. `SandboxPanel.jsx:21-26,191,201`; `SandboxPanel.test.js:26-43`. | Tidak diukur |
+| Sandbox, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam panel Sandbox; render test memverifikasi teks. `SandboxPanel.jsx:17,158`; `SandboxPanel.test.js:8-24`. | Browser 0 px pada 1280 |
+| Sandbox, kosong | PASS. Render test untuk placeholder `Belum ada data` dan `Belum ada kejadian`. `SandboxPanel.jsx:21-27,182,192`; `SandboxPanel.test.js:26-43`. | Tidak diukur |
 | Sandbox, error | PASS. HTTP 500, alert dan retry diverifikasi browser serta render test. `SandboxPanel.jsx:29,174`; `SandboxPanel.test.js:45-91`. | Browser 0 px pada 1280 |
 | Modal rotasi, loading | PASS. Browser 5 detik, HTTP 200, role=status di dalam dialog; render test memverifikasi teks. `AdminIotPage.jsx:10,637`; `AdminIotPage.test.js:8-24`. | Browser 0 px pada 1280 |
 | Modal rotasi, kosong | N/A. Dialog konfirmasi hanya muncul setelah memilih device; bukan surface data yang memiliki empty state. `AdminIotPage.jsx:626-636`. | Tidak diukur |
 | Modal rotasi, error | PASS. Browser HTTP 500 dan alert. Jalan keluarnya ialah tombol `Rotasi credential` aktif kembali setelah gagal: catch menyimpan error, finally mengatur `rotationBusy=false`, dan tombol hanya disabled saat busy. `AdminIotPage.jsx:245-260,638-641`. | Browser 0 px pada 1280 |
-| Klaim `/d/:code`, loading | PASS. Browser 5 detik, preview HTTP 200, role=status dalam main; render test memverifikasi teks. `DeviceClaim.jsx:199,320`; `DeviceClaim.test.js:8-24`. | Browser 0 px pada 1280 |
-| Klaim `/d/:code`, kosong | PASS. Render test form kosong, input password, dan tombol `Periksa kode`. `DeviceClaim.jsx:212-213,290-318`; `DeviceClaim.test.js:26-48`. | Tidak diukur |
+| Klaim `/d/:code`, loading | PASS. Browser 5 detik, preview HTTP 200, role=status dalam main; render test memverifikasi teks. `DeviceClaim.jsx:199,309`; `DeviceClaim.test.js:8-24`. | Browser 0 px pada 1280 |
+| Klaim `/d/:code`, kosong | PASS. Render test form kosong, input password, dan tombol `Periksa kode`. `DeviceClaim.jsx:290-316,212-216`; `DeviceClaim.test.js:26-48`. | Tidak diukur |
 | Klaim `/d/:code`, error | PASS. Browser HTTP 500, alert dan `Coba lagi`. `DeviceClaim.jsx:275-280`. | Browser 0 px pada 1280 |
 
 Tidak ada FAIL produk. R-27 applicable cells kini tuntas. Modal rotasi kosong N/A sesuai kriteria. HW-02 sampai HW-08 tetap belum diuji, jadi gate M3 belum lulus penuh; Minggu 4 tidak dimulai.
 
 ## Regression final
 
-Regression penuh pada code HEAD `8bff693`: `test:pilot` 16/16, `test:v1` 58/58, frontend unit tests 124/124, typecheck exit 0, lint exit 0, build exit 0, `git diff --check` exit 0. Build firmware `satuan_ph`, `satuan_tmp`, `satuan_tds`, dan `paket_water` semuanya SUCCESS. Output mentah stdout/stderr disimpan di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-final-regression.log`; file ini juga akan menampung rerun pada HEAD final setelah commit dokumentasi.
+Kode dan test R-27 berada di HEAD `8bff693`; regression penuh dijalankan kembali pada HEAD dokumentasi `25574a3`: `test:pilot` 16/16, `test:v1` 58/58, frontend unit tests 124/124, typecheck exit 0, lint exit 0, build exit 0, `git diff --check` exit 0. Build firmware `satuan_ph`, `satuan_tmp`, `satuan_tds`, dan `paket_water` semuanya SUCCESS. Output mentah stdout/stderr dari regression dan pengulangan final tersimpan di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-final-regression.log`. Sesudah regression, hanya referensi file:baris pada tabel dokumentasi R-27 yang dikoreksi; kode dan test tidak berubah.
 
 Dua `ExperimentalWarning: localStorage is not available` berasal dari `src/frontendReview.test.js` saat SSR test Developer links ke OpenAPI di bawah SmartProvider, dan `src/utils/activationCodeMemory.test.js` saat test logout membaca `globalThis.localStorage`. Kedua pemicu sudah ada di `b538cfb`; `activationCodeMemory.test.js` identik dengan versi commit itu, dan test Developer links sudah ada saat itu. Akses `localStorage` terkait di `src/store/SmartStore.jsx` juga sudah ada.
