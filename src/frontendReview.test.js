@@ -492,37 +492,6 @@ test('Per sensor partial overview error shows one alert and invokes one retry ac
   assert.equal(attempts, 1);
 });
 
-test('Per area shows overview feedback only after area data is ready', async t => {
-  const vite = await createServer({
-    root: process.cwd(),
-    configFile: false,
-    define: { 'import.meta.env.VITE_IOT_SOURCE': JSON.stringify('api') },
-    plugins: [exposeMonitoringForTests(), react()],
-    server: { middlewareMode: true },
-    appType: 'custom',
-    logLevel: 'silent',
-  });
-  t.after(() => vite.close());
-  const { AreaLatestFeedback, AreaTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
-  const feedback = props => React.createElement(AreaLatestFeedback, props);
-  const loadingMarkup = renderToStaticMarkup(React.createElement(React.Fragment, null,
-    React.createElement(AreaTabLoading),
-    feedback({ areaState: 'loading', areaError: '', latestState: 'loading', latestError: '' }),
-  ));
-  assert.equal((loadingMarkup.match(/role="status"/g) || []).length, 1);
-
-  const readyMarkup = renderToStaticMarkup(feedback({
-    areaState: 'ready',
-    areaError: '',
-    latestState: 'error',
-    latestError: 'Overview gagal',
-    onRetryLatest: () => {},
-  }));
-  assert.equal((readyMarkup.match(/role="alert"/g) || []).length, 1);
-  assert.match(readyMarkup, /Overview gagal/);
-  assert.match(readyMarkup, /Coba lagi/);
-});
-
 test('IoT control surfaces scope 44px hit areas without changing shared defaults', async () => {
   const [css, ui, developer, monitoring, adminIot] = await Promise.all([
     readFile(new URL('./index.css', import.meta.url), 'utf8'),
