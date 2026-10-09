@@ -7,6 +7,10 @@ const EMPTY_DEVICE = { typeCode: '', name: '', areaRef: '', firmware: '' };
 const EMPTY_TYPE = { code: '', name: '', kind: 'satuan', description: '', sensors: [] };
 const EMPTY_SENSOR = { code: '', name: '', unit: '', min: '', max: '', decimals: 2, warnLow: '', warnHigh: '' };
 const EMPTY_LIST = [];
+export function RotationBusyState() {
+  return <p role="status" className="text-sm text-on-surface-variant">Merotasi credential</p>;
+}
+
 const STATUS = {
   online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
   stale: { label: 'Data tertunda', tone: 'warn', icon: 'schedule' },
@@ -630,6 +634,7 @@ export default function AdminIotPage() {
           <p className="text-sm leading-relaxed text-on-surface-variant">
             Credential lama untuk <strong className="text-on-surface">{rotationConfirmation.code}</strong> langsung tidak berlaku setelah rotasi. Perangkat harus diprovisioning ulang dengan credential baru.
           </p>
+          {rotationBusy && <RotationBusyState />}
           {rotationError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{rotationError}</p>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button size="lg" variant="ghost" disabled={rotationBusy} onClick={cancelRotationConfirmation}>Batal</Button>
