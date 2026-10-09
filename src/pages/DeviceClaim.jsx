@@ -196,7 +196,7 @@ export default function DeviceClaim() {
           />
         </header>
 
-        {viewState === 'loading' && <Card><p role="status" className="text-sm text-on-surface-variant">Memuat informasi QR...</p></Card>}
+        {viewState === 'loading' && <DeviceClaimLoadingState />}
         {previewCard}
 
         {viewState === 'login-required' && (
@@ -210,31 +210,12 @@ export default function DeviceClaim() {
         )}
 
         {viewState === 'activation-required' && (
-          <Card>
-            <SectionTitle title="Masukkan kode aktivasi" />
-            <p className="text-sm text-on-surface-variant">Kode tidak tersimpan di alamat halaman. Minta kode yang masih berlaku dari pengelola untuk melanjutkan.</p>
-            <form onSubmit={submitActivationCode} className="mt-4 space-y-3">
-              <div>
-                <label htmlFor="manual-activation-code" className="mb-1 block text-sm font-semibold text-on-surface">Kode aktivasi</label>
-                <input
-                  id="manual-activation-code"
-                  type="password"
-                  value={manualActivationCode}
-                  onChange={event => setManualActivationCode(event.target.value)}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck="false"
-                  inputMode="text"
-                  maxLength={64}
-                  pattern="[a-f0-9]{64}"
-                  required
-                  className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                />
-              </div>
-              {viewError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{viewError}</p>}
-              <Button type="submit" size="lg" icon="key" className="!h-[52px] w-full">Periksa kode</Button>
-            </form>
-          </Card>
+          <ActivationRequiredState
+            manualActivationCode={manualActivationCode}
+            viewError={viewError}
+            onManualActivationCodeChange={event => setManualActivationCode(event.target.value)}
+            onSubmit={submitActivationCode}
+          />
         )}
 
         {viewState === 'claimable' && (
@@ -304,6 +285,40 @@ export default function DeviceClaim() {
       </div>
     </main>
   );
+}
+
+export function ActivationRequiredState({ manualActivationCode, viewError, onManualActivationCodeChange, onSubmit }) {
+  return (
+    <Card>
+      <SectionTitle title="Masukkan kode aktivasi" />
+      <p className="text-sm text-on-surface-variant">Kode tidak tersimpan di alamat halaman. Minta kode yang masih berlaku dari pengelola untuk melanjutkan.</p>
+      <form onSubmit={onSubmit} className="mt-4 space-y-3">
+        <div>
+          <label htmlFor="manual-activation-code" className="mb-1 block text-sm font-semibold text-on-surface">Kode aktivasi</label>
+          <input
+            id="manual-activation-code"
+            type="password"
+            value={manualActivationCode}
+            onChange={onManualActivationCodeChange}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck="false"
+            inputMode="text"
+            maxLength={64}
+            pattern="[a-f0-9]{64}"
+            required
+            className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          />
+        </div>
+        {viewError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{viewError}</p>}
+        <Button type="submit" size="lg" icon="key" className="!h-[52px] w-full">Periksa kode</Button>
+      </form>
+    </Card>
+  );
+}
+
+export function DeviceClaimLoadingState() {
+  return <Card><p role="status" className="text-sm text-on-surface-variant">Memuat informasi QR...</p></Card>;
 }
 
 function SectionTitle({ title }) {
