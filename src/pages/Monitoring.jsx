@@ -275,6 +275,40 @@ function PackageDeviceCard({ device, latest }) {
   );
 }
 
+export function PackageTabEmpty({ hasPackageDevices }) {
+  return <Empty
+    title={hasPackageDevices ? 'Sensor paket belum tersedia' : 'Belum ada perangkat paket live'}
+    hint={hasPackageDevices ? 'Sensor paket akan muncul setelah tersedia pada daftar API.' : 'Perangkat paket yang terpasang akan muncul di sini.'}
+    icon="deployed_code"
+  />;
+}
+
+export function PackageTabLoading() {
+  return <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat nilai terbaru...</p>;
+}
+
+export function SensorTabLoading() {
+  return <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat ringkasan sensor...</p>;
+}
+
+export function AreaTabLoading({ onReload }) {
+  return <div className="space-y-3">
+    <div className="flex justify-end"><Button variant="ghost" icon="refresh" onClick={onReload}>Muat ulang</Button></div>
+    <p role="status" className="text-sm text-on-surface-variant">Memuat ringkasan pembacaan hari ini...</p>
+    <p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p>
+  </div>;
+}
+
+export function AreaEmptyState({ hasArea }) {
+  return hasArea
+    ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="query_stats" />
+    : <Empty title="Belum ada area dengan perangkat live" hint="Area terisi akan muncul setelah perangkat memiliki areaRef." icon="water" />;
+}
+
+export function SensorDeviceEmpty() {
+  return <Empty title="Belum ada perangkat dengan sensor ini" hint="Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang." icon="sensors" />;
+}
+
 function ComparisonChart({ series, sensor }) {
   const validSeries = series.map(item => ({ ...item, points: item.history?.points || [] }))
     .filter(item => item.points.some(point => Number.isFinite(Number(point.avg))));
@@ -653,11 +687,9 @@ function MonitoringView({ currentUser }) {
   }
 
   function renderPackageTab() {
-    if (!packageDevices.some(device => deviceSensors(device).length)) return <Empty
-      title={packageDevices.length ? 'Sensor paket belum tersedia' : 'Belum ada perangkat paket live'}
-      hint={packageDevices.length ? 'Sensor paket akan muncul setelah tersedia pada daftar API.' : 'Perangkat paket yang terpasang akan muncul di sini.'}
-      icon="deployed_code"
-    />;
+    if (!packageDevices.some(device => deviceSensors(device).length)) return <PackageTabEmpty hasPackageDevices={packageDevices.length > 0} />;
+    if (latestState === 'loading') return <PackageTabLoading />;
+    if (latestError) return <ErrorPanel message={latestError} onRetry={retryLatest} />;
     return <div className="space-y-4">{packageDevices.map(device => <PackageDeviceCard
       key={`${currentUser?.id}:${device.id}`}
       device={device}
@@ -675,11 +707,11 @@ function MonitoringView({ currentUser }) {
         setComparisonError('');
         setComparisonHistories({});
       }} options={sensorOptions} /></Field></Card>
-      {sensorState === 'loading' || sensorState === 'idle' ? <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat ringkasan sensor...</p>
+      {sensorState === 'loading' || sensorState === 'idle' ? <SensorTabLoading />
          : sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retryLatest} />
           : <>
             {sensorError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{sensorError}</p>}
-            {currentSensorItems.length === 0 ? <Empty title="Belum ada perangkat dengan sensor ini" hint="Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang." icon="sensors" /> : (
+            {currentSensorItems.length === 0 ? <SensorDeviceEmpty /> : (
               <Card pad="sm">
                 <SectionTitle title={selectedSensorType?.name || selectedSensor} subtitle="Perangkat satuan dan paket ditampilkan bersama. Nilai ambang dan waktu berasal dari API." />
                 <div className="hidden min-w-0 overflow-hidden rounded-xl border border-outline-variant/40 sm:block">
@@ -752,10 +784,10 @@ function MonitoringView({ currentUser }) {
   function renderAreaTab() {
     const areas = [...new Set(liveDevices.map(device => device.areaRef?.trim()).filter(Boolean))];
     const reloadAction = <div className="flex justify-end"><Button variant="ghost" icon="refresh" onClick={() => areaRefreshActionRef.current?.()}>Muat ulang</Button></div>;
-    if (areaState === 'loading' || areaState === 'idle') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-on-surface-variant">Memuat ringkasan pembacaan hari ini...</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
+    if (areaState === 'loading' || areaState === 'idle') return <AreaTabLoading onReload={() => areaRefreshActionRef.current?.()} />;
     if (areaState === 'waiting') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-on-surface-variant">Menunggu permintaan ringkasan area sebelumnya selesai.</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
     if (areaState === 'error') return <div className="space-y-3">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;
-    if (!areas.length) return <div className="space-y-3">{reloadAction}<Empty title="Belum ada area dengan perangkat live" hint="Area terisi akan muncul setelah perangkat memiliki areaRef." icon="water" /></div>;
+    if (!areas.length) return <div className="space-y-3">{reloadAction}<AreaEmptyState hasArea={false} /></div>;
     return <div className="space-y-4">
       {reloadAction}
       <Card pad="sm">
@@ -765,7 +797,7 @@ function MonitoringView({ currentUser }) {
         <p className="mt-3 text-xs tabular-nums text-on-surface-variant">Request area: {areaCounters.started}/{areaCounters.total}</p>
       </Card>
       {areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}
-      {areaRows.length === 0 ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="query_stats" />
+      {areaRows.length === 0 ? <AreaEmptyState hasArea />
         : <div className="overflow-x-auto rounded-2xl border border-outline-variant/50">
           <table className="w-full min-w-[620px] text-sm">
             <thead className="bg-surface-container-high/70 text-left text-xs text-on-surface-variant"><tr><th className="px-3 py-3">Area</th><th className="px-3 py-3">Sensor</th><th className="px-3 py-3">Minimum</th><th className="px-3 py-3">Rata-rata</th><th className="px-3 py-3">Maksimum</th><th className="px-3 py-3">Sampel</th></tr></thead>
@@ -791,8 +823,8 @@ function MonitoringView({ currentUser }) {
 
   return (
     <div className="iot-touch-targets min-w-0 space-y-4">
-      {latestState === 'loading' && <p role="status" className="text-sm text-on-surface-variant">Memuat nilai terbaru...</p>}
-      {latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />}
+      {activeTab !== 'package' && latestState === 'loading' && <p role="status" className="text-sm text-on-surface-variant">Memuat nilai terbaru...</p>}
+      {activeTab !== 'package' && latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />}
       <Card pad="sm">
         <SectionTitle title="Monitoring" subtitle="Pilih cara membaca kondisi sensor, lalu buka perangkat untuk tindak lanjut." />
         <div role="tablist" aria-label="Tampilan Monitoring" className="flex min-w-0 flex-wrap gap-2">

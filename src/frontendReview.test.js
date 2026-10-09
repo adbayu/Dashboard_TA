@@ -445,6 +445,13 @@ test('Monitoring subtree remounts when the session owner changes', async () => {
 });
 
 test('Monitoring error panel exposes and invokes its retry action', async t => {
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const packageTab = source.match(/function renderPackageTab\(\)\s*\{([\s\S]*?)\n  \}/)?.[1] || '';
+  assert.ok(source.includes("if (catalogState === 'error') return <ErrorPanel message={catalogError} onRetry={retryCatalog} />;"));
+  assert.ok(source.includes("sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retryLatest} />"));
+  assert.ok(source.includes('if (areaState === \'error\') return <div className="space-y-3">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;'));
+  assert.match(packageTab, /if \(latestError\) return <ErrorPanel message=\{latestError\} onRetry=\{retryLatest\} \/>;/);
+
   const vite = await createServer({
     root: process.cwd(),
     configFile: false,
@@ -459,7 +466,10 @@ test('Monitoring error panel exposes and invokes its retry action', async t => {
   let attempts = 0;
   const panel = ErrorPanel({ message: 'API gagal', onRetry: () => { attempts += 1; } });
   const children = React.Children.toArray(panel.props.children);
-  assert.match(renderToStaticMarkup(panel), /Coba lagi/);
+  const markup = renderToStaticMarkup(panel);
+  assert.match(markup, /role="alert"/);
+  assert.match(markup, /API gagal/);
+  assert.match(markup, /Coba lagi/);
   children.find(child => child?.props?.children === 'Coba lagi')?.props.onClick();
   assert.equal(attempts, 1);
 });
@@ -593,4 +603,119 @@ test('state sensor selalu menampilkan ikon sesuai arah dan teks yang bermakna', 
     assert.ok(markup.includes(icon));
     assert.ok(markup.includes(label));
   }
+});
+
+test('Per paket empty state shows the live-device guidance when no package devices exist', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { PackageTabEmpty } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const markup = renderToStaticMarkup(React.createElement(PackageTabEmpty, { hasPackageDevices: false }));
+
+  assert.match(markup, /Belum ada perangkat paket live/);
+  assert.match(markup, /Perangkat paket yang terpasang akan muncul di sini\./);
+  assert.doesNotMatch(markup, /Sensor paket belum tersedia/);
+});
+
+test('Per paket latest-value loading is announced inside the active package tab', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { PackageTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const markup = renderToStaticMarkup(React.createElement(PackageTabLoading));
+  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const packageTab = source.match(/function renderPackageTab\(\)\s*\{([\s\S]*?)\n  \}/)?.[1] || '';
+
+  assert.match(markup, /role="status"/);
+  assert.match(markup, /Memuat nilai terbaru/);
+  assert.match(packageTab, /latestState\s*===\s*['"]loading['"][\s\S]*PackageTabLoading/);
+});
+
+test('Per sensor loading state is announced as a status region', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { SensorTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const markup = renderToStaticMarkup(React.createElement(SensorTabLoading));
+
+  assert.match(markup, /role="status"/);
+  assert.match(markup, /Memuat ringkasan sensor/);
+});
+
+test('Per sensor empty state guides users to select another sensor or check installed devices', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { SensorDeviceEmpty } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const markup = renderToStaticMarkup(React.createElement(SensorDeviceEmpty));
+
+  assert.match(markup, /Belum ada perangkat dengan sensor ini/);
+  assert.match(markup, /Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang\./);
+});
+
+test('Per area loading state is announced as a status region', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { AreaTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const markup = renderToStaticMarkup(React.createElement(AreaTabLoading));
+
+  assert.match(markup, /role="status"/);
+  assert.match(markup, /Memuat ringkasan pembacaan hari ini/);
+});
+
+test('Per area empty state distinguishes missing areas from missing readings', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { AreaEmptyState } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const noAreaMarkup = renderToStaticMarkup(React.createElement(AreaEmptyState, { hasArea: false }));
+  const noReadingsMarkup = renderToStaticMarkup(React.createElement(AreaEmptyState, { hasArea: true }));
+
+  assert.match(noAreaMarkup, /Belum ada area dengan perangkat live/);
+  assert.match(noAreaMarkup, /Area terisi akan muncul setelah perangkat memiliki areaRef\./);
+  assert.match(noReadingsMarkup, /Belum ada data sensor hari ini/);
+  assert.match(noReadingsMarkup, /Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam\./);
 });
