@@ -467,6 +467,31 @@ test('Monitoring error panel exposes and invokes its retry action', async t => {
   assert.equal(attempts, 1);
 });
 
+test('Per sensor partial overview error shows one alert and invokes one retry action', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    define: { 'import.meta.env.VITE_IOT_SOURCE': JSON.stringify('api') },
+    plugins: [exposeMonitoringForTests(), react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const { SensorLatestError } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  let attempts = 0;
+  const errorPanelElement = SensorLatestError({ message: 'Overview gagal', onRetry: () => { attempts += 1; } });
+  const presentation = errorPanelElement.type(errorPanelElement.props);
+  const children = React.Children.toArray(presentation.props.children);
+  const markup = renderToStaticMarkup(presentation);
+
+  assert.equal((markup.match(/role="alert"/g) || []).length, 1);
+  assert.match(markup, /Overview gagal/);
+  assert.equal((markup.match(/>Coba lagi<\/button>/g) || []).length, 1);
+  children.find(child => child?.props?.children === 'Coba lagi')?.props.onClick();
+  assert.equal(attempts, 1);
+});
+
 test('Per area shows overview feedback only after area data is ready', async t => {
   const vite = await createServer({
     root: process.cwd(),

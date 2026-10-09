@@ -291,6 +291,10 @@ export function SensorTabLoading() {
   return <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat ringkasan sensor...</p>;
 }
 
+export function SensorLatestError({ message, onRetry }) {
+  return <ErrorPanel message={message} onRetry={onRetry} />;
+}
+
 export function AreaTabLoading({ onReload }) {
   return <div className="space-y-3">
     <div className="flex justify-end"><Button variant="ghost" icon="refresh" onClick={onReload}>Muat ulang</Button></div>
@@ -717,7 +721,7 @@ function MonitoringView({ currentUser }) {
       {sensorState === 'loading' || sensorState === 'idle' ? <SensorTabLoading />
          : sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retryLatest} />
           : <>
-            {sensorError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{sensorError}</p>}
+            {sensorError && <SensorLatestError message={sensorError} onRetry={retryLatest} />}
             {currentSensorItems.length === 0 ? <SensorDeviceEmpty /> : (
               <Card pad="sm">
                 <SectionTitle title={selectedSensorType?.name || selectedSensor} subtitle="Perangkat satuan dan paket ditampilkan bersama. Nilai ambang dan waktu berasal dari API." />
