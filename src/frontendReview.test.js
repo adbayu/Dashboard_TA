@@ -445,13 +445,6 @@ test('Monitoring subtree remounts when the session owner changes', async () => {
 });
 
 test('Monitoring error panel exposes and invokes its retry action', async t => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
-  const packageTab = source.match(/function renderPackageTab\(\)\s*\{([\s\S]*?)\n  \}/)?.[1] || '';
-  assert.ok(source.includes("if (catalogState === 'error') return <ErrorPanel message={catalogError} onRetry={retryCatalog} />;"));
-  assert.ok(source.includes("sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retryLatest} />"));
-  assert.ok(source.includes('if (areaState === \'error\') return <div className="space-y-3">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;'));
-  assert.match(packageTab, /if \(latestError\) return <ErrorPanel message=\{latestError\} onRetry=\{retryLatest\} \/>;/);
-
   const vite = await createServer({
     root: process.cwd(),
     configFile: false,
@@ -472,6 +465,37 @@ test('Monitoring error panel exposes and invokes its retry action', async t => {
   assert.match(markup, /Coba lagi/);
   children.find(child => child?.props?.children === 'Coba lagi')?.props.onClick();
   assert.equal(attempts, 1);
+});
+
+test('Per area shows overview feedback only after area data is ready', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    define: { 'import.meta.env.VITE_IOT_SOURCE': JSON.stringify('api') },
+    plugins: [exposeMonitoringForTests(), react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const { AreaLatestFeedback, AreaTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const feedback = props => React.createElement(AreaLatestFeedback, props);
+  const loadingMarkup = renderToStaticMarkup(React.createElement(React.Fragment, null,
+    React.createElement(AreaTabLoading),
+    feedback({ areaState: 'loading', areaError: '', latestState: 'loading', latestError: '' }),
+  ));
+  assert.equal((loadingMarkup.match(/role="status"/g) || []).length, 1);
+
+  const readyMarkup = renderToStaticMarkup(feedback({
+    areaState: 'ready',
+    areaError: '',
+    latestState: 'error',
+    latestError: 'Overview gagal',
+    onRetryLatest: () => {},
+  }));
+  assert.equal((readyMarkup.match(/role="alert"/g) || []).length, 1);
+  assert.match(readyMarkup, /Overview gagal/);
+  assert.match(readyMarkup, /Coba lagi/);
 });
 
 test('IoT control surfaces scope 44px hit areas without changing shared defaults', async () => {
@@ -511,7 +535,6 @@ test('DeviceClaim clears valid manual input and relies on activation memory for 
 test('Monitoring recovery views wire bounded retries for latest, comparison, and area failures', async () => {
   const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
 
-  assert.ok(source.includes('latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />'));
   assert.ok(source.includes('comparisonRunner.current.isRunning()'));
   assert.ok(source.includes('onClick={retryComparison}>Coba lagi</Button>'));
   assert.ok(source.includes("if (areaState === 'error') return <div className=\"space-y-3\">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;"));

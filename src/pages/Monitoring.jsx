@@ -299,6 +299,13 @@ export function AreaTabLoading({ onReload }) {
   </div>;
 }
 
+export function AreaLatestFeedback({ areaState, areaError, latestState, latestError, onRetryLatest }) {
+  if (areaState !== 'ready' || areaError) return null;
+  if (latestState === 'loading') return <p role="status" className="text-sm text-on-surface-variant">Memuat nilai terbaru...</p>;
+  if (latestError) return <ErrorPanel message={latestError} onRetry={onRetryLatest} />;
+  return null;
+}
+
 export function AreaEmptyState({ hasArea }) {
   return hasArea
     ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="query_stats" />
@@ -787,9 +794,10 @@ function MonitoringView({ currentUser }) {
     if (areaState === 'loading' || areaState === 'idle') return <AreaTabLoading onReload={() => areaRefreshActionRef.current?.()} />;
     if (areaState === 'waiting') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-on-surface-variant">Menunggu permintaan ringkasan area sebelumnya selesai.</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
     if (areaState === 'error') return <div className="space-y-3">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;
-    if (!areas.length) return <div className="space-y-3">{reloadAction}<AreaEmptyState hasArea={false} /></div>;
+    if (!areas.length) return <div className="space-y-3">{reloadAction}<AreaLatestFeedback areaState={areaState} areaError={areaError} latestState={latestState} latestError={latestError} onRetryLatest={retryLatest} /><AreaEmptyState hasArea={false} /></div>;
     return <div className="space-y-4">
       {reloadAction}
+      <AreaLatestFeedback areaState={areaState} areaError={areaError} latestState={latestState} latestError={latestError} onRetryLatest={retryLatest} />
       <Card pad="sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h3 className="font-semibold text-on-surface">Ringkasan pembacaan area</h3><p className="mt-1 text-sm text-on-surface-variant">{AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel.</p></div>
@@ -823,8 +831,6 @@ function MonitoringView({ currentUser }) {
 
   return (
     <div className="iot-touch-targets min-w-0 space-y-4">
-      {activeTab !== 'package' && latestState === 'loading' && <p role="status" className="text-sm text-on-surface-variant">Memuat nilai terbaru...</p>}
-      {activeTab !== 'package' && latestError && <ErrorPanel message={latestError} onRetry={retryLatest} />}
       <Card pad="sm">
         <SectionTitle title="Monitoring" subtitle="Pilih cara membaca kondisi sensor, lalu buka perangkat untuk tindak lanjut." />
         <div role="tablist" aria-label="Tampilan Monitoring" className="flex min-w-0 flex-wrap gap-2">
