@@ -191,18 +191,38 @@ Status: PASS pada HEAD `0f511ca`. UI-07 PUT berstatus 200; interval runner tetap
 
 Timing UI-07 pada run ini: klik PUT skenario tercatat pada 2026-10-08 22:32:57.179 WIB. Fase runner saat klik adalah 3.169 ms ke dalam interval 30.000 ms; tick terjadwal berikutnya diperkirakan pada 2026-10-08 22:33:24.010 WIB, berselang 26.831 s. Tick tersebut dihitung dari fase runner dan interval, bukan timestamp tick yang direkam langsung. State low/event teramati 26.966 s setelah klik, pada 22:33:24.145 WIB, sekitar 135 ms sesudah tick terjadwal. Ini satu observasi yang valid dalam rentang sekitar 3 sampai 30 detik, bukan angka latensi tetap. Hasil terdahulu 20,342 s dan 3,106 s juga berbeda karena fase klik terhadap tick. Source `server/v1/sandbox.ts` hanya memperbarui `sandbox_scenario` lalu mengembalikan response, tidak memanggil runner; `server/sandbox/runner.ts` menjalankan cycle terjadwal setiap 30.000 ms.
 
-## Hasil R-27 skrip A, per surface
+## R-27 final, satu cell per run
 
-Diuji dengan skrip per surface, satu surface per invocation dan maksimal tiga state. Semua hasil per-cell ditulis ke `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-results.jsonl` sebelum cell berikutnya; report tidak menyimpan ID, email, URL query, activation code, credential, atau session. Dari 21 cell terakhir: 6 PASS, 0 FAIL produk terkonfirmasi, 15 `belum diuji`. Setelah maksimal dua percobaan per surface, cell yang tidak mendapat bukti UI atau API yang memadai tetap `belum diuji`.
+Matrix audit-007 mencakup 21 cell untuk tujuh surface dan tiga state. Hasil akhir: 20 PASS dan 1 N/A, tanpa FAIL atau `belum diuji`. Keenam loading cell diuji di Chrome dengan response nyata ditunda 5 detik; HTTP 200, `[role=status]` terlihat dalam scope aktif, dan overflow browser 0 px pada viewport 1280. Copy spesifik loading diuji juga dengan `renderToStaticMarkup`. Cell empty/error yang lulus lewat render test diberi catatan `overflow tidak diukur`, sesuai batas SSR. Report JSONL browser dan code review tersimpan di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-results.jsonl` dan `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-code-review.jsonl`.
 
-| Surface | Loading | Kosong | Error |
-| --- | --- | --- | --- |
-| Monitoring Per paket | `belum diuji`, target request tertunda tetapi status tidak terekam pada dua run | `belum diuji`, label kosong terlihat dan overflow 0 px, tetapi status API tidak terekam | `belum diuji`, respons target tidak terverifikasi |
-| Monitoring Per sensor | `belum diuji`, yang terekam adalah respons katalog awal, bukan state sensor | `belum diuji`, respons awal HTTP 200 tetapi label state sensor tidak terverifikasi | `belum diuji`, request target state sensor tidak terverifikasi |
-| Monitoring Per area | `belum diuji`, API 200 dan overflow 0 px, tetapi label area tidak terisolasi | `belum diuji`, API 200 dan overflow 0 px, label yang aman teramati hanya dari log kejadian | `belum diuji`, API 500 dan overflow 0 px, alert ada tetapi label dan tombol retry khusus area tidak dapat disahkan |
-| Log kejadian | PASS, HTTP 200, teks `Memuat log kejadian...`, overflow 0 px | PASS, HTTP 200, `Belum ada kejadian`, overflow 0 px | PASS, HTTP 500, alert dan `Coba lagi` terlihat, overflow 0 px |
-| Panel Sandbox | `belum diuji` setelah dua run, HTTP 200 setelah delay tetapi label loading tidak tertangkap | `belum diuji`, request/telemetry kosong tidak terverifikasi | PASS, HTTP 500, alert dan `Coba lagi` terlihat, overflow 0 px |
-| Modal rotasi credential | `belum diuji` setelah dua run, request tertunda dan HTTP 200 tetapi label loading tidak tertangkap | `belum diuji`, modal tidak memiliki state kosong yang bermakna | PASS, HTTP 500 dan alert terlihat; tombol eksplisit `Coba lagi` tidak ditemukan |
-| Alur klaim `/d/:code` | `belum diuji` setelah dua run, preview request 200 tertunda tetapi label loading tidak tertangkap | `belum diuji`, form aktivasi kosong tidak terverifikasi | PASS, HTTP 500, alert dan `Coba lagi` terlihat, overflow 0 px |
+| Surface/state | Hasil dan jenis bukti | Overflow |
+| --- | --- | --- |
+| Per paket, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel aktif; render test memverifikasi teks. `Monitoring.jsx:286,690-692`; `frontendReview.test.js:627-647`. | Browser 0 px pada 1280 |
+| Per paket, kosong | PASS. Render test untuk judul dan hint no-package. `Monitoring.jsx:278-284,690`; `frontendReview.test.js:608-624`. | Tidak diukur |
+| Per paket, error | PASS. Render test alert dan `Coba lagi` serta branch latestError dalam tab aktif. `Monitoring.jsx:692,128-134`; `frontendReview.test.js:447-481`. | Tidak diukur |
+| Per sensor, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per sensor; render test memverifikasi teks. `Monitoring.jsx:290,710`; `frontendReview.test.js:648-665`. | Browser 0 px pada 1280 |
+| Per sensor, kosong | PASS. Render test pesan tidak ada device dengan sensor terpilih. `Monitoring.jsx:308,714`; `frontendReview.test.js:666-683`. | Tidak diukur |
+| Per sensor, error | PASS. Render test alert, pesan, dan retry serta mapping sensorState error. `Monitoring.jsx:711,128-134`; `frontendReview.test.js:447-481`. | Tidak diukur |
+| Per area, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam tabpanel Per area; render test memverifikasi teks. `Monitoring.jsx:294,787`; `frontendReview.test.js:684-700`. | Browser 0 px pada 1280 |
+| Per area, kosong | PASS. Render test mencakup tidak ada area dan area tanpa readings. `Monitoring.jsx:302,790,800`; `frontendReview.test.js:702-724`. | Tidak diukur |
+| Per area, error | PASS. Render test alert dan retry serta branch areaState error. `Monitoring.jsx:789,128-134`; `frontendReview.test.js:447-481`. | Tidak diukur |
+| Log kejadian, loading | PASS. Browser HTTP 200, teks loading di panel log, plus static render test. `Monitoring.jsx:105`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
+| Log kejadian, kosong | PASS. Browser HTTP 200 dan `Belum ada kejadian`, plus static render test. `Monitoring.jsx:108`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
+| Log kejadian, error | PASS. Browser HTTP 500, alert dan `Coba lagi`, plus static render test. `Monitoring.jsx:106,128-134`; `frontendReview.test.js:340-394`. | Browser 0 px pada 1280 |
+| Sandbox, loading | PASS. Browser 5 detik, HTTP 200, role=status dalam panel Sandbox; render test memverifikasi teks. `SandboxPanel.jsx:17,175`; `SandboxPanel.test.js:8-24`. | Browser 0 px pada 1280 |
+| Sandbox, kosong | PASS. Render test untuk placeholder `Belum ada data` dan `Belum ada kejadian`. `SandboxPanel.jsx:21-26,191,201`; `SandboxPanel.test.js:26-43`. | Tidak diukur |
+| Sandbox, error | PASS. HTTP 500, alert dan retry diverifikasi browser serta render test. `SandboxPanel.jsx:29,174`; `SandboxPanel.test.js:45-91`. | Browser 0 px pada 1280 |
+| Modal rotasi, loading | PASS. Browser 5 detik, HTTP 200, role=status di dalam dialog; render test memverifikasi teks. `AdminIotPage.jsx:10,637`; `AdminIotPage.test.js:8-24`. | Browser 0 px pada 1280 |
+| Modal rotasi, kosong | N/A. Dialog konfirmasi hanya muncul setelah memilih device; bukan surface data yang memiliki empty state. `AdminIotPage.jsx:626-636`. | Tidak diukur |
+| Modal rotasi, error | PASS. Browser HTTP 500 dan alert. Jalan keluarnya ialah tombol `Rotasi credential` aktif kembali setelah gagal: catch menyimpan error, finally mengatur `rotationBusy=false`, dan tombol hanya disabled saat busy. `AdminIotPage.jsx:245-260,638-641`. | Browser 0 px pada 1280 |
+| Klaim `/d/:code`, loading | PASS. Browser 5 detik, preview HTTP 200, role=status dalam main; render test memverifikasi teks. `DeviceClaim.jsx:199,320`; `DeviceClaim.test.js:8-24`. | Browser 0 px pada 1280 |
+| Klaim `/d/:code`, kosong | PASS. Render test form kosong, input password, dan tombol `Periksa kode`. `DeviceClaim.jsx:212-213,290-318`; `DeviceClaim.test.js:26-48`. | Tidak diukur |
+| Klaim `/d/:code`, error | PASS. Browser HTTP 500, alert dan `Coba lagi`. `DeviceClaim.jsx:275-280`. | Browser 0 px pada 1280 |
 
-Cleanup pada semua run yang selesai: Chrome/profile, Fastify, Vite, pool dan schema disposable ditutup/dihapus; port 3001/5173 tertutup; PostgreSQL khusus 55432 tetap berjalan untuk regression gate. Tidak ada perubahan produk dari skrip A. M3 tetap belum lulus penuh karena matriks R-27 belum lengkap dan bench HW masih belum diuji. Minggu 4 tidak dimulai.
+Tidak ada FAIL produk. R-27 applicable cells kini tuntas. Modal rotasi kosong N/A sesuai kriteria. HW-02 sampai HW-08 tetap belum diuji, jadi gate M3 belum lulus penuh; Minggu 4 tidak dimulai.
+
+## Regression final
+
+Regression penuh pada code HEAD `8bff693`: `test:pilot` 16/16, `test:v1` 58/58, frontend unit tests 124/124, typecheck exit 0, lint exit 0, build exit 0, `git diff --check` exit 0. Build firmware `satuan_ph`, `satuan_tmp`, `satuan_tds`, dan `paket_water` semuanya SUCCESS. Output mentah stdout/stderr disimpan di `C:/Users/Hi/AppData/Local/hermes/cache/scratch/audit-007-r27-final-regression.log`; file ini juga akan menampung rerun pada HEAD final setelah commit dokumentasi.
+
+Dua `ExperimentalWarning: localStorage is not available` berasal dari `src/frontendReview.test.js` saat SSR test Developer links ke OpenAPI di bawah SmartProvider, dan `src/utils/activationCodeMemory.test.js` saat test logout membaca `globalThis.localStorage`. Kedua pemicu sudah ada di `b538cfb`; `activationCodeMemory.test.js` identik dengan versi commit itu, dan test Developer links sudah ada saat itu. Akses `localStorage` terkait di `src/store/SmartStore.jsx` juga sudah ada.
