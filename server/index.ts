@@ -23,8 +23,10 @@ pool.on('error', () => console.error('Database connection failed'));
 const command = process.argv[2];
 try {
   if (command === 'migrate') {
-    await migrate(pool);
-    console.log('Migration 1 applied. No telemetry deleted.');
+    const result = await migrate(pool);
+    const applied = result.applied.length ? result.applied.join(',') : 'none';
+    const current = result.current.at(-1) ?? 'none';
+    console.log(`New migrations: ${applied}. Current schema version: ${current}. No telemetry deleted.`);
     await pool.end();
   } else if (command === 'admin') {
     const email = required('ADMIN_EMAIL').toLowerCase();
@@ -43,11 +45,14 @@ try {
     await pool.end();
   } else {
     if (command) throw new Error('Unknown command');
-    const origin = new URL(required('APP_ORIGIN'));
+    const origins = required('APP_ORIGIN').split(',').map(value => new URL(value.trim()));
     const production = process.env.NODE_ENV === 'production';
-    if (origin.href !== origin.origin + '/' || !['http:', 'https:'].includes(origin.protocol)) throw new Error('APP_ORIGIN must be an origin without a path');
-    if (production && origin.protocol !== 'https:') throw new Error('Production requires HTTPS');
-    if (!production && origin.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)) throw new Error('HTTP is allowed only on loopback');
+    if (!origins.length || origins.some(origin => origin.href !== origin.origin + '/' || !['http:', 'https:'].includes(origin.protocol))) throw new Error('APP_ORIGIN must contain comma-separated origins without paths');
+    if (production && origins.some(origin => origin.protocol !== 'https:')) throw new Error('Production requires HTTPS');
+    const allowLanHttp = process.env.ALLOW_LAN_HTTP_ORIGIN === 'true';
+    if (!production && !allowLanHttp && origins.some(origin => origin.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))) throw new Error('HTTP is allowed only on loopback unless LAN HTTP is explicitly enabled');
+    const primaryOrigin = origins[0].origin;
+    const allowedOrigins = origins.map(origin => origin.origin).join(',');
     const smtpHost = required('SMTP_HOST');
     const smtpPort = port('SMTP_PORT', 1025);
     const from = required('SMTP_FROM');
@@ -60,10 +65,10 @@ try {
       connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 5000,
       auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS! } : undefined,
     });
-    const app = await buildApp({ pool, origin: origin.origin, production, logger: true,
+    const app = await buildApp({ pool, origin: allowedOrigins, production, logger: true,
       sendInvite: async (email, token) => {
         await transport.sendMail({ from, to: email, subject: 'Undangan Pilot JagoFarm',
-          text: 'Buka ' + origin.origin + '/#invite=' + token + '\nBerlaku 24 jam. Buat password untuk memverifikasi alamat email. Jangan bagikan tautan ini.',
+          text: 'Buka ' + primaryOrigin + '/#invite=' + token + '\nBerlaku 24 jam. Buat password untuk memverifikasi alamat email. Jangan bagikan tautan ini.',
         });
       },
     });

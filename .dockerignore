@@ -1,0 +1,14 @@
+.git
+node_modules
+dist
+dist-ssr
+coverage
+.env
+.env.*
+*.local
+*.log
+.pilot-buffer.json
+compose*.yaml
+docker-compose*.yml
+docker.env.example
+docker.env.lan.example

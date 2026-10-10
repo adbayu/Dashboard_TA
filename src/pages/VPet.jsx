@@ -71,6 +71,10 @@ export default function VPet() {
 
   const readings = pet ? readingsFor(pet) : [];
   const reaksi = pet ? reactionFor(pet) : reaksiPet([], {});
+  const ekspresiKarakter = pet?.happiness < 40
+    && !['kepanasan', 'kedinginan'].includes(reaksi.ekspresi)
+    ? 'sedih'
+    : reaksi.ekspresi;
   const status = pet ? [
     { key: 'hunger', label: 'Kenyang', value: pet.hunger, icon: 'restaurant', low: 'Lapar, beri pakan' },
     { key: 'happiness', label: 'Kebahagiaan', value: pet.happiness, icon: 'mood', low: 'Murung, ajak bermain' },
@@ -115,12 +119,17 @@ export default function VPet() {
               ? itemArea?.name || 'Area di luar akses Anda'
               : 'Lokasi belum ditentukan pengelola';
             const isSelected = item.id === activePetId;
+            const itemReaksi = reactionFor(item);
+            const itemEkspresi = item.happiness < 40
+              && !['kepanasan', 'kedinginan'].includes(itemReaksi.ekspresi)
+              ? 'sedih'
+              : itemReaksi.ekspresi;
             return (
               <div key={item.id} className="pet-collection-card-wrap">
                 <Card className={`pet-collection-card ${isSelected ? 'pet-collection-card-active' : ''}`}>
                   <div className="flex items-start gap-3">
                     <div className="w-28 shrink-0 sm:w-32">
-                      <PetKarakter species={item.species} level={item.level} tinggi={142} />
+                      <PetKarakter species={item.species} level={item.level} ekspresi={itemEkspresi} tinggi={142} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +228,7 @@ export default function VPet() {
                 title={`${pet.name}, ${pet.stage}`}
                 subtitle={`Lokasi: ${petLocation}. Reaksi sensor dan status perawatan dijelaskan di bawah; gambar karakter ditampilkan apa adanya.`}
               />
-              <PetKarakter species={pet.species} level={pet.level} pesan={reaksi.pesan} tinggi={300} />
+              <PetKarakter species={pet.species} level={pet.level} ekspresi={ekspresiKarakter} pesan={reaksi.pesan} tinggi={300} />
               <p className="mt-2 text-sm text-on-surface-variant">{reaksi.pesan}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-[1fr,auto] sm:items-center">
                 <p className="text-sm text-on-surface-variant">

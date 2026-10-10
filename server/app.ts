@@ -30,6 +30,8 @@ function fail(statusCode: number, message: string): never {
 
 export async function buildApp(options: Options) {
   const { pool } = options;
+  const allowedOrigins = new Set(options.origin.split(',').map(origin => origin.trim()).filter(Boolean));
+  if (!allowedOrigins.size) throw new Error('At least one allowed origin is required');
   const app = Fastify({
     bodyLimit: 4096,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
@@ -57,7 +59,7 @@ export async function buildApp(options: Options) {
     reply.header('X-Content-Type-Options', 'nosniff');
     if (options.production) reply.header('Strict-Transport-Security', 'max-age=31536000');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && request.url !== '/api/ingest') {
-      if (request.headers.origin !== options.origin) fail(403, 'Origin tidak diizinkan.');
+      if (!allowedOrigins.has(request.headers.origin ?? '')) fail(403, 'Origin tidak diizinkan.');
     }
   });
   const publicRoutes = new Set(['/api/health', '/api/session/login', '/api/invitations/accept', '/api/ingest']);

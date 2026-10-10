@@ -36,6 +36,50 @@
   user-select: none;
 }
 
+.pet-sprite-viewport {
+  position: relative;
+  width: min(100%, 260px);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: center;
+  animation: pet-fish-in-place 2s ease-in-out infinite;
+}
+
+.pet-panggung-sprite {
+  background: #fff;
+}
+
+.pet-sprite-sheet {
+  position: absolute;
+  top: var(--pet-sprite-top);
+  left: 0;
+  display: block;
+  width: 400%;
+  max-width: none;
+  height: auto;
+  animation: pet-sprite-frames 1.2s steps(4, end) infinite;
+}
+
+@keyframes pet-sprite-frames {
+  to { transform: translateX(-100%); }
+}
+
+@keyframes pet-fish-in-place {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  25% { transform: translate3d(2px, -7px, 0) rotate(-0.8deg); }
+  50% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  75% { transform: translate3d(-2px, 7px, 0) rotate(0.8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-sprite-viewport,
+  .pet-sprite-sheet {
+    animation: none;
+    transform: none;
+  }
+}
+
 .pet-karakter-kosong {
   position: absolute;
   inset: 0;

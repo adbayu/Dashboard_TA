@@ -39,6 +39,49 @@ Buka `http://127.0.0.1:4173/`.
 > `npm run build` melalui shell background — proses npm/npx di host ini menggantung
 > sampai timeout walaupun build-nya sendiri selesai dalam ~1,4 detik.
 
+### Docker lokal: seluruh web + Pilot API + PostgreSQL
+
+Prasyarat: Docker Engine dengan Compose v2 aktif. Stack menjalankan web Vite hasil build di Nginx, Fastify Pilot API, migrasi database otomatis, PostgreSQL dengan volume persisten, dan Mailpit untuk email uji.
+
+```powershell
+Set-Location C:\JagoFarm_TA\Dashboard_TA
+Copy-Item docker.env.example .env.docker
+# Isi admin email/password hanya bila ingin mengaktifkan akun Pilot.
+docker compose --env-file .env.docker config --quiet
+docker compose --env-file .env.docker up --build -d
+```
+
+Buka SmartDashboard di `http://127.0.0.1:8080/`, UI Pilot di `http://127.0.0.1:8080/pilot`, API health di `http://127.0.0.1:8080/api/health`, dan inbox email uji di `http://127.0.0.1:8025/`. API baru aktif setelah database sehat dan migrasi berhasil.
+
+Untuk membuat admin Pilot, isi `JAGOFARM_ADMIN_EMAIL` dan `JAGOFARM_ADMIN_PASSWORD` (12–128 karakter) di `.env.docker`, lalu jalankan:
+
+```bash
+docker compose --env-file .env.docker --profile admin-init run --rm admin-init
+```
+
+Hentikan stack tanpa menghapus data:
+
+```bash
+docker compose --env-file .env.docker down
+```
+
+Jangan tambahkan `-v` kecuali memang ingin menghapus volume database. Mengubah `JAGOFARM_DB_PASSWORD` setelah volume dibuat juga tidak otomatis merotasi password role PostgreSQL; lakukan rotasi SQL terencana atau pertahankan nilai yang sama. Konfigurasi default mengikat web, database, dan email uji ke loopback.
+
+### Akses dari perangkat lain di LAN
+
+Untuk membuka dari ponsel/laptop pada jaringan yang sama, isi `.env.docker.lan` memakai contoh `docker.env.lan.example`. Ganti alamat contoh dengan IPv4 Wi-Fi mesin Docker (`ipconfig`); pada mesin ini saat ini `192.168.11.33`. File lokal tersebut mengikat web hanya ke IP Wi-Fi itu; PostgreSQL dan Mailpit tetap loopback. APP_ORIGIN memuat allowlist origin yang eksplisit, bukan wildcard.
+
+Jalankan dengan file env dasar yang sama yang dipakai saat database dibuat. Stack saat ini memakai `docker.env.example`; bila Anda memakai `.env.docker` sendiri, gunakan file itu sebagai dasar agar password DB tetap cocok.
+
+```powershell
+docker compose --env-file docker.env.example --env-file .env.docker.lan config --quiet
+docker compose --env-file docker.env.example --env-file .env.docker.lan up --build -d
+```
+
+Buka `http://192.168.11.33:8080/` dari perangkat pada Wi-Fi yang sama. Jika IP berubah, perbarui `.env.docker.lan` dan jalankan ulang Compose. Jaringan Windows saat ini berstatus Public dan koneksi ini memakai HTTP tanpa enkripsi; hanya gunakan pada LAN tepercaya, jangan masukkan kredensial nyata, dan jangan meneruskan port router ke internet. Siapa pun di jaringan yang sama dapat membuka aplikasi demo. Untuk produksi atau akses internet umum, gunakan domain HTTPS, autentikasi produksi, dan deployment terpisah.
+
+Menghentikan stack tanpa menghapus data tetap memakai `docker compose --env-file docker.env.example --env-file .env.docker.lan down` saat mode LAN aktif. Untuk produksi, gunakan HTTPS reverse proxy, `NODE_ENV=production`, origin HTTPS yang cocok, serta rotasi kredensial database.
+
 ### Perintah lain
 
 | Perintah | Fungsi |

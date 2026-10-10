@@ -41,6 +41,10 @@ export default function AdminVPet() {
     kotor: 100 - pet.hygiene,
     sakit: 100 - pet.health,
   });
+  const ekspresiKarakter = pet.happiness < 40
+    && !['kepanasan', 'kedinginan'].includes(reaksi.ekspresi)
+    ? 'sedih'
+    : reaksi.ekspresi;
 
   const stats = [
     { label: 'Kenyang', value: pet.hunger },
@@ -90,7 +94,7 @@ export default function AdminVPet() {
           {/* Karakter yang sama dengan yang dilihat pengguna, supaya pengelola
               bisa memeriksa hasil reaksi sensor tanpa berpindah akun. */}
           <div className="my-3">
-            <PetKarakter species={pet.species} level={pet.level} pesan={reaksi.pesan} tinggi={260} />
+            <PetKarakter species={pet.species} level={pet.level} ekspresi={ekspresiKarakter} pesan={reaksi.pesan} tinggi={260} />
             <p className="mt-2 text-sm text-on-surface-variant">{reaksi.pesan}</p>
           </div>
           <Badge tone="brand">Level {pet.level}</Badge>

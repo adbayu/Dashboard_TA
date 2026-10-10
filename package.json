@@ -14,7 +14,7 @@
     "db:size": "npm run api -- size",
     "simulator": "node --env-file-if-exists=.env --import tsx server/simulator.ts",
     "typecheck": "tsc -p server/tsconfig.json",
-    "test:pilot": "node --env-file-if-exists=.env --import tsx --test server/pilot.test.ts",
+    "test:pilot": "node --env-file-if-exists=.env --import tsx --test server/pilot.test.ts server/db.test.ts",
     "test:vpet": "node --test scripts/pet-model.test.mjs scripts/pet-condition.test.mjs scripts/pet-progression.test.mjs scripts/fish-population.test.mjs scripts/pet-character-levels.test.mjs",
     "cek:aset": "python scripts/cek-aset.py"
   },

@@ -13,9 +13,10 @@ test('Sprint 1: PostgreSQL-backed pilot isolation and persistence', async contex
   await control.query('CREATE SCHEMA ' + schema);
   const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 5 });
   const origin = 'http://localhost:5173';
+  const lanOrigin = 'http://10.66.178.228:8080';
   const invitations = new Map<string, string>();
   let rejectMail = false;
-  const options = { pool, origin, sendInvite: async (email: string, token: string) => {
+  const options = { pool, origin: `${origin},${lanOrigin}`, sendInvite: async (email: string, token: string) => {
     if (rejectMail) throw new Error('SMTP unavailable');
     invitations.set(email, token);
   } };
@@ -33,6 +34,12 @@ test('Sprint 1: PostgreSQL-backed pilot isolation and persistence', async contex
   };
   const admin = await login('admin@example.test');
   const request = (method: 'GET' | 'POST', url: string, session: string, payload?: object) => app.inject({ method, url, headers: { origin, cookie: session }, payload });
+  await context.test('configured LAN origin is allowed while unrelated origins remain blocked', async () => {
+    const allowed = await app.inject({ method: 'POST', url: '/api/session/login', headers: { origin: lanOrigin }, payload: { email: 'admin@example.test', password } });
+    assert.equal(allowed.statusCode, 200, allowed.body);
+    const rejected = await app.inject({ method: 'POST', url: '/api/session/logout', headers: { origin: 'https://evil.test' } });
+    assert.equal(rejected.statusCode, 403);
+  });
   let userA = ''; let userB = ''; let accountA = ''; let accountB = '';
   let water: any; let environment: any; let measuredAt = ''; let message: any;
 
