@@ -68,6 +68,18 @@ Form atau aksi manual di halaman area/V-Pet memanggil satu aksi domain di `Smart
 
 ## Batasan teknis dan non-tujuan
 
+### Struktur source code yang wajib diikuti
+
+Ikuti peta folder fitur yang sudah ditetapkan di `docs/struktur-proyek.md` dan `src/README.md`; nama folder mengikuti output/menu aplikasi dan source diletakkan langsung di folder fiturnya:
+
+- Aturan reward dan misi: `src/gamifikasi/` (gunakan subfolder `model/`, `data/`, atau `pages/` sesuai peran file).
+- Progres/EXP, level, dan tampilan V-Pet: `src/v-pet/` (gunakan `model/`, `pages/`, `components/`, atau `data/` sesuai peran file).
+- Aksi input manual kolam: `src/kelola-area/` hanya bila integrasi form memang diperlukan.
+- State lintas fitur: `src/shared/store/SmartStore.jsx` sebagai orkestrasi/persistensi; aturan domain tetap di folder fitur pemiliknya. Gunakan `src/shared/` hanya untuk kode yang benar-benar dipakai beberapa fitur.
+- Tes diletakkan di folder fitur yang sesuai, yaitu `tests/gamifikasi/`, `tests/v-pet/`, dan `tests/kelola-area/` bila ada perubahan integrasi area.
+
+Jangan menaruh source baru di root `src/`, jangan membuat folder fitur duplikat atau mengganti nama folder yang sudah dirapihkan, dan jangan memindahkan file yang tidak perlu. Tambahkan subfolder hanya mengikuti konvensi proyek yang sudah ada.
+
 - Kerjakan hanya alur gamifikasi, V-Pet, dan integrasi state minimum untuk mengaitkan reward ke kolam.
 - Jangan mengubah logika sensor, nilai pH/suhu/TDS, ambang, simulator/telemetri, atau reaksi karakter terhadap sensor.
 - Jangan menjalankan migrasi database, mengubah layanan backend, menghapus data lokal, atau mengubah aset karakter.
