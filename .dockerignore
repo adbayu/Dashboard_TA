@@ -1,0 +1,15 @@
+.git
+node_modules
+dist
+.env
+.env.*
+!.env.example
+firmware
+docs
+anti-slop
+Claude outputs
+scripts
+*.md
+compose*.yaml
+**/*.test.js
+**/*.test.ts

@@ -77,6 +77,7 @@ try {
       enableOfflineDetection: process.env.OFFLINE_DETECTION_ENABLED !== 'false',
       enableSandbox: boolean('SANDBOX_ENABLED', true),
       sandboxRetentionDays: boundedInteger('SANDBOX_RETENTION_DAYS', 7, 1, 3650),
+      trustProxyHops: boundedInteger('TRUST_PROXY_HOPS', 0, 0, 5),
       sendInvite: async (email, token) => {
         await transport.sendMail({ from, to: email, subject: 'Undangan Pilot JagoFarm',
           text: 'Buka ' + origin.origin + '/#invite=' + token + '\nBerlaku 24 jam. Buat password untuk memverifikasi alamat email. Jangan bagikan tautan ini.',

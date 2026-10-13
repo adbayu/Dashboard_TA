@@ -1,0 +1,86 @@
+# Compose untuk VPS. Jalankan dari folder deploy/ setelah mengisi deploy/.env.
+# Hanya Caddy yang membuka port ke luar. Database dan API tidak punya ports publik.
+name: jagofarm-prod
+
+services:
+  database:
+    image: postgres:17
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: pilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di deploy/.env}
+      POSTGRES_DB: jagofarm
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pilot -d jagofarm"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Penampung email undangan kalau belum ada SMTP asli. UI hanya di loopback VPS.
+  # Akses lewat SSH tunnel: ssh -L 8025:127.0.0.1:8025 <user>@<ip-vps>
+  mailbox:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "127.0.0.1:8025:8025"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: api
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3001"
+      DATABASE_URL: postgresql://pilot:${POSTGRES_PASSWORD}@database:5432/jagofarm
+      APP_ORIGIN: https://${DOMAIN:?isi DOMAIN di deploy/.env}
+      TRUST_PROXY_HOPS: "1"
+      SMTP_HOST: ${SMTP_HOST:-mailbox}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_FROM: ${SMTP_FROM:-pilot@jagofarm.test}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+    # Migration idempoten, jadi aman dijalankan setiap start.
+    command: ["sh", "-c", "node --import tsx server/index.ts migrate && exec node --import tsx server/index.ts"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  database:
+  caddy_data:
+  caddy_config:

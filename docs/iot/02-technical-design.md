@@ -369,6 +369,7 @@ Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0
 | `OFFLINE_DETECTION_ENABLED` | `true` | Menyalakan job deteksi offline tiap 60 detik; `false` untuk test yang memanggil siklus langsung |
 | `USAGE_RETENTION_DAYS` | `30` (usulan) | Umur data `api_usage` |
 | `SANDBOX_RETENTION_DAYS` | `7` | Umur telemetry sandbox sebelum dihapus; query dibatasi `is_sandbox=true` dan mempertahankan event state anchor terakhir |
+| `TRUST_PROXY_HOPS` | `0` (pilot VPS di Compose: `1`) | Jumlah hop proxy tepercaya; nilai `1` hanya untuk API privat di belakang satu Caddy, tanpa port publik pada API |
 | `READINGS_RETENTION_DAYS` | `365` (usulan) | Umur minimal readings device asli sebelum boleh dipindah atau diringkas |
 | `MAX_ACCOUNTS`, `MAX_DEVICES` | `10`, `20 live` | Menggantikan angka batas pilot yang sekarang di-hardcode; device sandbox tidak dihitung |
 | `VITE_IOT_SOURCE` | `api` | Sumber data halaman IoT di frontend |
@@ -399,4 +400,4 @@ Job terjadwal untuk query retensi belum dibuat.
 | Event ambang berulang kalau nilai naik-turun di sekitar batas | Tambahkan histeresis 2% dari rentang ambang sebelum status kembali normal (usulan) |
 | Store rate limit di memori hilang saat restart | Bisa diterima untuk satu instance. Dicatat di ADR-0004 |
 | `date_bin` butuh PostgreSQL 14 ke atas | `compose.yaml` memakai `postgres:17` |
-| `trustProxy` belum dikonfigurasi | Di belakang reverse proxy atau hosting, semua pengguna dan semua alat berbagi satu bucket rate limit IP 120 request/menit sampai `trustProxy` diatur hanya untuk proxy tepercaya. Catatan implementasi Minggu 4; jangan ubah kode sekarang. |
+| Reverse proxy dan request IP | Secara bawaan `TRUST_PROXY_HOPS=0` dan header `X-Forwarded-*` diabaikan. Pengecualian sempit untuk pilot VPS melalui Caddy: `TRUST_PROXY_HOPS=1` hanya saat API tidak memiliki port publik. Ini bukan keputusan hosting produksi final. |

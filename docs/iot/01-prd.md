@@ -164,7 +164,7 @@ Rilis dianggap selesai kalau semua gate di [Test Plan](07-test-plan.md) lulus. R
 - Batas pilot di kode sekarang: 10 akun dan 20 unit (`server/app.ts`). Batas ini perlu dinaikkan atau dibuat konfigurasi kalau satuan dan paket dipakai bersamaan.
 - Jadwal (mulai 5 Oktober, demo paling lambat 1 November 2026) adalah asumsi dari target kurang dari sebulan.
 - Model ESP32 dan modul sensor yang sudah dirakit belum dikonfirmasi. Data `model` di `seed.js` (Atlas EZO-pH, Gravity TDS V1.0, DS18B20) adalah data contoh, belum tentu sama dengan alat asli.
-- Hosting untuk uji lapangan belum ditentukan.
+- Target deployment pilot dan uji lapangan saat ini: Lighthouse VPS dengan domain `iot.jagofarm.dev`. Ini bukan keputusan hosting produksi final.
 
 ## 11. Pertanyaan terbuka
 
@@ -176,4 +176,4 @@ Rilis dianggap selesai kalau semua gate di [Test Plan](07-test-plan.md) lulus. R
 | Q4 | Data area/kolam tanggung jawab modul siapa? | Tim |
 | Q5 | Modul "Kelola ..." di sisi kanan papan dipegang siapa saja, dan data IoT apa yang mereka butuhkan? | Tim |
 | Q6 | Model persis ESP32 dan modul sensor yang sudah dirakit, serta jumlah unit satuan dan paket | Haykal |
-| Q7 | Hosting untuk demo dan uji lapangan | Tim |
+| Q7 | Keputusan hosting produksi final setelah pilot | Tim |

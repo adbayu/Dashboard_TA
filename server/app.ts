@@ -25,6 +25,8 @@ type Options = {
   enableOfflineDetection?: boolean;
   enableSandbox?: boolean;
   sandboxRetentionDays?: number;
+  // Jumlah proxy tepercaya di depan API. 0 berarti header X-Forwarded-* diabaikan.
+  trustProxyHops?: number;
   sandboxScheduler?: SandboxScheduler;
   streamHub?: StreamHub;
   sendInvite: (email: string, token: string) => Promise<void>;
@@ -66,6 +68,7 @@ export function serializeRequestForLog(request: { method: string }) {
 export async function buildApp(options: Options) {
   const { pool } = options;
   const app = Fastify({
+    trustProxy: options.trustProxyHops ? (_address: string, hop: number) => hop < options.trustProxyHops! : false,
     bodyLimit: 4096,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
     logger: options.logger ? {
