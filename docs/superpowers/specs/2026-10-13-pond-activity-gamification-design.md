@@ -1,4 +1,4 @@
-# Gamifikasi dan EXP V-Pet dari Aktivitas Kolam
+# Gamifikasi dan Quest Level V-Pet dari Aktivitas Kolam
 
 Tanggal: 2026-10-13
 Status: Menunggu review pengguna
@@ -14,7 +14,7 @@ Poin, misi, dan kenaikan level V-Pet harus mengikuti tindakan nyata yang dicatat
 - EXP V-Pet bertambah dari peningkatan nilai kondisi pet; catatan pemantauan, kematian, dan panen belum menaikkan EXP.
 - Misi di halaman Gamifikasi dapat dicentang manual dan sebagian mencakup HPP atau chatbot.
 - Screenshot halaman Gamifikasi yang disertakan pengguna memperlihatkan alur centang misi manual tersebut.
-- Store tetap persisten di browser. Tambahkan `pondActivityEvents` dan kode aktivitas pada Aturan Poin secara aditif: defaultkan field baru untuk state lama, kaitkan R-2/R-4/R-6 ke kode stabil lewat ID rule, dan tambahkan R-7 hanya jika belum ada. Pertahankan nilai poin, batas harian, status aktif, saldo, pet, dan riwayat yang telah disimpan; jangan mereset atau memberi reward retroaktif.
+- Store tetap persisten di browser. Tambahkan `pondActivityEvents` dan `petQuestCompletions`, serta kode aktivitas pada Aturan Poin secara aditif: defaultkan field baru untuk state lama, kaitkan R-2/R-4/R-6 ke kode stabil lewat ID rule, dan tambahkan R-7 hanya jika belum ada. Pertahankan nilai poin, batas harian, status aktif, saldo, pet, dan riwayat yang telah disimpan; jangan mereset atau memberi reward/quest retroaktif.
 - Tidak ada perubahan database/server yang diperlukan atau termasuk dalam desain ini.
 
 ## Rancangan yang disetujui
@@ -28,7 +28,7 @@ Reward otomatis hanya berasal dari tindakan manual berikut, bila terkait kolam y
 3. Catatan panen aktual. Catatan bertanggal lampau tetap masuk riwayat, tetapi tidak memperoleh reward baru.
 4. Aksi beri pakan, bersihkan, dan rawat pada V-Pet yang ditempatkan di kolam.
 
-Kolam harus bertipe `kolam`; pengguna harus memiliki akses ke area tersebut. Pet-care yang dilakukan pada pet tanpa lokasi kolam yang valid tidak memperoleh reward. Untuk aktivitas level kolam, semua pet yang ditugaskan ke kolam itu menerima EXP. Aksi pet tertentu tetap memperbarui kondisi/log pet yang dituju.
+Kolam harus bertipe `kolam`; pengguna harus memiliki akses ke area tersebut. Pet-care pada pet tanpa lokasi kolam yang valid tidak memperoleh reward. Saat quest untuk kolam selesai, semua pet yang ditugaskan ke kolam tersebut menerima EXP. Aksi pet tertentu tetap memperbarui kondisi/log pet yang dituju.
 
 ### Aktivitas yang tidak memenuhi syarat
 
@@ -37,34 +37,46 @@ Kolam harus bertipe `kolam`; pengguna harus memiliki akses ke area tersebut. Pet
 - Centang misi manual dan penyesuaian saldo oleh pengelola tidak menghasilkan EXP. Penyesuaian administratif poin tetap merupakan fungsi terpisah dan tidak dihitung sebagai aktivitas kolam.
 - Aktivitas pada growbed, tandon, atau area yang tidak dapat diakses pengguna.
 
-### Reward dan progres level
+### Poin akun dan EXP melalui quest V-Pet
 
-- Setiap aktivitas baru yang memenuhi syarat memperoleh +10 EXP untuk setiap V-Pet yang ditugaskan ke kolam terkait.
-- Poin mengikuti aturan aktif dan nilai `Maks/hari` yang sudah dikonfigurasi pada Sistem Point. Batas diterapkan per pengguna, per kode aturan reward, per tanggal lokal, melintasi seluruh kolam; aksi pakan/bersih/rawat berbagi kuota aturan “Pelihara virtual pet”. Penghitung terpisah tidak boleh bergantung pada riwayat tampilan poin yang dibatasi jumlah barisnya.
-- Gunakan kode aktivitas stabil untuk memetakan tindakan ke Aturan Poin; perubahan nama aturan oleh pengelola tidak memutus pemetaan. `pemantauan_manual` memakai aturan pemantauan yang ada (R-2), `perawatan_pet` memakai R-4 untuk pakan/bersih/rawat, `panen_aktual` memakai R-6, dan `catat_kematian` memakai aturan baru R-7.
-- Tambahkan aturan awal “Catat kematian ikan” sebesar 5 poin dengan batas 1 kali/hari; nilai ini dapat disesuaikan pengelola. Batas R-4 adalah satu kuota bersama untuk semua jenis perawatan pet.
-- Aturan nonaktif atau batas harian yang telah tercapai berarti aktivitas tersebut tidak memberi poin maupun EXP. Catatan aktivitas yang benar-benar tersimpan tetap dapat memperbarui status misi.
-- Pertahankan XP, level, tahap, dan ambang progres yang sudah tersimpan. Terapkan EXP baru melalui fungsi kenaikan level yang sama agar sisa XP, ambang berikutnya, dan tahap tetap konsisten. Aksi pakan/bersihkan/rawat tidak boleh menggandakan EXP melalui algoritme peningkatan kondisi lama.
-- Saldo poin dan badge lama tidak dikurangi atau dihitung ulang. Perubahan hanya berlaku pada reward baru.
+#### Poin akun pada Gamifikasi
+
+- Poin tetap mengikuti aturan aktif dan nilai `Maks/hari` di Sistem Point. Batas dihitung per pengguna, per kode aturan, per tanggal lokal, melintasi seluruh kolam. Aksi pakan/bersih/rawat memakai kuota bersama R-4.
+- Gunakan kode aktivitas stabil: `pemantauan_manual` memakai R-2, `perawatan_pet` memakai R-4, `panen_aktual` memakai R-6, dan `catat_kematian` memakai R-7. Perubahan label aturan tidak memutus pemetaan.
+- Tambahkan R-7 “Catat kematian ikan” sebesar 5 poin dengan batas 1 kali/hari; nilainya dapat diubah pengelola.
+- Aturan nonaktif atau batas harian tercapai hanya menghentikan poin akun dari aktivitas terkait. Catatan valid tetap dapat menyelesaikan quest V-Pet.
+
+#### Quest harian V-Pet
+
+- Level V-Pet hanya memperoleh EXP dari quest yang selesai, bukan langsung dari setiap event dan bukan dari perubahan nilai kondisi pet.
+- Quest rutin per kolam: “Beri pakan” selesai oleh aksi pakan; “Bersihkan” oleh aksi bersih; “Rawat” oleh aksi rawat; “Cek kualitas air” oleh catatan pemantauan manual dengan sedikitnya dua parameter pH/suhu/TDS.
+- Quest peristiwa “Catat kematian ikan” dan “Catat panen” hanya selesai saat catatan nyata dibuat. Keduanya bukan kewajiban harian dan tidak meminta pengguna membuat catatan bila peristiwa tidak terjadi.
+- Setiap quest selesai memberi +10 EXP kepada semua V-Pet yang ditugaskan ke kolam tersebut saat quest selesai. Quest diselesaikan paling banyak sekali per `questId + areaId + tanggal lokal`; kolam lain memiliki progres quest masing-masing.
+- Aksi ulang pada quest yang sudah selesai tetap boleh memperbarui kondisi pet atau membuat catatan yang sah, tetapi tidak memberi EXP quest kedua pada tanggal yang sama. Untuk catatan kematian, koreksi pada baris kolam/tanggal yang sama tidak dihitung sebagai event baru.
+- Batas poin Sistem Point tidak membatasi EXP quest. Aksi yang valid dapat memberi EXP quest walaupun batas poin akun sudah tercapai atau aturan poinnya nonaktif.
+- Aksi “Ajak main” tetap hanya menaikkan kebahagiaan dan tidak menyelesaikan quest EXP.
+- Quest menggunakan tanggal lokal yang sama dengan `hariKey()`. Saat tanggal berganti, daftar quest harian kembali belum selesai; riwayat penyelesaian lama tetap tersimpan.
+- Pertahankan XP, level, tahap, dan ambang progres yang sudah tersimpan. Jalankan EXP quest melalui fungsi kenaikan level yang sama agar sisa EXP dan tahap tetap konsisten. Perubahan kondisi dari pakan/bersih/rawat tidak boleh menambah EXP lagi di luar quest.
+- Saldo poin, badge, level, dan EXP lama tidak dikurangi atau dihitung ulang. Tidak ada reward atau penyelesaian quest retroaktif dari data lama.
 
 ### Pencatatan idempoten
 
-Simpan satu state `pondActivityEvents` sebagai sumber status misi dan audit reward. Setiap event berisi ID pengguna, tanggal lokal, kode aktivitas, area/kolam, ID sumber yang stabil, waktu pencatatan, aturan poin, jumlah poin/EXP yang diberikan, dan ID pet penerima EXP. Event aktivitas valid tetap disimpan meskipun batas harian tercapai atau tidak ada pet di kolam; nilai reward-nya nol bila tidak berhak.
+Simpan state aktivitas `pondActivityEvents` dan penyelesaian `petQuestCompletions` secara persisten. Event aktivitas berisi ID pengguna, tanggal lokal, kode aktivitas, area/kolam, ID sumber stabil, waktu pencatatan, aturan poin, dan poin yang diberikan. Penyelesaian quest berisi `questId`, `areaId`, tanggal lokal, ID event sumber, ID pet penerima, dan +10 EXP per pet.
 
-Periksa ID sumber sebelum membuat reward. Pengiriman ulang event yang sama tidak boleh memberi reward kedua. Catatan kematian memakai kunci sumber `areaId + tanggal` agar edit catatan harian menggunakan event yang sama. Penghitung batas harian dihitung dari event/reward per aturan, bukan dari `ledger` tampilan yang dibatasi 60 baris. Aktivitas bertanggal lampau atau gagal validasi tidak menerima reward. Tidak ada pengurangan reward historis secara retroaktif.
+Kunci unik penyelesaian adalah `questId + areaId + tanggal lokal`. Catatan aktivitas valid tetap disimpan walau batas poin tercapai atau tidak ada pet di kolam; misi poin tetap dapat membaca event, tetapi quest EXP hanya memberi hadiah bila ada pet yang ditugaskan. Periksa ID sumber sebelum mencatat reward. Koreksi catatan kematian menggunakan event sumber yang sama untuk `areaId + tanggal`; tidak membuat penyelesaian quest kedua. Batas poin dihitung dari event/reward per aturan, bukan ledger tampilan yang dipangkas. Aktivitas bertanggal lampau atau gagal validasi tidak menerima poin atau EXP quest. Jangan memberi reward atau penyelesaian quest retroaktif.
 
-### Misi dan tampilan
+### Misi Gamifikasi dan quest V-Pet di UI
 
-- Ganti centang manual dengan status misi harian yang diturunkan dari `pondActivityEvents`.
-- Misi awal: “Cek pH, suhu & TDS pagi” selesai oleh catatan pemantauan manual dengan sedikitnya dua parameter; “Beri pakan virtual pet” selesai oleh aksi pakan; misi HPP dan chatbot dihapus sebagai misi reward dan diganti “Bersihkan/rawat pet” yang selesai oleh aksi bersih atau rawat. Catatan kematian dan panen tetap memperoleh reward saat terjadi, tetapi bukan kewajiban harian.
-- Misi hanya mencerminkan aktivitas yang benar-benar disimpan; tidak memberi bonus poin kedua. Catatan event tetap dapat menyelesaikan misi sekalipun batas poin/EXP untuk hari itu telah tercapai.
-- Kartu saldo, badge, dan papan peringkat tetap menggunakan saldo poin akun.
-- V-Pet menampilkan EXP aktivitas di progres dan riwayat pet; pesan reward membedakan poin akun dari EXP pet.
-- Perubahan UI dibatasi pada halaman Gamifikasi dan V-Pet yang diperlukan untuk memperlihatkan status baru. Tampilan statistik sensor tidak diubah.
+- Halaman `/gamifikasi` menampilkan status misi poin berdasarkan `pondActivityEvents`, bukan centang manual. Misi status tidak memberi bonus poin kedua; poin akun hanya berasal dari aturan aktivitas.
+- Halaman `/v-pet` menampilkan daftar quest harian pada detail pet/kolam, dengan status belum selesai/selesai dan hadiah `+10 EXP`. Status selesai berasal dari aktivitas manual yang tercatat; tidak ada tombol centang untuk mengklaim EXP.
+- Quest V-Pet: “Beri pakan”, “Bersihkan”, “Rawat”, dan “Cek kualitas air” (minimal dua parameter manual). Quest kematian/panen bersifat peristiwa, hanya muncul/selesai saat catatan nyata tersedia dan bukan target rutin harian.
+- Kartu saldo, badge, dan papan peringkat tetap memakai saldo poin akun. EXP quest memperbarui progres level serta riwayat V-Pet, terpisah dari poin akun.
+- Screenshot aksi V-Pet menjadi acuan alur: “Beri pakan”, “Bersihkan”, dan “Rawat” dapat menyelesaikan quest masing-masing; “Ajak main” hanya menambah kebahagiaan.
+- Perubahan UI dibatasi pada halaman Gamifikasi dan V-Pet yang diperlukan untuk status misi/quest. Tampilan statistik sensor tidak diubah.
 
 ## Alur data
 
-Form atau aksi manual di halaman area/V-Pet memanggil satu aksi domain di `SmartStore`. Aksi tersebut memvalidasi pengguna, area kolam, dan ID sumber; mencatat aktivitas; memeriksa aturan serta batas harian; lalu, bila layak, memperbarui saldo poin dan EXP pet secara konsisten. Misi membaca aktivitas tersimpan yang sama. Pembaruan telemetri sensor tidak melewati jalur reward ini.
+Form atau aksi manual di halaman area/V-Pet memanggil satu aksi domain di `SmartStore`. Aksi tersebut memvalidasi pengguna, kolam, tanggal, dan ID sumber; menyimpan `pondActivityEvents`; memberi poin akun jika aturan dan kuota mengizinkan; lalu memeriksa quest harian yang relevan. Quest yang belum selesai dicatat di `petQuestCompletions` dan memberi +10 EXP kepada pet di kolam. Misi poin dan quest V-Pet membaca event yang sama tetapi memakai ledger serta aturan reward terpisah. Pembaruan telemetri sensor tidak melewati jalur quest maupun reward.
 
 ## Batasan teknis dan non-tujuan
 
@@ -88,13 +100,13 @@ Jangan menaruh source baru di root `src/`, jangan membuat folder fitur duplikat 
 
 ## Kriteria penerimaan
 
-1. Catatan pemantauan manual yang valid memberi poin dan EXP sesuai aturan aktif serta batas harian.
-2. Catatan kematian baru dapat memberi reward sekali; perubahan catatan pada tanggal yang sama tidak membayar ulang.
-3. Panen aktual hari ini memberi reward; panen bertanggal lampau tidak.
-4. Pakan, bersih, dan rawat hanya memberi reward untuk pet di kolam yang dapat diakses; pet pada kolam yang sama bertambah 10 EXP.
-5. Growbed/tandon, pet tanpa kolam, HPP, chatbot, bermain, centang manual, dan telemetri otomatis tidak memberi EXP atau poin otomatis.
-6. Batas harian per pengguna/aktivitas diterapkan meskipun ledger tampilan sudah dibatasi; aksi berulang dengan ID sumber yang sama tidak dihitung dua kali.
-7. Level-up berulang dalam satu aksi mempertahankan sisa EXP, ambang berikutnya, dan tahap yang benar.
-8. Misi menampilkan status berdasarkan catatan aktivitas, tanpa centang manual atau bonus ganda.
-9. Data lama, saldo poin, level, dan XP tetap utuh setelah state dimuat ulang.
-10. Tes unit/integrasi dan browser membuktikan skenario positif, batas harian, akses area, duplikasi/koreksi, tanggal lampau, serta bahwa jalur sensor tidak berubah.
+1. Aktivitas manual yang valid memberi poin akun mengikuti aturan aktif dan batas harian per pengguna/aturan.
+2. Pakan, bersihkan, rawat, dan pemantauan manual minimal dua parameter menyelesaikan quest terkait untuk kolam yang sama.
+3. Quest yang selesai memberi tepat +10 EXP kepada semua V-Pet yang ditugaskan di kolam itu; quest yang sama hanya membayar sekali per kolam/tanggal lokal.
+4. Quest di kolam berbeda memiliki status/penyelesaian terpisah; tanggal lokal baru mereset status quest rutin tanpa menghapus riwayat lama.
+5. Catatan kematian yang diperbarui pada kolam/tanggal sama tidak menyelesaikan quest dua kali; quest kematian/panen hanya tersedia saat catatan nyata dibuat.
+6. Ajak main, HPP, chatbot, centang manual, telemetri otomatis, growbed/tandon, pet tanpa kolam, serta aktivitas tanpa hak akses tidak memberi EXP quest.
+7. Batas poin harian atau aturan poin nonaktif tidak menggagalkan EXP dari quest yang valid; poin dan EXP memiliki pencatatan terpisah.
+8. Perubahan kondisi pet tidak memberi EXP langsung di luar reward quest; kenaikan level menjaga sisa XP, ambang berikutnya, dan tahap yang benar.
+9. Data lama, saldo poin, level, dan EXP tetap utuh setelah state dimuat ulang; tidak ada quest/reward retroaktif.
+10. Tes unit/integrasi dan browser membuktikan quest completion, reset tanggal, akses area, pengulangan event, batas poin terpisah, migrasi state lokal, serta bahwa jalur sensor tidak berubah.
