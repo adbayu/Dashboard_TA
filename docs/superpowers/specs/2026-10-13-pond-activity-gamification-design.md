@@ -69,6 +69,8 @@ Kunci unik penyelesaian adalah `questId + areaId + tanggal lokal`. Catatan aktiv
 
 - Halaman `/gamifikasi` menampilkan status misi poin berdasarkan `pondActivityEvents`, bukan centang manual. Misi status tidak memberi bonus poin kedua; poin akun hanya berasal dari aturan aktivitas.
 - Halaman `/v-pet` menampilkan daftar quest harian pada detail pet/kolam, dengan status belum selesai/selesai dan hadiah `+10 EXP`. Status selesai berasal dari aktivitas manual yang tercatat; tidak ada tombol centang untuk mengklaim EXP.
+- Saat quest pertama kali selesai, UI langsung menandai quest, memperbarui EXP/bar level dan jurnal pet, lalu menampilkan pesan yang jelas, misalnya “Quest Bersihkan selesai (+10 EXP)”. Pesan poin akun ditampilkan terpisah agar tidak membingungkan.
+- Jika tombol aksi ditekan lagi setelah quest yang sama selesai hari itu, quest tetap terlihat selesai, EXP tidak bertambah lagi, dan UI memberi tahu bahwa batas quest harian sudah tercapai. Perubahan kondisi pet yang sah tetap boleh terlihat.
 - Quest V-Pet: “Beri pakan”, “Bersihkan”, “Rawat”, dan “Cek kualitas air” (minimal dua parameter manual). Quest kematian/panen bersifat peristiwa, hanya muncul/selesai saat catatan nyata tersedia dan bukan target rutin harian.
 - Kartu saldo, badge, dan papan peringkat tetap memakai saldo poin akun. EXP quest memperbarui progres level serta riwayat V-Pet, terpisah dari poin akun.
 - Screenshot aksi V-Pet menjadi acuan alur: “Beri pakan”, “Bersihkan”, dan “Rawat” dapat menyelesaikan quest masing-masing; “Ajak main” hanya menambah kebahagiaan.
@@ -103,10 +105,11 @@ Jangan menaruh source baru di root `src/`, jangan membuat folder fitur duplikat 
 1. Aktivitas manual yang valid memberi poin akun mengikuti aturan aktif dan batas harian per pengguna/aturan.
 2. Pakan, bersihkan, rawat, dan pemantauan manual minimal dua parameter menyelesaikan quest terkait untuk kolam yang sama.
 3. Quest yang selesai memberi tepat +10 EXP kepada semua V-Pet yang ditugaskan di kolam itu; quest yang sama hanya membayar sekali per kolam/tanggal lokal.
-4. Quest di kolam berbeda memiliki status/penyelesaian terpisah; tanggal lokal baru mereset status quest rutin tanpa menghapus riwayat lama.
-5. Catatan kematian yang diperbarui pada kolam/tanggal sama tidak menyelesaikan quest dua kali; quest kematian/panen hanya tersedia saat catatan nyata dibuat.
-6. Ajak main, HPP, chatbot, centang manual, telemetri otomatis, growbed/tandon, pet tanpa kolam, serta aktivitas tanpa hak akses tidak memberi EXP quest.
-7. Batas poin harian atau aturan poin nonaktif tidak menggagalkan EXP dari quest yang valid; poin dan EXP memiliki pencatatan terpisah.
-8. Perubahan kondisi pet tidak memberi EXP langsung di luar reward quest; kenaikan level menjaga sisa XP, ambang berikutnya, dan tahap yang benar.
-9. Data lama, saldo poin, level, dan EXP tetap utuh setelah state dimuat ulang; tidak ada quest/reward retroaktif.
-10. Tes unit/integrasi dan browser membuktikan quest completion, reset tanggal, akses area, pengulangan event, batas poin terpisah, migrasi state lokal, serta bahwa jalur sensor tidak berubah.
+4. Setelah klik pertama yang memenuhi syarat, status quest, EXP/bar level, dan jurnal pet langsung tampak berubah tanpa menutup detail pet; pesan membedakan EXP dari poin akun.
+5. Klik ulang pada quest yang sudah selesai tetap menampilkan status selesai dan memberi keterangan bahwa reward hari ini sudah diterima, tanpa EXP tambahan.
+6. Quest di kolam berbeda memiliki status/penyelesaian terpisah; tanggal lokal baru mereset status quest rutin tanpa menghapus riwayat lama.
+7. Catatan kematian yang diperbarui pada kolam/tanggal sama tidak menyelesaikan quest dua kali; quest kematian/panen hanya tersedia saat catatan nyata dibuat.
+8. Ajak main, HPP, chatbot, centang manual, telemetri otomatis, growbed/tandon, pet tanpa kolam, serta aktivitas tanpa hak akses tidak memberi EXP quest.
+9. Batas poin harian atau aturan poin nonaktif tidak menggagalkan EXP dari quest yang valid; poin dan EXP memiliki pencatatan terpisah.
+10. Perubahan kondisi pet tidak memberi EXP langsung di luar reward quest; kenaikan level menjaga sisa XP, ambang berikutnya, dan tahap yang benar.
+11. Data lama, saldo poin, level, dan EXP tetap utuh setelah state dimuat ulang; tes unit/integrasi dan browser mencakup reward, visual completion, batas harian, duplikasi/koreksi, akses, reset tanggal, migrasi state, serta jalur sensor yang tidak berubah.
