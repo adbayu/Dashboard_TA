@@ -68,9 +68,9 @@ Kunci unik penyelesaian adalah `questId + areaId + tanggal lokal`. Catatan aktiv
 ### Misi Gamifikasi dan quest V-Pet di UI
 
 - Halaman `/gamifikasi` menampilkan status misi poin berdasarkan `pondActivityEvents`, bukan centang manual. Misi status tidak memberi bonus poin kedua; poin akun hanya berasal dari aturan aktivitas.
-- Halaman `/v-pet` menampilkan daftar quest harian pada detail pet/kolam, dengan status belum selesai/selesai dan hadiah `+10 EXP`. Status selesai berasal dari aktivitas manual yang tercatat; tidak ada tombol centang untuk mengklaim EXP.
-- Saat quest pertama kali selesai, UI langsung menandai quest, memperbarui EXP/bar level dan jurnal pet, lalu menampilkan pesan yang jelas, misalnya “Quest Bersihkan selesai (+10 EXP)”. Pesan poin akun ditampilkan terpisah agar tidak membingungkan.
-- Jika tombol aksi ditekan lagi setelah quest yang sama selesai hari itu, quest tetap terlihat selesai, EXP tidak bertambah lagi, dan UI memberi tahu bahwa batas quest harian sudah tercapai. Perubahan kondisi pet yang sah tetap boleh terlihat.
+- Halaman `/v-pet` menampilkan quest harian sebagai checklist pada detail pet/kolam. Quest yang belum selesai terlihat belum dicentang; setelah aktivitas manual terkait tercatat, checklist otomatis tercentang dan menampilkan hadiah `+10 EXP`. Checkbox hanya indikator status, bukan kontrol klaim.
+- Saat quest pertama kali selesai, UI langsung menandai checklist, memperbarui EXP/bar level dan jurnal pet, lalu menampilkan pesan yang jelas, misalnya “Quest Bersihkan selesai (+10 EXP)”. Pesan poin akun ditampilkan terpisah agar tidak membingungkan.
+- Jika tombol aksi ditekan lagi setelah quest yang sama selesai hari itu, checklist tetap tercentang, EXP tidak bertambah lagi, dan UI memberi tahu bahwa reward harian sudah diterima. Perubahan kondisi pet yang sah tetap boleh terlihat.
 - Quest V-Pet: “Beri pakan”, “Bersihkan”, “Rawat”, dan “Cek kualitas air” (minimal dua parameter manual). Quest kematian/panen bersifat peristiwa, hanya muncul/selesai saat catatan nyata tersedia dan bukan target rutin harian.
 - Kartu saldo, badge, dan papan peringkat tetap memakai saldo poin akun. EXP quest memperbarui progres level serta riwayat V-Pet, terpisah dari poin akun.
 - Screenshot aksi V-Pet menjadi acuan alur: “Beri pakan”, “Bersihkan”, dan “Rawat” dapat menyelesaikan quest masing-masing; “Ajak main” hanya menambah kebahagiaan.
@@ -105,8 +105,8 @@ Jangan menaruh source baru di root `src/`, jangan membuat folder fitur duplikat 
 1. Aktivitas manual yang valid memberi poin akun mengikuti aturan aktif dan batas harian per pengguna/aturan.
 2. Pakan, bersihkan, rawat, dan pemantauan manual minimal dua parameter menyelesaikan quest terkait untuk kolam yang sama.
 3. Quest yang selesai memberi tepat +10 EXP kepada semua V-Pet yang ditugaskan di kolam itu; quest yang sama hanya membayar sekali per kolam/tanggal lokal.
-4. Setelah klik pertama yang memenuhi syarat, status quest, EXP/bar level, dan jurnal pet langsung tampak berubah tanpa menutup detail pet; pesan membedakan EXP dari poin akun.
-5. Klik ulang pada quest yang sudah selesai tetap menampilkan status selesai dan memberi keterangan bahwa reward hari ini sudah diterima, tanpa EXP tambahan.
+4. Setelah klik pertama yang memenuhi syarat, checklist otomatis tercentang, EXP/bar level dan jurnal pet langsung berubah tanpa menutup detail pet; pesan membedakan EXP dari poin akun.
+5. Checkbox quest bukan tombol klaim. Klik ulang pada quest yang sudah selesai tetap menampilkan centang dan memberi keterangan reward harian sudah diterima, tanpa EXP tambahan.
 6. Quest di kolam berbeda memiliki status/penyelesaian terpisah; tanggal lokal baru mereset status quest rutin tanpa menghapus riwayat lama.
 7. Catatan kematian yang diperbarui pada kolam/tanggal sama tidak menyelesaikan quest dua kali; quest kematian/panen hanya tersedia saat catatan nyata dibuat.
 8. Ajak main, HPP, chatbot, centang manual, telemetri otomatis, growbed/tandon, pet tanpa kolam, serta aktivitas tanpa hak akses tidak memberi EXP quest.
