@@ -490,6 +490,7 @@ export default function AdminIotPage() {
                       <td className="max-w-[15rem] px-3 py-3">
                         <p className="break-words font-semibold text-on-surface">{device.name}</p>
                         <p className="font-mono text-xs text-on-surface-variant">{device.code}</p>
+                        <p className="mt-0.5 break-all font-mono text-[11px] text-on-surface-variant/80">{device.id}</p>
                       </td>
                       <td className="px-3 py-3 text-on-surface-variant">
                         <span className="block">{device.type?.kind === 'paket' ? 'Paket' : 'Satuan'}</span>
@@ -501,6 +502,7 @@ export default function AdminIotPage() {
                       <td className="px-3 py-3">
                         {iotApi.canWrite ? (
                           <AksiBaris>
+                            <IconButton icon="content_copy" size="sm" onClick={() => copyText(device.id).then(() => { setActionError(''); setNotice(`ID device ${device.code} tersalin.`); }).catch(error => setActionError(error.message))} title={`Salin ID device ${device.code}`} />
                             <IconButton icon="qr_code_2" size="sm" onClick={() => openLabelForDevice(device)} title={`Buat label QR ${device.code}`} />
                             <IconButton icon="edit" size="sm" onClick={() => openEditDevice(device)} title={`Ubah ${device.code}`} />
                             <IconButton icon="autorenew" size="sm" onClick={() => startActivationRenewal(device)} title={`Buat ulang kode aktivasi ${device.code}`} />
@@ -708,6 +710,14 @@ export default function AdminIotPage() {
         ) : (
           <div className="space-y-4">
             <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">Credential dan kode aktivasi hanya tampil sekali. Simpan sebelum menutup jendela ini.</p>
+            <div>
+              <label htmlFor="provision-device-id" className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">ID device</label>
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <Input id="provision-device-id" readOnly value={provision.deviceId} className="min-w-0 flex-1 font-mono text-xs" />
+                <Button variant="ghost" icon={copied.deviceId ? 'check' : 'content_copy'} onClick={() => copySecret('deviceId', provision.deviceId)}>{copied.deviceId ? 'Tersalin' : 'Salin'}</Button>
+              </div>
+              <p className="mt-1 text-xs text-on-surface-variant">Isi kolom "ID device" di portal alat dengan nilai ini. ID ini bukan rahasia dan tetap terlihat di tabel device.</p>
+            </div>
             {provision.credential && <div>
               <label htmlFor="provision-credential" className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Credential device</label>
               <div className="flex min-w-0 flex-wrap gap-2">

@@ -86,6 +86,7 @@ Credential disimpan di NVS dan tidak dicetak ke serial. Firmware menerima root C
 - Kilat singkat: sampel tersimpan dan terkirim.
 - Dua kedip: sampel tersimpan saat offline.
 - Menyala terus: credential ditolak, alat menunggu provisioning ulang.
+- Tiga kedip cepat tiap 2 detik: state error (konfigurasi tidak valid atau LittleFS gagal dimuat). Kalau penyebabnya konfigurasi, tahan BOOT 5 detik untuk membuka portal lagi.
 
 ## Pemeriksaan pada alat asli
 

@@ -192,3 +192,4 @@ Hasil kalibrasi disimpan di NVS alat. Tanggal kalibrasi dicatat admin di dashboa
 | Menyala singkat tiap 30 detik | Sampel tersimpan dan terkirim |
 | Kedip 2 kali tiap 30 detik | Sampel tersimpan, belum terkirim (offline) |
 | Menyala terus | Halted (credential ditolak) |
+| Tiga kedip cepat tiap 2 detik | Error (konfigurasi tidak valid atau LittleFS gagal dimuat). Kalau karena konfigurasi, tahan BOOT 5 detik untuk provisioning ulang |

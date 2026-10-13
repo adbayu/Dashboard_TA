@@ -57,7 +57,7 @@
 // jadi board baru yang belum pernah diisi LittleFS akan berhenti di state error tanpa ini.
 // Pada board yang sudah berisi antrean sampel, format menghapus sampel yang belum terkirim.
 // Set 0 untuk alat yang dipasang di lapangan.
-#define JF_DEV_FORMAT_FS_IF_MOUNT_FAILS 0
+#define JF_DEV_FORMAT_FS_IF_MOUNT_FAILS 1
 // =========================================================================
 
 #if JF_VARIANT == 1
@@ -114,6 +114,8 @@ constexpr float kQ6ProvisionalTdsTempCompensationCoefficient = 0.02F;
 constexpr float kQ6ProvisionalTdsTempReferenceC = 25.0F;
 constexpr float kQ6ProvisionalTemporaryTdsMaxPpm = 5000.0F;
 constexpr float kDefaultTemperatureOffsetC = 0.0F;
+constexpr float kQ6ProvisionalPhFallbackV7 = 2.5F;
+constexpr float kQ6ProvisionalPhFallbackV4 = 3.04F;
 
 }
 
@@ -253,6 +255,9 @@ uint8_t ledStep = 0;
 bool ledOn = false;
 bool ntpAttempted = false;
 bool clockSyncObserved = false;
+bool fsMounted = false;
+bool retryBackoffActive = false;
+size_t queuedRecords = 0;
 
 bool isHexSecret(const String& value) {
   if (value.length() != 64) return false;
@@ -360,6 +365,16 @@ String setupApName() {
   return "JagoFarm-Setup-" + mac.substring(mac.length() > 4 ? mac.length() - 4 : 0);
 }
 
+// startConfigPortal() memblokir sampai portal ditutup, jadi LED dikedipkan dari task terpisah.
+void provisioningLedTask(void*) {
+  for (;;) {
+    digitalWrite(kLedPin, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(150));
+    digitalWrite(kLedPin, LOW);
+    vTaskDelay(pdMS_TO_TICKS(150));
+  }
+}
+
 bool runProvisioning(DeviceConfig& value) {
   state = DeviceState::provisioning;
   WiFi.mode(WIFI_STA);
@@ -388,7 +403,12 @@ bool runProvisioning(DeviceConfig& value) {
   manager.addParameter(&temperatureOffsetParameter);
   const String apName = setupApName();
   Serial.printf("Provisioning starts. Setup AP: %s\n", apName.c_str());
-  if (!manager.startConfigPortal(apName.c_str())) return false;
+  TaskHandle_t ledTask = nullptr;
+  xTaskCreate(provisioningLedTask, "jf_prov_led", 2048, nullptr, 1, &ledTask);
+  const bool portalDone = manager.startConfigPortal(apName.c_str());
+  if (ledTask) vTaskDelete(ledTask);
+  digitalWrite(kLedPin, LOW);
+  if (!portalDone) return false;
 
   const String submittedApiUrl = apiUrlParameter.getValue();
   const String submittedDeviceId = deviceIdParameter.getValue();
@@ -476,9 +496,19 @@ bool readWaterTemperature(float& value) {
 
 bool readPh(float& value) {
 #if JF_HAS_PH
-  if (!std::isfinite(config.phV7) || !std::isfinite(config.phV4) || config.phV7 <= 0.0F || config.phV4 <= 0.0F || config.phV7 == config.phV4) return false;
+  float v7 = config.phV7;
+  float v4 = config.phV4;
+  const bool calibrated = std::isfinite(v7) && std::isfinite(v4) && v7 > 0.0F && v4 > 0.0F && v7 != v4;
+  if (!calibrated) {
+    // Sementara, sampai V7 dan V4 diisi di portal: pakai nilai bawaan modul pH analog umum.
+    v7 = HardwareConfig::kQ6ProvisionalPhFallbackV7;
+    v4 = HardwareConfig::kQ6ProvisionalPhFallbackV4;
+  }
   const float voltage = medianVoltage(kPhPin);
-  const float measured = 7.0F + (voltage - config.phV7) * (4.0F - 7.0F) / (config.phV4 - config.phV7);
+  const float measured = 7.0F + (voltage - v7) * (4.0F - 7.0F) / (v4 - v7);
+  if (!calibrated) {
+    Serial.printf("pH belum dikalibrasi, memakai nilai bawaan sementara: %.3f V -> pH %.2f\n", voltage, measured);
+  }
   if (!std::isfinite(measured) || measured < 0.0F || measured > 14.0F) return false;
   value = measured;
   return true;
@@ -545,7 +575,21 @@ String oldestQueueFile(size_t* count = nullptr) {
     file = directory.openNextFile();
   }
   directory.close();
-  return oldest;
+  // file.name() hanya mengembalikan nama file tanpa direktori, sedangkan LittleFS.open() dan
+  // remove() menolak path yang tidak diawali "/". Jadi path lengkap disusun di sini.
+  return oldest.length() ? String(kQueueDirectory) + "/" + oldest : String();
+}
+
+void refreshQueueCount() {
+  size_t count = 0;
+  oldestQueueFile(&count);
+  queuedRecords = count;
+}
+
+bool removeQueueFile(const String& path) {
+  if (!LittleFS.remove(path)) return false;
+  if (queuedRecords > 0) --queuedRecords;
+  return true;
 }
 
 bool readOldestSample(String& path, StoredSample& sample) {
@@ -555,7 +599,7 @@ bool readOldestSample(String& path, StoredSample& sample) {
   const size_t expected = file ? file.size() : 0;
   if (!file || (expected != sizeof(sample) && expected != kLegacyRecordBytes)) {
     if (file) file.close();
-    LittleFS.remove(path);
+    removeQueueFile(path);
     Serial.println("Record LittleFS rusak, dilewati.");
     return false;
   }
@@ -564,7 +608,7 @@ bool readOldestSample(String& path, StoredSample& sample) {
   const size_t bytes = file.read(reinterpret_cast<uint8_t*>(&sample), expected);
   file.close();
   if (bytes != expected) {
-    LittleFS.remove(path);
+    removeQueueFile(path);
     Serial.println("Record LittleFS tidak lengkap, dilewati.");
     return false;
   }
@@ -573,11 +617,11 @@ bool readOldestSample(String& path, StoredSample& sample) {
 
 bool appendSample(const StoredSample& sample) {
   if (!LittleFS.exists(kQueueDirectory) && !LittleFS.mkdir(kQueueDirectory)) return false;
-  size_t count = 0;
-  const String oldest = oldestQueueFile(&count);
-  if (count >= kMaxQueueRecords && oldest.length()) {
-    LittleFS.remove(oldest);
-    Serial.println("Buffer penuh, sampel terlama dibuang.");
+  if (queuedRecords >= kMaxQueueRecords) {
+    const String oldest = oldestQueueFile();
+    if (oldest.length() && removeQueueFile(oldest)) {
+      Serial.println("Buffer penuh, sampel terlama dibuang.");
+    }
   }
   const String destination = sampleFilename(sample);
   const char* temporary = "/queue/pending.tmp";
@@ -595,6 +639,7 @@ bool appendSample(const StoredSample& sample) {
     LittleFS.remove(temporary);
     return false;
   }
+  ++queuedRecords;
   return true;
 }
 
@@ -675,12 +720,18 @@ int postPayload(WiFiClient& client, const String& url, const String& payload) {
 
 void scheduleRetry() {
   nextRetryAt = millis() + retryDelayMs;
+  retryBackoffActive = true;
   retryDelayMs = std::min(retryDelayMs * 2U, kMaxRetryMs);
 }
 
 void sendQueuedBatch() {
   if (state == DeviceState::halted || WiFi.status() != WL_CONNECTED) return;
-  if (static_cast<int32_t>(millis() - nextRetryAt) < 0) return;
+  // Selisih bertanda hanya valid selama backoff (maksimal 5 menit). Tanpa flag, nextRetryAt = 0
+  // membuat pengiriman macet setiap kali uptime melewati 2^31 ms (sekitar 24,8 hari).
+  if (retryBackoffActive) {
+    if (static_cast<int32_t>(millis() - nextRetryAt) < 0) return;
+    retryBackoffActive = false;
+  }
   const String url = normalizedUrl(config.apiUrl) + "/api/ingest";
   for (size_t message = 0; message < kMaxMessagesPerSendCycle; ++message) {
     String path;
@@ -697,12 +748,12 @@ void sendQueuedBatch() {
       statusCode = postPayload(client, url, payload);
     }
     if (statusCode >= 200 && statusCode < 300) {
-      if (!LittleFS.remove(path)) {
+      if (!removeQueueFile(path)) {
         Serial.println("Sampel diterima tetapi record tidak dapat dihapus; batch dihentikan.");
         return;
       }
       retryDelayMs = kInitialRetryMs;
-      nextRetryAt = 0;
+      retryBackoffActive = false;
       lastSuccessAt = millis();
       Serial.println("Sampel diterima backend.");
       continue;
@@ -713,7 +764,7 @@ void sendQueuedBatch() {
       return;
     }
     if (statusCode == 400 || statusCode == 409) {
-      if (!LittleFS.remove(path)) {
+      if (!removeQueueFile(path)) {
         Serial.printf("Sampel ditolak permanen: HTTP %d, tetapi record tidak dapat dihapus; batch dihentikan.\n", statusCode);
         return;
       }
@@ -728,6 +779,12 @@ void sendQueuedBatch() {
 
 void updateLed() {
   const uint32_t now = millis();
+  if (state == DeviceState::error) {
+    const uint32_t phase = now % 2000U;
+    const bool blink = phase < 100 || (phase >= 250 && phase < 350) || (phase >= 500 && phase < 600);
+    digitalWrite(kLedPin, blink ? HIGH : LOW);
+    return;
+  }
   if (state == DeviceState::halted) {
     digitalWrite(kLedPin, HIGH);
     return;
@@ -748,7 +805,7 @@ void updateLed() {
     }
     return;
   }
-  if (WiFi.status() != WL_CONNECTED || oldestQueueFile().length()) {
+  if (WiFi.status() != WL_CONNECTED || queuedRecords > 0) {
     const uint32_t phase = now % 30000U;
     const bool blink = phase < 120 || (phase >= 320 && phase < 440);
     digitalWrite(kLedPin, blink ? HIGH : LOW);
@@ -837,6 +894,8 @@ void setup() {
     return;
   }
   Serial.println("LittleFS berhasil dimuat.");
+  fsMounted = true;
+  refreshQueueCount();
   config = loadConfig();
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -858,9 +917,11 @@ void setup() {
 }
 
 void loop() {
-  if (state == DeviceState::error) {
-    digitalWrite(kLedPin, LOW);
-    delay(1000);
+  // Kalau LittleFS gagal dimuat, provisioning tidak membantu. Kalau penyebabnya konfigurasi,
+  // BOOT 5 detik tetap bisa membuka portal.
+  if (state == DeviceState::error && !fsMounted) {
+    updateLed();
+    delay(50);
     return;
   }
   if (provisionButtonHeld()) {
@@ -871,8 +932,13 @@ void loop() {
       if (clockSyncObserved) lastNtpSyncAt = millis();
       if (WiFi.status() != WL_CONNECTED) WiFi.begin();
     } else {
-      state = DeviceState::connecting;
+      state = hasProvisioning(config) ? DeviceState::connecting : DeviceState::error;
     }
+  }
+  if (state == DeviceState::error) {
+    updateLed();
+    delay(50);
+    return;
   }
   if (state == DeviceState::halted) {
     updateLed();

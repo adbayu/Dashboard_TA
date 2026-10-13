@@ -25,5 +25,7 @@ constexpr float kQ6ProvisionalTdsTempCompensationCoefficient = 0.02F;
 constexpr float kQ6ProvisionalTdsTempReferenceC = 25.0F;
 constexpr float kQ6ProvisionalTemporaryTdsMaxPpm = 5000.0F;
 constexpr float kDefaultTemperatureOffsetC = 0.0F;
+constexpr float kQ6ProvisionalPhFallbackV7 = 2.5F;
+constexpr float kQ6ProvisionalPhFallbackV4 = 3.04F;
 
 }
