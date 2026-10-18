@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
 import { transaction } from '../db.js';
+import { connectionStatus } from '../domain.js';
 import { failV1, requireAdmin, requireActor, sandboxScope, sensorCodeSchema, shortTextSchema, uuidSchema, v1Object } from './common.js';
-import { visibleDevice } from './access.js';
+import { historyDevice, visibleDevice } from './access.js';
 import { deviceSensors, sensorState, type EffectiveThreshold, type ThresholdSource } from './monitoring-state.js';
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -14,7 +15,7 @@ const buckets = {
 const bucketMs = { '1m': 60_000, '5m': 300_000, '1h': 3_600_000 } as const;
 type Bucket = keyof typeof buckets | 'raw';
 type ReadingQuery = {
-  sensor: string;
+  sensor?: string;
   from: string;
   to: string;
   bucket?: Bucket;
@@ -24,7 +25,8 @@ type ReadingQuery = {
 type ThresholdInput = { sensor: string; low: number | null; high: number | null };
 type LatestRow = { measured_at: Date | string; readings: Record<string, number> };
 type AggregateRow = { t: Date | string; avg: number | string; min: number | string; max: number | string; n: string | number };
-type RawRow = { message_id: string; measured_at: Date | string; received_at: Date | string; value: number | string };
+type RawRow = { message_id: string; measured_at: Date | string; received_at: Date | string; readings: Record<string, number> };
+type DeviceStatusRow = { measured_at: Date | string | null; received_at: Date | string | null };
 type OverviewRow = {
   id: string;
   code: string;
@@ -44,7 +46,7 @@ const readingsQuerySchema = v1Object({
   bucket: { type: 'string', enum: ['1m', '5m', '1h', 'raw'] },
   cursor: { type: 'string', maxLength: 300 },
   limit: { type: 'string', pattern: '^[1-9][0-9]{0,2}$' },
-}, ['sensor', 'from', 'to']);
+}, ['from', 'to']);
 const thresholdItemSchema = v1Object({
   sensor: sensorCodeSchema,
   low: { anyOf: [{ type: 'number' }, { type: 'null' }] },
@@ -131,13 +133,14 @@ export function registerReadingRoutes(app: FastifyInstance, pool: pg.Pool) {
     schema: { params: latestParamsSchema, querystring: readingsQuerySchema },
     config: { scope: 'readings:read' },
   }, async request => {
-    const device = await visibleDevice(pool, request, request.params.id);
-    const sensor = (await deviceSensors(pool, device.type_id, device.area_ref)).find(item => item.code === request.query.sensor);
-    if (!sensor) failV1(404, 'NOT_FOUND', 'Sensor tidak ditemukan pada device.');
+    const device = await historyDevice(pool, request, request.params.id);
+    const sensors = await deviceSensors(pool, device.type_id, device.area_ref);
+    const sensor = request.query.sensor ? sensors.find(item => item.code === request.query.sensor) : undefined;
+    if (request.query.sensor && !sensor) failV1(404, 'NOT_FOUND', 'Sensor tidak ditemukan pada device.');
     const range = parseRange(request.query.from, request.query.to);
     const bucket = request.query.bucket ?? '5m';
-    const ownershipId = device.is_admin ? null : device.ownership_id;
     if (bucket !== 'raw') {
+      if (!sensor) failV1(400, 'VALIDATION_FAILED', 'Sensor wajib untuk bucket agregasi.');
       if (request.query.cursor || request.query.limit !== undefined) failV1(400, 'VALIDATION_FAILED', 'Cursor dan limit hanya berlaku untuk bucket raw.');
       const maxPoints = Math.max(1, Math.floor((Date.parse(range.to) - Date.parse(range.from)) / bucketMs[bucket]));
       const result = await pool.query<AggregateRow>(
@@ -149,13 +152,13 @@ export function registerReadingRoutes(app: FastifyInstance, pool: pg.Pool) {
              max((r.readings->>$4)::float8) AS max,
              count(*) AS n
            FROM readings r
-           WHERE r.device_id=$1 AND ($2::uuid IS NULL OR r.ownership_id=$2)
+           WHERE r.device_id=$1 AND ($2::uuid[] IS NULL OR r.ownership_id=ANY($2::uuid[]))
              AND r.measured_at >= $5::timestamptz AND r.measured_at < $6::timestamptz
              AND r.readings ? $4
            GROUP BY 1 ORDER BY 1 DESC LIMIT $7
          ) selected
          ORDER BY selected.t ASC`,
-        [device.id, ownershipId, buckets[bucket], sensor.code, range.from, range.to, maxPoints],
+        [device.id, device.ownership_ids, buckets[bucket], sensor.code, range.from, range.to, maxPoints],
       );
       return {
         sensor: sensor.code,
@@ -166,28 +169,90 @@ export function registerReadingRoutes(app: FastifyInstance, pool: pg.Pool) {
     }
 
     const cursor = parseCursor(request.query.cursor);
-    const limit = Number(request.query.limit ?? 100);
+    const limit = Number(request.query.limit ?? 50);
     if (limit > 100) failV1(400, 'VALIDATION_FAILED', 'Halaman raw maksimal 100 baris.');
     const result = await pool.query<RawRow>(
-      `SELECT r.message_id,r.measured_at,r.received_at,r.readings->>$3 AS value
+      `SELECT r.message_id,r.measured_at,r.received_at,r.readings
        FROM readings r
-       WHERE r.device_id=$1 AND ($2::uuid IS NULL OR r.ownership_id=$2)
+       WHERE r.device_id=$1 AND ($2::uuid[] IS NULL OR r.ownership_id=ANY($2::uuid[]))
          AND r.measured_at >= $4::timestamptz AND r.measured_at < $5::timestamptz
-         AND r.readings ? $3
+         AND ($3::text IS NULL OR r.readings ? $3::text)
          AND ($6::timestamptz IS NULL OR (r.measured_at,r.message_id)<($6::timestamptz,$7::uuid))
        ORDER BY r.measured_at DESC,r.message_id DESC LIMIT $8`,
-      [device.id, ownershipId, sensor.code, range.from, range.to, cursor?.time ?? null, cursor?.id ?? null, limit + 1],
+      [device.id, device.ownership_ids, sensor?.code ?? null, range.from, range.to, cursor?.time ?? null, cursor?.id ?? null, limit + 1],
     );
     const page = result.rows.slice(0, limit);
     const last = page.at(-1);
     const nextCursor = result.rows.length > limit && last
       ? Buffer.from(JSON.stringify({ time: iso(last.measured_at), id: last.message_id })).toString('base64url')
       : null;
+    let firstPageFields: {
+      total: number;
+      thresholds: Array<{ sensor: string } & EffectiveThreshold>;
+      device: {
+        name: string;
+        code: string;
+        type: { code: string; kind: string };
+        status: string;
+        hasReadings: boolean;
+        areaRef: string | null;
+        sensors: Array<{ code: string; name: string; unit: string; decimals: number }>;
+      };
+    } | undefined;
+    if (!cursor) {
+      const [countResult, statusResult] = await Promise.all([
+        pool.query<{ total: string }>(
+          `SELECT count(*) AS total FROM readings r
+           WHERE r.device_id=$1 AND ($2::uuid[] IS NULL OR r.ownership_id=ANY($2::uuid[]))
+             AND r.measured_at >= $3::timestamptz AND r.measured_at < $4::timestamptz
+             AND ($5::text IS NULL OR r.readings ? $5::text)`,
+          [device.id, device.ownership_ids, range.from, range.to, sensor?.code ?? null],
+        ),
+        pool.query<DeviceStatusRow>(
+          `SELECT
+             (SELECT r.measured_at FROM readings r
+              WHERE r.device_id=$1 AND ($2::uuid[] IS NULL OR r.ownership_id=ANY($2::uuid[]))
+              ORDER BY r.measured_at DESC,r.message_id DESC LIMIT 1) AS measured_at,
+             (SELECT max(r.received_at) FROM readings r
+              WHERE r.device_id=$1 AND ($2::uuid[] IS NULL OR r.ownership_id=ANY($2::uuid[]))) AS received_at`,
+          [device.id, device.ownership_ids],
+        ),
+      ]);
+      const latest = statusResult.rows[0];
+      firstPageFields = {
+        total: Number(countResult.rows[0].total),
+        thresholds: sensors.map(item => ({ sensor: item.code, ...item.threshold })),
+        device: {
+          name: device.name,
+          code: device.code,
+          type: { code: device.type_code, kind: device.type_kind },
+          status: connectionStatus(iso(latest?.measured_at), iso(latest?.received_at)),
+          hasReadings: latest?.received_at != null,
+          areaRef: device.area_ref,
+          sensors: sensors.map(({ code, name, unit, decimals }) => ({ code, name, unit, decimals })),
+        },
+      };
+    }
+    const pointSensors = sensor ? [sensor] : sensors;
     return {
-      sensor: sensor.code,
+      ...(sensor ? { sensor: sensor.code } : {}),
       bucket,
-      points: page.map(row => ({ messageId: row.message_id, measuredAt: iso(row.measured_at), receivedAt: iso(row.received_at), value: Number(row.value), unit: sensor.unit })),
-      threshold: sensor.threshold,
+      points: page.map(row => {
+        const readings = pointSensors.map(item => {
+          const raw = row.readings?.[item.code];
+          const value = typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+          return { sensor: item.code, value, unit: item.unit, state: sensorState(value, item.threshold) };
+        });
+        return {
+          messageId: row.message_id,
+          measuredAt: iso(row.measured_at),
+          receivedAt: iso(row.received_at),
+          readings,
+          ...(sensor ? { value: readings[0].value, unit: sensor.unit } : {}),
+        };
+      }),
+      ...(sensor ? { threshold: sensor.threshold } : {}),
+      ...(firstPageFields ?? {}),
       nextCursor,
     };
   });
