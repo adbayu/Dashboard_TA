@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import pg from 'pg';
+import ExcelJS from 'exceljs';
 import { migrate } from './db.js';
 import { buildApp } from './app.js';
 import { hash, passwordHash, secret } from './domain.js';
@@ -1263,6 +1264,634 @@ test('V1 ingest validates v2 readings and continues accepting pilot v1', async c
       assert.deepEqual(saved.rows[0], { ingest_version: 1, ingest_type: 'water-v1', ingest_meta: {} });
     });
   } finally {
+    await app?.close();
+    await pool.end();
+    await control.query('DROP SCHEMA ' + schema + ' CASCADE');
+    await control.end();
+  }
+});
+
+test('V1 raw readings history pagination and access contracts', async context => {
+  assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
+  const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = 'v1_raw_readings_test_' + randomUUID().replaceAll('-', '');
+  await control.query('CREATE SCHEMA ' + schema);
+  const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 8 });
+  const origin = 'http://localhost:5173';
+  const password = 'Farm-raw-readings-integration-test';
+  const adminId = randomUUID();
+  const userId = randomUUID();
+  const otherUserId = randomUUID();
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  try {
+    await migrate(pool);
+    const encodedPassword = await passwordHash(password);
+    await pool.query(
+      "INSERT INTO users(id,email,password_hash,role) VALUES ($1,'admin-raw@example.test',$2,'admin'),($3,'user-raw@example.test',$2,'user'),($4,'other-raw@example.test',$2,'user')",
+      [adminId, encodedPassword, userId, otherUserId],
+    );
+    app = await buildApp({ pool, origin, sendInvite: async () => undefined, enableOfflineDetection: false });
+
+    const login = async (email: string) => {
+      const response = await app!.inject({ method: 'POST', url: '/api/session/login', headers: { origin }, payload: { email, password } });
+      assert.equal(response.statusCode, 200, response.body);
+      return String(response.headers['set-cookie']).split(';')[0];
+    };
+    const adminCookie = await login('admin-raw@example.test');
+    const userCookie = await login('user-raw@example.test');
+    const otherCookie = await login('other-raw@example.test');
+    const request = (method: 'GET' | 'POST' | 'PUT', url: string, cookie?: string, payload?: object, headers: Record<string, string> = {}) => app!.inject({
+      method,
+      url,
+      headers: { ...(cookie ? { cookie } : {}), ...(cookie && method !== 'GET' ? { origin } : {}), ...headers },
+      payload,
+    });
+    const createAndClaim = async (typeCode: string, ownerCookie = userCookie, areaRef: string | null = 'AR-RAW') => {
+      const created = await request('POST', '/api/v1/devices', adminCookie, {
+        typeCode, name: 'Raw history ' + randomUUID().slice(0, 8), areaRef, allocatedTo: null,
+      });
+      assert.equal(created.statusCode, 201, created.body);
+      const value = created.json();
+      const claim = await request('POST', '/api/v1/devices/claim', ownerCookie, {
+        code: value.device.code, activationCode: value.activationCode,
+      });
+      assert.equal(claim.statusCode, 200, claim.body);
+      const ownershipId = (await pool.query('SELECT id FROM ownerships WHERE device_id=$1 AND ended_at IS NULL', [value.device.id])).rows[0].id as string;
+      return { id: value.device.id as string, code: value.device.code as string, ownershipId };
+    };
+    const insertReading = async (deviceId: string, ownershipId: string, measuredAt: string, readings: Record<string, number>, receivedAt = measuredAt, messageId: string = randomUUID()) => {
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         SELECT $1,$2,$3,$4,$5,$6::jsonb,2,t.code,'{}'::jsonb
+         FROM devices d JOIN device_types t ON t.id=d.type_id WHERE d.id=$1`,
+        [deviceId, messageId, ownershipId, measuredAt, receivedAt, JSON.stringify(readings)],
+      );
+      return messageId;
+    };
+    const rawUrl = (deviceId: string, from: string, to: string, options: Record<string, string> = {}) => {
+      const query = new URLSearchParams({ from, to, bucket: 'raw', ...options });
+      return `/api/v1/devices/${deviceId}/readings?${query}`;
+    };
+    const makeKey = async (owner: string, environment: 'live' | 'test', scopes: string[]) => {
+      const value = 'jf_' + environment + '_' + secret();
+      await pool.query(
+        'INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment) VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [randomUUID(), owner, 'Raw history test key', value.slice(0, 12), hash(value), scopes, environment],
+      );
+      return value;
+    };
+    const assertV1Error = (response: { statusCode: number; body: string; json: () => any }, status: number, code: string) => {
+      assert.equal(response.statusCode, status, response.body);
+      assert.equal(response.json().error.code, code);
+    };
+
+    await context.test('raw returns configured sensors, current threshold states, safe metadata and strict time boundaries', async () => {
+      const device = await createAndClaim('AQ-WATER-01');
+      const from = '2026-01-01T00:00:00.000Z';
+      const to = '2026-01-01T00:00:03.000Z';
+      const firstId = await insertReading(device.id, device.ownershipId, from, { ph: 6.4, tds: 600, water_temperature: 25 });
+      const missingPhId = await insertReading(device.id, device.ownershipId, '2026-01-01T00:00:01.000Z', { tds: 950, water_temperature: 27 });
+      const latestId = await insertReading(device.id, device.ownershipId, '2026-01-01T00:00:02.000Z', { ph: 7.6, tds: 950, water_temperature: 28 });
+      await insertReading(device.id, device.ownershipId, to, { ph: 7, tds: 700, water_temperature: 26 });
+      const thresholds = await request('PUT', '/api/v1/areas/AR-RAW/thresholds', adminCookie, {
+        thresholds: [{ sensor: 'ph', low: 6.5, high: 7.5 }, { sensor: 'tds', low: 500, high: 900 }],
+      });
+      assert.equal(thresholds.statusCode, 200, thresholds.body);
+
+      const response = await request('GET', rawUrl(device.id, from, to), userCookie);
+      assert.equal(response.statusCode, 200, response.body);
+      const body = response.json();
+      assert.deepEqual(body.points.map((point: { messageId: string }) => point.messageId), [latestId, missingPhId, firstId]);
+      assert.equal(body.total, 3);
+      assert.equal(body.points[0].measuredAt, '2026-01-01T00:00:02.000Z');
+      assert.equal(body.points[0].receivedAt, '2026-01-01T00:00:02.000Z');
+      const latestReadings = Object.fromEntries(body.points[0].readings.map((reading: { sensor: string; value: number; state: string }) => [reading.sensor, reading]));
+      assert.deepEqual(Object.keys(latestReadings).sort(), ['ph', 'tds', 'water_temperature']);
+      assert.equal(latestReadings.ph.value, 7.6);
+      assert.equal(latestReadings.ph.state, 'high');
+      assert.equal(latestReadings.tds.state, 'high');
+      const missingPh = Object.fromEntries(body.points[1].readings.map((reading: { sensor: string; value: number | null; state: string }) => [reading.sensor, reading]));
+      assert.equal(missingPh.ph.value, null);
+      assert.equal(missingPh.ph.state, 'unknown');
+      assert.equal(missingPh.tds.value, 950);
+      assert.equal(body.thresholds.find((item: { sensor: string }) => item.sensor === 'ph').source, 'area');
+      assert.equal(body.thresholds.find((item: { sensor: string }) => item.sensor === 'water_temperature').source, 'default');
+      assert.deepEqual(Object.keys(body.device).sort(), ['areaRef', 'code', 'hasReadings', 'name', 'sensors', 'status', 'type']);
+      assert.equal(body.device.name.startsWith('Raw history '), true);
+      assert.equal(body.device.hasReadings, true);
+      assert.equal(body.device.code, device.code);
+      assert.equal(body.device.type.code, 'AQ-WATER-01');
+      assert.equal(body.device.areaRef, 'AR-RAW');
+      assert.equal(Object.hasOwn(body.device, 'ownerId'), false);
+      assert.equal(Object.hasOwn(body.device, 'credential'), false);
+      assert.equal(Object.hasOwn(body.device, 'account'), false);
+    });
+
+    await context.test('first-page metadata distinguishes never-sent from an empty historical range', async () => {
+      const device = await createAndClaim('AQ-PH', userCookie, null);
+      const now = Date.now();
+      const from = new Date(now - 3 * 60 * 60 * 1000).toISOString();
+      const to = new Date(now - 2 * 60 * 60 * 1000).toISOString();
+      const neverSent = await request('GET', rawUrl(device.id, from, to), userCookie);
+      assert.equal(neverSent.statusCode, 200, neverSent.body);
+      assert.equal(neverSent.json().total, 0);
+      assert.equal(neverSent.json().device.hasReadings, false);
+      assert.equal(neverSent.json().device.status, 'offline');
+
+      await insertReading(device.id, device.ownershipId, new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), { ph: 7 });
+      const emptyRange = await request('GET', rawUrl(device.id, from, to), userCookie);
+      assert.equal(emptyRange.statusCode, 200, emptyRange.body);
+      assert.equal(emptyRange.json().total, 0);
+      assert.equal(emptyRange.json().device.hasReadings, true);
+      assert.equal(emptyRange.json().device.status, 'offline');
+    });
+
+    await context.test('sensor-filtered raw keeps legacy fields and omits rows without the sensor', async () => {
+      const device = await createAndClaim('AQ-WATER-01', userCookie, null);
+      const from = '2026-02-01T00:00:00.000Z';
+      const to = '2026-02-01T00:00:03.000Z';
+      const firstId = await insertReading(device.id, device.ownershipId, from, { ph: 6.4, tds: 600, water_temperature: 25 });
+      await insertReading(device.id, device.ownershipId, '2026-02-01T00:00:01.000Z', { tds: 700, water_temperature: 27 });
+      const latestId = await insertReading(device.id, device.ownershipId, '2026-02-01T00:00:02.000Z', { ph: 7.6, tds: 800, water_temperature: 28 });
+      const response = await request('GET', rawUrl(device.id, from, to, { sensor: 'ph' }), userCookie);
+      assert.equal(response.statusCode, 200, response.body);
+      const body = response.json();
+      assert.equal(body.sensor, 'ph');
+      assert.deepEqual(body.threshold, { low: 6.2, high: 7.6, source: 'default' });
+      assert.equal(body.total, 2);
+      assert.deepEqual(body.points.map((point: { messageId: string }) => point.messageId), [latestId, firstId]);
+      assert.equal(body.points[0].value, 7.6);
+      assert.equal(body.points[0].unit, 'pH');
+      assert.deepEqual(body.points[0].readings.map((reading: { sensor: string }) => reading.sensor), ['ph']);
+    });
+
+    await context.test('raw keyset cursor neither duplicates nor skips old rows after a newer insert', async () => {
+      const device = await createAndClaim('AQ-PH');
+      const from = '2026-03-01T00:00:00.000Z';
+      const to = '2026-03-02T00:00:00.000Z';
+      const sameTime = '2026-03-01T12:00:00.000Z';
+      const ids = [1, 2, 3, 4].map(number => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`);
+      for (const id of ids) await insertReading(device.id, device.ownershipId, sameTime, { ph: 7 }, sameTime, id);
+      const firstPage = await request('GET', rawUrl(device.id, from, to, { limit: '2' }), userCookie);
+      assert.equal(firstPage.statusCode, 200, firstPage.body);
+      const firstBody = firstPage.json();
+      assert.deepEqual(firstBody.points.map((point: { messageId: string }) => point.messageId), [...ids].reverse().slice(0, 2));
+      assert.ok(firstBody.nextCursor);
+      const newId = await insertReading(device.id, device.ownershipId, '2026-03-01T12:01:00.000Z', { ph: 7.1 });
+      const secondPage = await request('GET', rawUrl(device.id, from, to, { limit: '2', cursor: firstBody.nextCursor }), userCookie);
+      assert.equal(secondPage.statusCode, 200, secondPage.body);
+      const secondBody = secondPage.json();
+      assert.deepEqual(secondBody.points.map((point: { messageId: string }) => point.messageId), [...ids].reverse().slice(2));
+      assert.deepEqual([...firstBody.points, ...secondBody.points].map((point: { messageId: string }) => point.messageId), [...ids].reverse());
+      assert.equal(new Set([...firstBody.points, ...secondBody.points].map((point: { messageId: string }) => point.messageId)).size, 4);
+      assert.equal([...firstBody.points, ...secondBody.points].some((point: { messageId: string }) => point.messageId === newId), false);
+      for (const key of ['total', 'thresholds', 'device']) assert.equal(Object.hasOwn(secondBody, key), false, `${key} is first-page only`);
+    });
+
+    await context.test('raw defaults to 50, permits 100, rejects 101, and rejects ranges over 31 days', async () => {
+      const device = await createAndClaim('AQ-PH');
+      const ids = Array.from({ length: 101 }, () => randomUUID());
+      const times = ids.map((_, index) => new Date(Date.parse('2026-04-01T00:00:00.000Z') + index * 1000).toISOString());
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         SELECT $1,sample.message_id,$2,sample.measured_at,sample.measured_at,'{"ph":7}'::jsonb,2,'AQ-PH','{}'::jsonb
+         FROM unnest($3::uuid[],$4::timestamptz[]) AS sample(message_id,measured_at)`,
+        [device.id, device.ownershipId, ids, times],
+      );
+      const from = '2026-04-01T00:00:00.000Z';
+      const to = '2026-04-02T00:00:00.000Z';
+      const defaultPage = await request('GET', rawUrl(device.id, from, to), userCookie);
+      assert.equal(defaultPage.statusCode, 200, defaultPage.body);
+      assert.equal(defaultPage.json().points.length, 50);
+      assert.equal(defaultPage.json().total, 101);
+      const maxPage = await request('GET', rawUrl(device.id, from, to, { limit: '100', sensor: 'ph' }), userCookie);
+      assert.equal(maxPage.statusCode, 200, maxPage.body);
+      assert.equal(maxPage.json().points.length, 100);
+      assert.ok(maxPage.json().nextCursor);
+      const overLimit = await request('GET', rawUrl(device.id, from, to, { limit: '101', sensor: 'ph' }), userCookie);
+      assertV1Error(overLimit, 400, 'VALIDATION_FAILED');
+      const longRange = await request('GET', rawUrl(device.id, '2026-03-01T00:00:00.000Z', '2026-04-02T00:00:00.000Z'), userCookie);
+      assertV1Error(longRange, 400, 'VALIDATION_FAILED');
+    });
+
+    await context.test('history hides other owners and enforces API-key environment and scope', async () => {
+      const device = await createAndClaim('AQ-PH');
+      const from = '2026-05-01T00:00:00.000Z';
+      const to = '2026-05-02T00:00:00.000Z';
+      await insertReading(device.id, device.ownershipId, from, { ph: 7 });
+      const foreign = await request('GET', rawUrl(device.id, from, to), otherCookie);
+      assertV1Error(foreign, 404, 'NOT_FOUND');
+
+      const testKey = await makeKey(userId, 'test', ['readings:read']);
+      const crossEnvironment = await request('GET', rawUrl(device.id, from, to), undefined, undefined, { authorization: 'Bearer ' + testKey });
+      assertV1Error(crossEnvironment, 404, 'NOT_FOUND');
+      const noScopeKey = await makeKey(userId, 'live', ['devices:read']);
+      const missingScope = await request('GET', rawUrl(device.id, from, to), undefined, undefined, { authorization: 'Bearer ' + noScopeKey });
+      assertV1Error(missingScope, 403, 'FORBIDDEN_SCOPE');
+    });
+
+    await context.test('former owner retains only their readings after release', async () => {
+      const device = await createAndClaim('AQ-PH');
+      const oldMeasuredAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const oldId = await insertReading(device.id, device.ownershipId, oldMeasuredAt, { ph: 7 });
+      const released = await request('POST', `/api/v1/devices/${device.id}/release`, userCookie);
+      assert.equal(released.statusCode, 200, released.body);
+      const successorOwnershipId = randomUUID();
+      await pool.query('INSERT INTO ownerships(id,device_id,user_id) VALUES($1,$2,$3)', [successorOwnershipId, device.id, otherUserId]);
+      const currentMeasuredAt = new Date().toISOString();
+      const currentId = await insertReading(device.id, successorOwnershipId, currentMeasuredAt, { ph: 7.1 });
+      const from = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const to = new Date(Date.now() + 60_000).toISOString();
+
+      const formerOwner = await request('GET', rawUrl(device.id, from, to), userCookie);
+      assert.equal(formerOwner.statusCode, 200, formerOwner.body);
+      assert.equal(formerOwner.json().total, 1);
+      assert.deepEqual(formerOwner.json().points.map((point: { messageId: string }) => point.messageId), [oldId]);
+      assert.equal(formerOwner.json().device.status, 'offline');
+      const successor = await request('GET', rawUrl(device.id, from, to), otherCookie);
+      assert.equal(successor.statusCode, 200, successor.body);
+      assert.deepEqual(successor.json().points.map((point: { messageId: string }) => point.messageId), [currentId]);
+      const admin = await request('GET', rawUrl(device.id, from, to), adminCookie);
+      assert.equal(admin.statusCode, 200, admin.body);
+      assert.equal(admin.json().total, 2);
+    });
+  } finally {
+    await app?.close();
+    await pool.end();
+    await control.query('DROP SCHEMA ' + schema + ' CASCADE');
+    await control.end();
+  }
+});
+
+test('V1 readings export streams an ExcelJS workbook with bounded access and cleanup', async context => {
+  assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
+  const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = 'v1_export_test_' + randomUUID().replaceAll('-', '');
+  await control.query('CREATE SCHEMA ' + schema);
+  const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 12 });
+  const origin = 'http://localhost:5173';
+  const password = 'Farm-export-integration-test';
+  const actorIds = Array.from({ length: 9 }, () => randomUUID());
+  const typeId = randomUUID();
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+  let capApp: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  try {
+    await migrate(pool);
+    const encodedPassword = await passwordHash(password);
+    for (let index = 0; index < actorIds.length; index++) {
+      await pool.query('INSERT INTO users(id,email,password_hash,role) VALUES($1,$2,$3,$4)', [
+        actorIds[index], `export-${index}@example.test`, encodedPassword, index === 0 ? 'admin' : 'user',
+      ]);
+    }
+    await pool.query("INSERT INTO device_types(id,code,name,kind,description) VALUES($1,'EXPORT-BUNDLE','=1+1','paket','Export test type')", [typeId]);
+    await pool.query(
+      `INSERT INTO device_type_sensors(type_id,sensor_code,label)
+       SELECT $1,sensor_code,sensor_code FROM unnest($2::text[]) AS sensors(sensor_code)`,
+      [typeId, ['ph', 'tds', 'water_temperature', 'ec']],
+    );
+    await pool.query("UPDATE sensor_types SET decimals=CASE code WHEN 'ph' THEN 2 WHEN 'tds' THEN 0 WHEN 'water_temperature' THEN 1 WHEN 'ec' THEN 3 END WHERE code=ANY($1::text[])", [
+      ['ph', 'tds', 'water_temperature', 'ec'],
+    ]);
+    await pool.query('INSERT INTO area_thresholds(area_ref,sensor_code,warn_low,warn_high) VALUES($1,$2,$3,$4)', ['AR-EXPORT', 'ph', 6.5, 7.5]);
+    app = await buildApp({ pool, origin, sendInvite: async () => undefined, enableOfflineDetection: false });
+
+    const login = async (index: number) => {
+      const response = await app!.inject({
+        method: 'POST', url: '/api/session/login', headers: { origin },
+        payload: { email: `export-${index}@example.test`, password },
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      return String(response.headers['set-cookie']).split(';')[0];
+    };
+    const cookies = await Promise.all(actorIds.map((_, index) => login(index)));
+    const address = await app.listen({ host: '127.0.0.1', port: 0 });
+    let nextDevice = 0;
+    const createDevice = async (actorIndex: number, name = 'Export fixture') => {
+      const id = randomUUID();
+      const ownershipId = randomUUID();
+      const code = `EX-${String(++nextDevice).padStart(3, '0')}`;
+      await pool.query(
+        `INSERT INTO devices(id,name,model,credential_hash,allocated_to,code,type_id,area_ref,is_sandbox)
+         VALUES($1,$2,NULL,NULL,$3,$4,$5,'AR-EXPORT',false)`,
+        [id, name, actorIds[actorIndex], code, typeId],
+      );
+      await pool.query('INSERT INTO ownerships(id,device_id,user_id) VALUES($1,$2,$3)', [ownershipId, id, actorIds[actorIndex]]);
+      return { id, ownershipId, code };
+    };
+    const insertReading = async (
+      device: { id: string; ownershipId: string }, measuredAt: string,
+      readings: Record<string, number>, receivedAt = measuredAt,
+    ) => pool.query(
+      `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+       VALUES($1,$2,$3,$4,$5,$6::jsonb,2,'EXPORT-BUNDLE','{}'::jsonb)`,
+      [device.id, randomUUID(), device.ownershipId, measuredAt, receivedAt, JSON.stringify(readings)],
+    );
+    const exportUrl = (deviceId: string, params: Record<string, string> = {}) => {
+      const query = new URLSearchParams({ from: '2025-01-15T00:00:00.000Z', to: '2025-01-16T00:00:00.000Z', ...params });
+      return `${address}/api/v1/devices/${deviceId}/readings/export?${query}`;
+    };
+    const exportRequest = (deviceId: string, cookie: string, params: Record<string, string> = {}, headers: Record<string, string> = {}) => fetch(
+      exportUrl(deviceId, params), { headers: { cookie, ...headers } },
+    );
+    const workbookFrom = async (response: Response) => {
+      const workbook = new ExcelJS.Workbook();
+      const contents = Buffer.from(await response.arrayBuffer());
+      await workbook.xlsx.load(contents as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+      return workbook;
+    };
+    const assertError = async (response: Response, status: number, code: string) => {
+      assert.equal(response.status, status);
+      const body = await response.json() as { error: { code: string; message: string } };
+      assert.equal(body.error.code, code);
+      return body.error;
+    };
+    const summaryValue = (worksheet: ExcelJS.Worksheet, label: string) => {
+      for (let index = 1; index <= worksheet.rowCount; index++) {
+        if (worksheet.getRow(index).getCell(1).value === label) return worksheet.getRow(index).getCell(2).value;
+      }
+      return undefined;
+    };
+
+    await context.test('XLSX has two sheets, ordered rows, labels, formats, SQL summaries, and safe headers', async () => {
+      const device = await createDevice(0);
+      const firstAt = '2025-01-15T03:04:05.678Z';
+      await insertReading(device, firstAt, { ph: 6, tds: 350, water_temperature: 25.2345, ec: 1.25 }, '2025-01-15T03:05:05.678Z');
+      await insertReading(device, '2025-01-15T03:04:06.678Z', { ph: 8, tds: 700, water_temperature: 35, ec: 2.25 });
+      await insertReading(device, '2025-01-15T03:04:07.678Z', { tds: 800, water_temperature: 26 });
+
+      const response = await exportRequest(device.id, cookies[0]);
+      assert.equal(response.status, 200);
+      assert.match(String(response.headers.get('content-type')), /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.ok(response.headers.get('x-ratelimit-limit'));
+      assert.ok(response.headers.get('x-ratelimit-remaining'));
+      assert.ok(response.headers.get('x-ratelimit-reset'));
+      const resetAt = Number(response.headers.get('x-ratelimit-reset'));
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      assert.ok(resetAt >= nowSeconds && resetAt <= nowSeconds + 61, `reset must be absolute Unix seconds (reset=${resetAt}, now=${nowSeconds})`);
+      assert.match(String(response.headers.get('content-disposition')), /^attachment; filename="[A-Za-z0-9._-]+\.xlsx"$/);
+
+      const workbook = await workbookFrom(response);
+      assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Log sensor', 'Ringkasan']);
+      const log = workbook.getWorksheet('Log sensor')!;
+      const summary = workbook.getWorksheet('Ringkasan')!;
+      assert.equal(log.actualRowCount, 4);
+      assert.equal(summaryValue(summary, 'Jumlah baris'), 3);
+      assert.equal(log.getCell(1, 1).value, 'Waktu ukur (Asia/Jakarta)');
+      assert.equal(log.getCell(1, 2).value, 'Waktu ukur (UTC)');
+      assert.equal(log.getCell(1, 3).value, 'Waktu diterima (Asia/Jakarta)');
+      const headers = log.getRow(1).values as Array<ExcelJS.CellValue | undefined>;
+      const column = (header: string) => headers.indexOf(header);
+      assert.ok(column('Status pH') > 0);
+      assert.ok(column('Status TDS') > 0);
+      assert.ok(column('Status Suhu air') > 0);
+      assert.ok(column('Status EC') > 0);
+      assert.equal(log.getRow(2).getCell(column('Waktu ukur (UTC)')).value, firstAt);
+      assert.equal((log.getRow(2).getCell(1).value as Date).toISOString(), '2025-01-15T10:04:05.678Z');
+      assert.equal((log.getRow(2).getCell(3).value as Date).toISOString(), '2025-01-15T10:05:05.678Z');
+      assert.equal(log.getRow(2).getCell(column('Status pH')).value, 'Di bawah ambang');
+      assert.equal(log.getRow(3).getCell(column('Status pH')).value, 'Di atas ambang');
+      assert.equal(log.getRow(2).getCell(column('Status TDS')).value, 'Di bawah ambang');
+      assert.equal(log.getRow(3).getCell(column('Status TDS')).value, 'Normal');
+      assert.equal(log.getRow(3).getCell(column('Status Suhu air')).value, 'Di atas ambang');
+      assert.equal(log.getRow(2).getCell(column('Status EC')).value, 'Tanpa ambang');
+      assert.equal(log.getRow(4).getCell(column('pH (pH)')).value, null);
+      assert.equal(log.getRow(4).getCell(column('Status pH')).value, 'Tanpa ambang');
+      assert.equal(log.getColumn(column('pH (pH)')).numFmt, '0.00');
+      assert.equal(log.getColumn(column('TDS (ppm)')).numFmt, '0');
+      assert.equal(log.getColumn(column('Suhu air (°C)')).numFmt, '0.0');
+      assert.equal(log.getColumn(column('EC (mS/cm)')).numFmt, '0.000');
+      assert.equal(log.views[0]?.state, 'frozen');
+      assert.equal(log.views[0]?.ySplit, 1);
+      assert.ok(log.autoFilter);
+
+      assert.equal(summaryValue(summary, 'Kode perangkat'), device.code);
+      assert.equal(summaryValue(summary, 'Tipe perangkat'), 'EXPORT-BUNDLE (paket)');
+      assert.equal(summaryValue(summary, 'AreaRef'), 'AR-EXPORT');
+      assert.equal(summaryValue(summary, 'Zona waktu'), 'Asia/Jakarta');
+      assert.match(String(summaryValue(summary, 'Dibuat')), /^\d{4}-\d{2}-\d{2}T/);
+      assert.match(String(summaryValue(summary, 'Catatan status')), /ambang.*waktu ekspor/i);
+
+      const sensorHeaderRow = Array.from({ length: summary.rowCount }, (_, index) => index + 1)
+        .find(row => summary.getRow(row).getCell(1).value === 'Sensor');
+      assert.ok(sensorHeaderRow);
+      const sensorHeaders = summary.getRow(sensorHeaderRow).values as Array<ExcelJS.CellValue | undefined>;
+      const sensorColumn = (header: string) => sensorHeaders.indexOf(header);
+      const phRow = Array.from({ length: summary.rowCount - sensorHeaderRow }, (_, index) => sensorHeaderRow + index + 1)
+        .find(row => summary.getRow(row).getCell(sensorColumn('Kode sensor')).value === 'ph');
+      assert.ok(phRow);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Jumlah sampel')).value, 2);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Minimum')).value, 6);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Rata-rata')).value, 7);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Maksimum')).value, 8);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Ambang rendah')).value, 6.5);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Ambang tinggi')).value, 7.5);
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Sumber ambang rendah')).value, 'area');
+      assert.equal(summary.getRow(phRow).getCell(sensorColumn('Sumber ambang tinggi')).value, 'area');
+
+      const selected = await exportRequest(device.id, cookies[0], { sensor: 'ph' });
+      assert.equal(selected.status, 200);
+      const selectedBook = await workbookFrom(selected);
+      assert.equal(selectedBook.getWorksheet('Log sensor')!.actualRowCount, 3);
+      assert.equal(summaryValue(selectedBook.getWorksheet('Ringkasan')!, 'Jumlah baris'), 2);
+      assert.equal(selectedBook.getWorksheet('Log sensor')!.getCell(1, column('EC (mS/cm)')).value, 'EC (mS/cm)');
+    });
+
+    await context.test('local Excel dates use the requested IANA timezone, including UTC and Makassar', async () => {
+      const device = await createDevice(1);
+      await insertReading(device, '2025-01-15T03:04:05.678Z', { ph: 7 });
+      for (const [tz, localDate] of [
+        ['Asia/Jakarta', '2025-01-15T10:04:05.678Z'],
+        ['Asia/Makassar', '2025-01-15T11:04:05.678Z'],
+        ['UTC', '2025-01-15T03:04:05.678Z'],
+      ]) {
+        const response = await exportRequest(device.id, cookies[1], { tz });
+        assert.equal(response.status, 200);
+        const workbook = await workbookFrom(response);
+        const log = workbook.getWorksheet('Log sensor')!;
+        assert.equal(log.getCell(1, 1).value, `Waktu ukur (${tz})`);
+        assert.equal((log.getCell(2, 1).value as Date).toISOString(), localDate);
+      }
+    });
+
+    await context.test('invalid timezone, range, sensor, and device keep V1 contract errors', async () => {
+      const device = await createDevice(2);
+      const invalidTimezone = await exportRequest(device.id, cookies[2], { tz: 'Mars/Olympus' });
+      await assertError(invalidTimezone, 400, 'VALIDATION_FAILED');
+      const longRange = await exportRequest(device.id, cookies[2], {
+        from: '2025-01-01T00:00:00.000Z', to: '2025-02-05T00:00:00.000Z',
+      });
+      await assertError(longRange, 400, 'VALIDATION_FAILED');
+      const futureRange = await exportRequest(device.id, cookies[2], {
+        from: '2030-01-01T00:00:00.000Z', to: '2030-01-02T00:00:00.000Z',
+      });
+      await assertError(futureRange, 400, 'VALIDATION_FAILED');
+      const unknownSensor = await exportRequest(device.id, cookies[2], { sensor: 'missing_sensor' });
+      await assertError(unknownSensor, 404, 'NOT_FOUND');
+      const unknownDevice = await exportRequest(randomUUID(), cookies[2]);
+      await assertError(unknownDevice, 404, 'NOT_FOUND');
+    });
+
+    await context.test('a valid empty range creates a readable workbook with zero data rows', async () => {
+      const device = await createDevice(3);
+      const response = await exportRequest(device.id, cookies[3]);
+      assert.equal(response.status, 200);
+      const workbook = await workbookFrom(response);
+      assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Log sensor', 'Ringkasan']);
+      assert.equal(workbook.getWorksheet('Log sensor')!.actualRowCount, 1);
+      assert.equal(summaryValue(workbook.getWorksheet('Ringkasan')!, 'Jumlah baris'), 0);
+    });
+
+    await context.test('formula-like device name is stored as a string cell and filename is sanitized', async () => {
+      const device = await createDevice(4, '=1+1');
+      const response = await exportRequest(device.id, cookies[4]);
+      assert.equal(response.status, 200);
+      const workbook = await workbookFrom(response);
+      const summary = workbook.getWorksheet('Ringkasan')!;
+      let nameCell: ExcelJS.Cell | undefined;
+      for (let index = 1; index <= summary.rowCount; index++) {
+        if (summary.getRow(index).getCell(1).value === 'Nama perangkat') nameCell = summary.getRow(index).getCell(2);
+      }
+      assert.ok(nameCell);
+      assert.equal(nameCell.value, '=1+1');
+      assert.equal(nameCell.type, ExcelJS.ValueType.String);
+      assert.doesNotMatch(String(response.headers.get('content-disposition')), /[:+\\/]/);
+    });
+
+    await context.test('row cap is configurable and rejects before starting the download', async () => {
+      const device = await createDevice(5);
+      for (let index = 0; index < 4; index++) {
+        await insertReading(device, `2025-01-15T03:04:0${index}.000Z`, { ph: 7 });
+      }
+      const previousLimit = process.env.EXPORT_MAX_ROWS;
+      process.env.EXPORT_MAX_ROWS = '3';
+      try {
+        capApp = await buildApp({ pool, origin, sendInvite: async () => undefined, enableOfflineDetection: false });
+      } finally {
+        if (previousLimit === undefined) delete process.env.EXPORT_MAX_ROWS;
+        else process.env.EXPORT_MAX_ROWS = previousLimit;
+      }
+      const capAddress = await capApp.listen({ host: '127.0.0.1', port: 0 });
+      const response = await fetch(`${capAddress}${exportUrl(device.id).slice(address.length)}`, { headers: { cookie: cookies[5] } });
+      const error = await assertError(response, 400, 'VALIDATION_FAILED');
+      assert.match(error.message, /4/);
+      assert.match(error.message, /persempit/i);
+      assert.doesNotMatch(String(response.headers.get('content-type')), /spreadsheet/);
+    });
+
+    await context.test('OpenAPI describes the export route, binary response, and query parameters', async () => {
+      const response = await app!.inject({ method: 'GET', url: '/docs/openapi.json' });
+      assert.equal(response.statusCode, 200, response.body);
+      const operation = response.json().paths['/api/v1/devices/{id}/readings/export']?.get;
+      assert.ok(operation);
+      assert.ok(operation.parameters.some((parameter: { name: string }) => parameter.name === 'from'));
+      assert.ok(operation.parameters.some((parameter: { name: string }) => parameter.name === 'to'));
+      assert.ok(operation.parameters.some((parameter: { name: string }) => parameter.name === 'sensor'));
+      assert.equal(operation.parameters.find((parameter: { name: string }) => parameter.name === 'tz').schema.default, 'Asia/Jakarta');
+      assert.ok(operation.responses['200'].content['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    });
+
+    await context.test('route rate limit is per actor and hijacked API-key exports log usage once', async () => {
+      const device = await createDevice(6);
+      await insertReading(device, '2025-01-15T03:04:05.678Z', { ph: 7 });
+      const keyId = randomUUID();
+      const apiKey = 'jf_live_' + secret();
+      await pool.query(
+        'INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment) VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [keyId, actorIds[6], 'Export API key', apiKey.slice(0, 12), hash(apiKey), ['readings:read'], 'live'],
+      );
+      for (let index = 0; index < 5; index++) {
+        const response = await exportRequest(device.id, '', {}, { authorization: 'Bearer ' + apiKey });
+        assert.equal(response.status, 200);
+        assert.ok(response.headers.get('x-ratelimit-limit'));
+        await response.arrayBuffer();
+      }
+      const limited = await exportRequest(device.id, '', {}, { authorization: 'Bearer ' + apiKey });
+      await assertError(limited, 429, 'RATE_LIMITED');
+      assert.ok(limited.headers.get('retry-after'));
+      assert.equal(limited.headers.get('x-ratelimit-limit'), '5');
+      assert.equal(limited.headers.get('x-ratelimit-remaining'), '0');
+      assert.ok(limited.headers.get('x-ratelimit-reset'));
+
+      const deadline = Date.now() + 3000;
+      let usageRows = 0;
+      while (Date.now() < deadline) {
+        usageRows = Number((await pool.query('SELECT count(*) FROM api_usage WHERE key_id=$1 AND route=$2', [keyId, '/api/v1/devices/:id/readings/export'])).rows[0].count);
+        if (usageRows === 6) break;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      assert.equal(usageRows, 6, 'each streamed or rejected export should create exactly one usage row');
+    });
+
+    await context.test('third simultaneous export is rejected with retry and rate headers', async () => {
+      const device = await createDevice(7);
+      const blocker = await pool.connect();
+      await blocker.query('BEGIN');
+      await blocker.query('LOCK TABLE readings IN ACCESS EXCLUSIVE MODE');
+      const pending = [
+        fetch(exportUrl(device.id), { headers: { cookie: cookies[7] } }),
+        fetch(exportUrl(device.id), { headers: { cookie: cookies[7] } }),
+      ];
+      try {
+        const deadline = Date.now() + 5000;
+        let waiters = 0;
+        while (Date.now() < deadline && waiters < 2) {
+          waiters = Number((await pool.query(
+            `SELECT count(*) FROM pg_stat_activity
+             WHERE datname=current_database() AND pid<>pg_backend_pid()
+               AND wait_event_type='Lock' AND query ILIKE '%FROM readings r WHERE%'`,
+          )).rows[0].count);
+          if (waiters < 2) await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        assert.ok(waiters >= 2, `expected two exports in preflight SQL, saw ${waiters}`);
+        const third = await exportRequest(device.id, cookies[7]);
+        await assertError(third, 429, 'RATE_LIMITED');
+        assert.ok(third.headers.get('retry-after'));
+        assert.equal(third.headers.get('x-ratelimit-limit'), '2');
+        assert.equal(third.headers.get('x-ratelimit-remaining'), '0');
+        assert.ok(third.headers.get('x-ratelimit-reset'));
+      } finally {
+        await blocker.query('ROLLBACK');
+        blocker.release();
+      }
+      const responses = await Promise.all(pending);
+      for (const response of responses) {
+        assert.equal(response.status, 200);
+        await response.arrayBuffer();
+      }
+    });
+
+    await context.test('disconnect cancels the export query and releases its connection and actor slot', async () => {
+      const device = await createDevice(8);
+      const followupDevice = await createDevice(8, 'Disconnect follow-up');
+      await pool.query(
+        `INSERT INTO readings(device_id,message_id,ownership_id,measured_at,received_at,readings,ingest_version,ingest_type,ingest_meta)
+         SELECT $1,('00000000-0000-4000-8000-' || lpad(sample.i::text,12,'0'))::uuid,$2,
+           '2025-01-15T03:04:05.000Z'::timestamptz + sample.i * interval '1 second',
+           '2025-01-15T03:04:05.000Z'::timestamptz + sample.i * interval '1 second',
+           jsonb_build_object('ph',7.0+(sample.i%10)::double precision/10),2,'EXPORT-BUNDLE','{}'::jsonb
+         FROM generate_series(1,20000) AS sample(i)`,
+        [device.id, device.ownershipId],
+      );
+      const response = await fetch(exportUrl(device.id), { headers: { cookie: cookies[8] } });
+      assert.equal(response.status, 200);
+      await response.body?.cancel();
+
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline && (pool.waitingCount > 0 || pool.idleCount !== pool.totalCount)) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.equal(pool.waitingCount, 0);
+      assert.equal(pool.idleCount, pool.totalCount, 'the disconnected export client must not remain checked out');
+      const followup = await exportRequest(followupDevice.id, cookies[8]);
+      assert.equal(followup.status, 200);
+      await followup.arrayBuffer();
+    });
+  } finally {
+    await capApp?.close();
     await app?.close();
     await pool.end();
     await control.query('DROP SCHEMA ' + schema + ' CASCADE');

@@ -227,6 +227,7 @@ export async function buildApp(options: Options) {
     if (request.routeOptions.url?.startsWith('/api/admin/') && request.actor.role !== 'admin') fail(403, 'Khusus Admin Pilot.');
   });
   app.addHook('onResponse', (request, reply) => {
+    if ((request as typeof request & { v1ExportUsageHandled?: boolean }).v1ExportUsageHandled) return;
     const actor = request.actor;
     const route = request.routeOptions.url;
     if (actor?.kind !== 'key' || !actor.keyId || typeof route !== 'string') return;
