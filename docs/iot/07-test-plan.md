@@ -61,6 +61,13 @@ Semua uji yang sudah ada di `pilot.test.ts` wajib tetap hijau setelah migration 
 | V1-32 | Retensi data sandbox melewati event threshold/koneksi terakhir | Hanya event anchor terakhir dipertahankan; readings/events live tidak disentuh dan threshold tidak ditulis ulang |
 | V1-33 | Sesi akun yang belum pernah membuat key test membuka `/sandbox/devices` | Device sandbox diprovisikan idempoten dan satu kali |
 | V1-34 | Route SSE membuka koneksi dengan komentar awal sebelum replay | Frame `: connected` tanpa event/ID diterima lebih dulu; frame replay berikutnya tetap mengikuti cursor dan filter actor |
+| V1-35 | Raw tanpa sensor dan dengan sensor: urutan, batas rentang, state, total, ambang, dan metadata halaman pertama | Urutan `(measured_at,message_id)` DESC; `from` inklusif dan `to` eksklusif; nilai/state per sensor benar; filter hanya menghitung baris yang memiliki sensor; total, ambang efektif, serta metadata aman hanya ada di halaman pertama |
+| V1-36 | Cursor raw pada waktu ukur sama, ada insert baru, limit, dan rentang | Cursor memakai pasangan `(measured_at,message_id)` tanpa duplikasi; insert lebih baru tidak menggeser halaman berikutnya; default 50, maksimum 100; limit di atas 100 dan rentang lebih dari 31 hari ditolak |
+| V1-37 | Raw dan ekspor memakai ownership, environment, scope, serta riwayat sesudah release | Actor hanya membaca interval ownership miliknya; riwayat lama tetap pada pemilik lama; key test/live terisolasi; scope kurang mendapat 403 dan resource tersembunyi mendapat 404 |
+| V1-38 | Workbook dua sheet, ringkasan SQL, string berawalan formula, dan hasil kosong | Hanya ada sheet `Log sensor` dan `Ringkasan`; isi dan urutan baris cocok, string tidak menjadi formula, ringkasan cocok dengan SQL, dan ekspor kosong tetap workbook valid |
+| V1-39 | Zona waktu, query invalid, `to` masa depan, batas baris, nama file, dan OpenAPI | IANA valid diterima dan invalid mendapat 400; rentang masa depan dipotong; batas baris menghasilkan 400 `VALIDATION_FAILED`; nama file aman, MIME XLSX, dan schema route tercantum di OpenAPI |
+| V1-40 | Batas concurrency dan rate serta pencatatan usage | Maksimal 2 ekspor aktif dan 5 request per menit per actor; penolakan 429 memiliki header rate dan `retry-after`; ekspor API key dicatat satu kali di `api_usage` |
+| V1-41 | Klien terputus saat query atau streaming | Query backend dibatalkan bila masih berjalan, koneksi pool tidak tertinggal atau dipakai ulang dalam keadaan sibuk, slot ekspor dilepas, dan kegagalan tengah stream menghentikan koneksi |
 
 Regresi frontend E1 otomatis dijalankan bersama tes UI dan service:
 
@@ -111,6 +118,9 @@ Regresi frontend E2 otomatis:
 | UI-21 | Bandingkan badge menu pada device offline, stale, low/high, unknown, dan sandbox | Badge memakai union device live berbeda; stale dengan low/high tetap dihitung; sandbox/unknown tidak; label `[n] kejadian perlu perhatian`, tersembunyi saat nol, dan error tidak mengubahnya menjadi nol |
 | UI-22 | Developer: pilih `ph_turun` pada panel Sandbox dan tunggu runner | Status, nilai/state pH, dan event berasal dari sandbox API/stream; dalam 1-2 siklus runner pH menjadi "Di bawah ambang" dan event ambang terlihat; tidak ada stream kedua atau secret di curl |
 | UI-23 | Buka QR sebelum login, hapus query, klik `Masuk untuk klaim`, login pada SPA yang sama, kembali ke QR, refresh, lalu klaim manual; uji logout/TTL | Login mengembalikan ke `/d/:code` dengan preview claimable dari memori; refresh menampilkan input manual kosong; kode tidak ada di URL, DOM, storage, atau `history.state`; sukses/logout/10 menit membersihkan kode |
+| UI-24 | Buka Log sensor, ubah rentang cepat dan rentang sendiri, pilih sensor paket, lalu salin/muat ulang URL | Filter dan sensor tersimpan di query URL, waktu lokal diberi label zona browser dan dikonversi benar; rentang invalid atau masa depan menampilkan validasi bahasa Indonesia tanpa request yang salah |
+| UI-25 | Periksa tombol ekspor pada data kosong, rentang invalid, mode local, batas baris, proses berjalan, berhasil, gagal, dan dibatalkan | Tombol serta alasannya cocok dengan state; pesan **Menyiapkan file...**, hasil unduh, pesan error API, retry, dan pembatalan tampil dengan benar |
+| UI-26 | Jalankan alur browser Log sensor dengan filter rentang dan sensor, unduh XLSX, lalu bandingkan baris | Tabel memuat 50 baris per halaman dan berhenti pada 2000; urutan, nilai, state, waktu zona, penanda keterlambatan, jumlah baris, serta data workbook cocok dengan respons API dan perbandingan Excel |
 
 ## 5. Uji bench alat
 

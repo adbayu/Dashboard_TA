@@ -18,5 +18,6 @@ Setiap keputusan teknis yang sulit dibalik dicatat di sini dengan format: kontek
 | [0012](0012-idempotensi-ingest-mencakup-metadata.md) | Idempotensi ingest membandingkan metadata bersama payload | Usulan |
 | [0013](0013-state-monitoring-dari-database.md) | State ambang dan koneksi dipulihkan dari database dengan row lock device | Usulan |
 | [0014](0014-sandbox-satu-device-per-akun.md) | Satu device sandbox per akun, di luar batas 20 unit live | Usulan |
+| [0015](0015-ekspor-log-sensor-dengan-streaming.md) | Ekspor log sensor memakai workbook XLSX streaming di server | Usulan |
 
 Semua masih berstatus Usulan sampai direview tim. Untuk menambah ADR baru, salin salah satu file, beri nomor berikutnya, lalu tambahkan barisnya di tabel ini.

@@ -30,7 +30,7 @@ Mengirim cookie dan API key sekaligus akan ditolak dengan `400 AMBIGUOUS_AUTH`.
 | --- | --- |
 | `devices:read` | `GET /sensor-types`, `GET /device-types`, `GET /devices`, `GET /devices/:id`, `GET /sandbox/devices` |
 | `devices:write` | `POST /devices/claim`, `POST /devices/:id/release`, `PATCH /devices/:id` (nama dan area milik sendiri), `PUT /sandbox/devices/:id/scenario` |
-| `readings:read` | `GET /devices/:id/latest`, `GET /devices/:id/readings`, `GET /sensors/:code/overview`, `GET /events`, `GET /stream` |
+| `readings:read` | `GET /devices/:id/latest`, `GET /devices/:id/readings`, `GET /devices/:id/readings/export`, `GET /sensors/:code/overview`, `GET /events`, `GET /stream` |
 | `admin` | `POST/PATCH/DELETE /sensor-types`, `POST/PATCH /device-types`, `POST /devices`, `POST /devices/:id/credentials/rotate`, `POST /devices/:id/qr`, `POST /devices/:id/activation`, `PUT /areas/:ref/thresholds` |
 
 Sesi cookie memakai scope sesuai peran: `user` mendapat tiga scope pertama, `admin` mendapat keempatnya.
@@ -185,7 +185,7 @@ Device sandbox tidak dapat dirotasi, dilepas, diklaim, diberi kode aktivasi, ata
 
 `state` bernilai `normal`, `low`, `high`, atau `unknown` (belum ada nilai atau tidak ada ambang). Bila device belum pernah mengirim data, `measuredAt` bernilai `null`, setiap sensor bernilai `null`, dan state bernilai `unknown`. `threshold.source` bernilai `area` atau `default`.
 
-`GET /devices/:id/readings?sensor=ph&from=...&to=...&bucket=5m` (scope `readings:read`). `sensor`, `from`, dan `to` wajib; `bucket` bawaan `5m`.
+`GET /devices/:id/readings?sensor=ph&from=...&to=...&bucket=5m` (scope `readings:read`). `from` dan `to` wajib; `sensor` wajib untuk bucket agregat dan opsional untuk `raw`; `bucket` bawaan `5m`.
 
 ```json
 { "sensor": "ph", "bucket": "5m",
@@ -193,15 +193,30 @@ Device sandbox tidak dapat dirotasi, dilepas, diklaim, diberi kode aktivasi, ata
   "threshold": { "low": 6.5, "high": 7.5, "source": "area" } }
 ```
 
-`bucket` bernilai `1m`, `5m`, `1h`, atau `raw`. Bucket agregat berurutan dari waktu terlama. Mode `raw` diurutkan dari waktu terbaru, memakai `cursor`, dan memiliki `limit` bawaan 100 serta maksimum 100 baris per halaman; response memiliki `nextCursor`. `cursor` dan `limit` hanya berlaku untuk `bucket=raw`.
+`bucket` bernilai `1m`, `5m`, `1h`, atau `raw`. Bucket agregat berurutan dari waktu terlama. Untuk bucket agregat, `sensor` wajib. Mode `raw` mengizinkan `sensor` opsional, diurutkan dari waktu terbaru, memakai `cursor`, dan memiliki `limit` bawaan 50 serta maksimum 100 baris per halaman. `cursor` dan `limit` hanya berlaku untuk `bucket=raw`. Rentang `from` sampai `to` memakai batas awal inklusif dan batas akhir eksklusif, maksimal 31 hari.
 
 ```json
-{ "sensor": "ph", "bucket": "raw",
-  "points": [ { "messageId": "0b7e...", "measuredAt": "2026-10-10T08:00:00.000Z", "receivedAt": "2026-10-10T08:00:01.120Z", "value": 7.02, "unit": "pH" } ],
-  "threshold": { "low": 6.5, "high": 7.5, "source": "area" }, "nextCursor": null }
+{ "bucket": "raw",
+  "points": [ { "messageId": "0b7e...", "measuredAt": "2026-10-10T08:00:00.000Z", "receivedAt": "2026-10-10T08:00:01.120Z",
+    "readings": [
+      { "sensor": "ph", "value": 7.02, "unit": "pH", "state": "normal" },
+      { "sensor": "tds", "value": 612, "unit": "ppm", "state": "normal" }
+    ] } ],
+  "total": 42,
+  "thresholds": [ { "sensor": "ph", "low": 6.2, "high": 7.6, "source": "default" }, { "sensor": "tds", "low": 500, "high": 900, "source": "area" } ],
+  "device": { "name": "Paket Kolam Nila B", "code": "AQ-PKT-001", "type": { "code": "AQ-WATER-01", "kind": "paket" },
+    "status": "online", "hasReadings": true, "areaRef": "AR-02",
+    "sensors": [ { "code": "ph", "name": "pH Air", "unit": "pH", "decimals": 2 }, { "code": "tds", "name": "TDS", "unit": "ppm", "decimals": 0 } ] },
+  "nextCursor": "eyJ0aW1lIjoi..." }
 ```
 
-Rentang `from` sampai `to` maksimal 31 hari. Rentang kosong mengembalikan `points: []`.
+Pada request halaman pertama, `total` menghitung semua baris yang cocok dengan device, rentang, ownership, dan filter sensor. `thresholds` berisi ambang efektif dan sumbernya untuk sensor device; `device` hanya memuat nama, kode, tipe, status koneksi, penanda data, `areaRef`, dan katalog sensor yang aman. Metadata ini tidak memuat ID pemilik atau credential. Request dengan cursor berikutnya tidak mengulang hitung total dan tidak menyertakan `total`, `thresholds`, atau `device`.
+
+Cursor adalah Base64URL dari pasangan waktu ukur dan `messageId`. Urutan serta pagination memakai `(measured_at, message_id)` secara menurun agar waktu ukur yang sama tetap deterministik. Setiap item `readings` membawa nilai, satuan, dan state `normal`, `low`, `high`, atau `unknown` untuk tiap sensor. State dan `thresholds` memakai ambang efektif yang berlaku saat request dibuat, bukan ambang historis pada waktu pengukuran.
+
+Untuk menjaga arti field mode raw yang sudah ada, request dengan `sensor=ph` tetap menyertakan `sensor` di response, `value` dan `unit` langsung di setiap point, serta `threshold` di tingkat response. Bentuk baru juga menyertakan array `readings` per point, sehingga state per pembacaan tetap tersedia. Filter sensor menghitung hanya baris yang memiliki sensor tersebut. Rentang tanpa data mengembalikan `points: []` dan `total: 0` pada halaman pertama.
+
+Raw log dan ekspor memakai scope `readings:read` serta pemeriksaan ownership/environment yang sama dengan riwayat. Actor tanpa scope `admin` hanya menerima riwayat ownership miliknya; pelepasan device tidak memindahkan pembacaan lama ke pemilik baru dan pemilik lama tetap dapat membaca riwayat dari masa ownership-nya. Actor dengan scope `admin` dapat melihat seluruh riwayat yang diizinkan oleh environment. Key `test` hanya melihat sandbox, key `live` hanya melihat device live. Resource yang bukan milik actor atau berada di environment lain mendapat 404 `NOT_FOUND`; request tanpa scope mendapat 403 `FORBIDDEN_SCOPE`.
 
 `GET /sensors/:code/overview` (scope `readings:read`) mengembalikan nilai terakhir satu jenis sensor di semua device milik actor:
 
@@ -291,6 +306,19 @@ Pembuatan key dengan `environment: "test"` otomatis memastikan akun memiliki tep
 Nilai yang valid: `normal`, `ph_turun`, `suhu_naik`, `offline`. Device non-sandbox atau sandbox yang bukan milik actor selalu mendapat 404 `NOT_FOUND`, termasuk request dengan key `live`. `ph_turun` menghasilkan pH di bawah ambang bawah efektif pada siklus berikutnya, paling lambat 30 detik.
 
 `SANDBOX_ENABLED=false` mematikan siklus simulasi, bukan provisioning endpoint atau job retensi. Retensi memakai `SANDBOX_RETENTION_DAYS` (default 7 hari) dan hanya menghapus readings/events device `is_sandbox=true`; device, ownership, dan telemetry live tetap ada. Untuk memulihkan status, event transisi terakhir per `(device, sensor)` dan event koneksi terakhir per device dipertahankan meskipun lebih tua dari masa retensi.
+
+### 6.10 Ekspor log sensor ke Excel
+
+`GET /devices/:id/readings/export?from=...&to=...&sensor=ph&tz=Asia%2FJakarta` (scope `readings:read`). `from` dan `to` wajib berupa waktu ISO 8601. `sensor` opsional dan hanya memfilter baris yang memiliki sensor tersebut; kolom workbook tetap mencakup semua sensor pada device. `tz` opsional, bawaan `Asia/Jakarta`, dan harus berupa nama zona waktu IANA yang dikenal. Rentang harus positif dan maksimal 31 hari. Nilai `to` di masa depan dipotong ke waktu request saat diproses.
+
+Jika jumlah baris yang cocok melebihi `EXPORT_MAX_ROWS` (bawaan 200000), route mengembalikan 400 `VALIDATION_FAILED` sebelum mengirim file. Batas route adalah 5 request per menit dan 2 ekspor aktif per actor; pelanggaran mendapat 429 `RATE_LIMITED`. Response menyediakan `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`, dan, saat dibatasi, `retry-after`. Semua response memakai `Cache-Control: no-store`.
+
+Response 200 adalah file attachment dengan MIME `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` dan nama `log-<kode-device>-<from>_<to>.xlsx`. Nama memakai rentang UTC yang telah dinormalisasi dan karakter di luar huruf, angka, titik, garis bawah, serta tanda hubung dihapus. Workbook memiliki tepat dua sheet:
+
+1. **Log sensor**: satu baris per reading, urut waktu ukur terlama ke terbaru, lalu `messageId` menaik untuk waktu yang sama. Kolomnya `Waktu ukur (<tz>)`, `Waktu ukur (UTC)`, `Waktu diterima (<tz>)`, lalu pasangan kolom nilai bernama `<nama sensor> (<satuan>)` dan `Status <nama sensor>` untuk setiap sensor pada device. Nilai sensor yang tidak ada ditulis kosong. Label status adalah `Normal`, `Di bawah ambang`, `Di atas ambang`, atau `Tanpa ambang`. Header dibekukan dan baris header memiliki filter.
+2. **Ringkasan**: tabel informasi dengan kolom `Informasi` dan `Nilai`, lalu baris `Nama perangkat`, `Kode perangkat`, `Tipe perangkat`, `AreaRef`, `Rentang dari (UTC)`, `Rentang sampai (UTC)`, `Zona waktu`, `Jumlah baris`, `Dibuat`, dan `Catatan status`. Nilai catatan status adalah `Status dihitung memakai ambang yang efektif pada waktu ekspor.` Setelah satu baris kosong, tabel statistik memiliki kolom `Sensor`, `Kode sensor`, `Satuan`, `Jumlah sampel`, `Minimum`, `Rata-rata`, `Maksimum`, `Ambang rendah`, `Sumber ambang rendah`, `Ambang tinggi`, dan `Sumber ambang tinggi`. Statistik jumlah/minimum/rata-rata/maksimum dihitung di PostgreSQL atas baris yang sama dengan filter ekspor.
+
+File tidak memuat PII, identitas pemilik, atau `messageId`. Nilai status dihitung dengan ambang efektif saat ekspor, bukan ambang historis. Untuk API key, request ekspor yang masuk ke tahap streaming dicatat satu kali di `api_usage` menggunakan route template; pencatatan tidak dilakukan per batch workbook.
 
 ## 7. Ingest (untuk firmware)
 

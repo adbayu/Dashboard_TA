@@ -332,6 +332,14 @@ Index `reading_history (ownership_id, measured_at DESC, message_id DESC)` yang s
 
 `GET /api/v1/stream` membuka koneksi `text/event-stream`. Setelah header HTTP 200 di-flush, server langsung mengirim frame komentar `: connected\n\n` sebelum memulai replay; komentar ini membantu fetch client melihat respons melalui proxy dan tidak membawa event maupun ID. Hub di memori menyimpan actor beserta koneksinya, dan hanya mengirim event untuk device yang actor tersebut boleh lihat. Frame `device_event` membawa `id:` dari `device_events.id`; frame `reading` tidak memiliki `id:`. Heartbeat dikirim tiap 25 detik supaya koneksi tidak diputus proxy. Klien browser memakai fetch streaming, bukan `EventSource`, agar dapat memeriksa status HTTP/429 dan mengirim header custom `Last-Event-ID`. Setelah koneksi yang pernah aktif terputus, klien membuat satu request reconnect pada satu waktu dengan ID event terakhir. Server memutar ulang baris `device_events` setelah ID itu dengan filter akses yang sama seperti pengiriman live, sehingga event yang tersimpan selama jeda diterima tanpa GET `/events` tambahan. Klien mengabaikan ulang ID event yang sudah diterima. Jika stream tidak tersedia, satu interval polling bersama tetap berjalan sambil satu timer retry dengan backoff terbatas menunggu; `Retry-After` pada 429 menjadi batas minimum waktu tunggu. Saat stream kembali dengan HTTP 200, polling berhenti. Singleton membersihkan reader, controller, subscription, interval, serta timer retry setelah subscriber terakhir dilepas. Maksimal 5 koneksi per actor; key dan sesi milik akun yang sama berbagi batas. Ini mengizinkan beberapa tab tetapi menyisakan ruang dari batas umum enam koneksi HTTP/1.1 per origin; upaya koneksi keenam mendapat 429 `RATE_LIMITED`. Koneksi dan timer di backend dibersihkan saat peer menutup stream atau aplikasi berhenti.
 
+### 7.4 Ekspor log sensor
+
+`GET /api/v1/devices/:id/readings/export` memakai `ExcelJS.stream.xlsx.WorkbookWriter` dan scope `readings:read`. Sebelum byte pertama workbook dikirim, route memvalidasi actor, device, sensor, zona waktu, rentang, lalu membuka transaksi `REPEATABLE READ READ ONLY`. Query hitung baris dan ringkasan SQL per sensor dijalankan dalam snapshot yang sama; jika jumlah melampaui batas, API masih dapat mengirim error JSON biasa sebelum streaming dimulai.
+
+Setelah count dan ringkasan lolos, workbook mulai dikirim sebagai XLSX. Baris log dibaca dengan keyset `(measured_at, message_id)` urut menaik, dalam batch sekitar 2000 baris. Setiap baris langsung di-commit ke worksheet; shared strings dimatikan, sehingga memori tidak bertambah mengikuti seluruh ukuran workbook. Query, agregat, dan workbook konsisten terhadap snapshot transaksi.
+
+Jika klien memutus koneksi saat query database berjalan, route meminta PostgreSQL membatalkan query (`pg_cancel_backend`), menghentikan workbook, lalu mengembalikan atau menghancurkan koneksi pool sesuai hasil pembatalan agar koneksi yang sibuk tidak dipakai ulang. Slot ekspor actor juga dilepas. Jika kegagalan terjadi sebelum response dimulai, Fastify mengirim error terstruktur. Jika terjadi setelah streaming dimulai, response tidak dapat diganti menjadi JSON dan koneksi HTTP dihancurkan.
+
 ## 8. Sandbox
 
 - Satu device virtual `AQ-WATER-01` diprovisikan per akun secara idempoten saat akun membuat key `test` atau membuka `GET /api/v1/sandbox/devices` dengan sesi maupun key test. Ini juga mencakup akun yang belum pernah membuat key test dan key test yang sudah ada sebelum Minggu 3. Advisory transaction lock mencegah duplikasi pada request paralel; tabel `sandbox_accounts` menjaga pemetaan akun, sedangkan sequence PostgreSQL memberi kode `AQ-SBX-<NNN>` yang unik lintas akun.
@@ -371,8 +379,12 @@ Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0
 | `SANDBOX_RETENTION_DAYS` | `7` | Umur telemetry sandbox sebelum dihapus; query dibatasi `is_sandbox=true` dan mempertahankan event state anchor terakhir |
 | `TRUST_PROXY_HOPS` | `0` (pilot VPS di Compose: `1`) | Jumlah hop proxy tepercaya; nilai `1` hanya untuk API privat di belakang satu Caddy, tanpa port publik pada API |
 | `READINGS_RETENTION_DAYS` | `365` (usulan) | Umur minimal readings device asli sebelum boleh dipindah atau diringkas |
+| `EXPORT_MAX_ROWS` | `200000` | Jumlah maksimum baris readings pada satu ekspor Excel |
+| `EXPORT_MAX_CONCURRENT` | `2` | Maksimal ekspor aktif per actor |
 | `MAX_ACCOUNTS`, `MAX_DEVICES` | `10`, `20 live` | Menggantikan angka batas pilot yang sekarang di-hardcode; device sandbox tidak dihitung |
 | `VITE_IOT_SOURCE` | `api` | Sumber data halaman IoT di frontend |
+
+Route ekspor juga membatasi setiap actor sampai 5 request per menit. Batas ini terpisah dari batas ekspor aktif.
 
 Pembersihan tabel `api_usage` direncanakan memakai query berikut dengan parameter jumlah hari dari `USAGE_RETENTION_DAYS`:
 

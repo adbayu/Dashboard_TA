@@ -144,6 +144,12 @@ Tata letak label QR siap cetak, dibangun dari `QrCode.jsx` yang sudah ada. Isiny
 
 Teks "Live" dengan ikon `sensors` saat SSE tersambung, atau "Diperbarui tiap 30 detik" saat memakai polling. Saat putus, teksnya menjadi "Menyambung ulang..." dengan tone `warn`. Ini satu-satunya indikator aktivitas di halaman (sesuai MOTION 1). Tidak memakai animasi berdenyut.
 
+### 4.10 `LogTable`
+
+Tabel log raw untuk `/iot/:id/log`, dengan label aksesibel **Log pembacaan sensor**. Di layar lebar, gunakan elemen tabel semantik dengan kepala kolom **Waktu ukur** dan satu kolom untuk setiap sensor device. Waktu memakai elemen `<time>` dan angka memakai `tabular-nums`, format `id-ID`, desimal sesuai definisi sensor. Setiap nilai disertai satuan dan Badge status dengan ikon serta teks, bukan warna saja.
+
+Jika `receivedAt` lebih dari 90 detik setelah `measuredAt`, tampilkan penanda **Dikirim terlambat** beserta waktu penerimaan. `messageId` hanya menjadi key baris dan tidak ditampilkan. Pada lebar di bawah 720 px, kepala tabel disembunyikan dan tiap baris berubah menjadi kartu dengan label sensor pada setiap nilai; mulai 720 px, tabel kembali ke bentuk baris. Gunakan token permukaan/garis dan warna Badge yang sama di tema terang serta gelap. Jika tabel lebar, overflow dibatasi ke pembungkus tabel dan tidak menggeser halaman.
+
 ## 5. Aturan pakai
 
 | Lakukan | Hindari |

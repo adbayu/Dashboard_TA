@@ -84,7 +84,7 @@ Prioritas memakai MoSCoW: M (Must), S (Should), C (Could). Gambar desain untuk s
 | F-18 | Referensi OpenAPI di `/docs` dengan Scalar | M | 4 |
 | F-19 | Panduan tertulis (quickstart, kontrak ingest, wiring) | M | 4 |
 | F-20 | Firmware ESP32 varian satuan dan paket | M | 1 sampai 3 |
-| F-21 | Ekspor riwayat ke CSV | C | Setelah rilis |
+| F-21 | Ekspor log sensor ke Excel (.xlsx) | C | Setelah rilis |
 
 ## 7. User story dan kriteria terima
 

@@ -37,6 +37,7 @@ Pengguna
 ├── Dashboard
 ├── List IoT (diubah)              sumber data dari API, filter tipe satuan/paket
 │   └── Detail device (diubah)     /iot/:id
+│       └── Log sensor (baru)      /iot/:id/log
 ├── Monitoring (baru)              /monitoring, tab Per paket · Per sensor · Per area
 ├── Detail Information (diubah)    scan QR, sekarang juga bisa klaim dan input kode manual
 └── Kelola Area, V-Pet, Gamifikasi, Chatbot (tetap)
@@ -216,6 +217,26 @@ Modal secret key:
 Konfirmasi cabut key: "Cabut key [nama key]? Semua request dengan key ini langsung ditolak." Tombolnya "Cabut key" (danger) dan "Batal".
 
 Gambar: [secret key](design/screens/06c-secret-key.png), [secret key gelap](design/screens/06d-secret-key-gelap.png), [Developer gelap](design/screens/06b-developer-gelap.png).
+
+### 5.7 Log sensor (`/iot/:id/log`), baru
+
+Halaman dibuka dari Detail device dan memakai `GET /devices/:id/readings?bucket=raw` untuk membaca log serta `GET /devices/:id/readings/export` untuk membuat workbook. Header menampilkan nama, kode, tipe, status koneksi, tautan **Kembali ke detail device**, dan `LiveIndicator` yang sudah didefinisikan di [Design System bagian 4.9](06-design-system.md#49-liveindicator). Tidak ada indikator live baru khusus untuk halaman ini.
+
+Filter awal adalah 24 jam terakhir. Pilihan cepatnya **1 jam**, **24 jam**, **7 hari**, dan **31 hari**; **Pilih sendiri** membuka input **Dari** dan **Sampai**. Filter sensor hanya tampil untuk tipe paket, dengan pilihan **Semua sensor** dan nama sensor. Tombol **Terapkan** menerapkan filter dan menyimpan pilihan di query URL: `range` untuk pilihan cepat, atau `from` dan `to` ISO UTC untuk rentang sendiri, serta `sensor` bila dipilih. URL dapat disalin, dimuat ulang, dan dipakai tombol Back/Forward browser untuk memulihkan filter. Query yang tidak valid kembali ke rentang 24 jam.
+
+Input tanggal memakai waktu lokal browser. Di bawahnya tampil label seperti WIB, WITA, WIT, atau offset GMT beserta nama zona IANA; waktu lokal dikonversi ke UTC untuk URL dan API. Ringkasan menampilkan jumlah sampel total hasil filter dan rentang waktu dengan label zona. Waktu pada setiap baris ditampilkan dalam zona browser.
+
+Empat state layar wajib tersedia: **Memuat log...**, error API dengan aksi **Coba lagi**, hasil berisi, dan kosong. Jika perangkat belum pernah mengirim data, teksnya **Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi.** Jika perangkat punya data tetapi rentang kosong, tampilkan **Tidak ada data pada rentang ini. Coba perlebar rentang waktu.** Nilai kosong tetap kosong, bukan diganti contoh.
+
+`LogTable` menampilkan waktu ukur, nilai tiap sensor beserta satuan dan status teks **Normal**, **Di bawah ambang**, **Di atas ambang**, atau **Tanpa ambang**. Urutan API adalah terbaru lebih dulu. Jika selisih waktu diterima dan waktu ukur lebih dari 90 detik, tandai **Dikirim terlambat** dan tampilkan **Diterima [waktu]**.
+
+Halaman pertama memuat 50 baris. **Muat lebih banyak** mengambil halaman cursor berikutnya sebanyak paling banyak 50 baris dan mengumumkan jumlah baris yang dimuat. DOM dibatasi 2000 baris; setelah batas tercapai, tombol hilang dan copy **Untuk data lebih banyak, ekspor ke Excel** tampil. Jika pengguna sudah memuat halaman berikutnya, refresh live halaman pertama berhenti agar urutan dan posisi baris tidak berubah.
+
+Untuk pilihan rentang cepat, halaman memakai subscriber `iotStreamClient` bersama. Frame `reading` untuk device ini dan sambungan ulang stream yang berhasil memicu refresh halaman pertama; saat stream gagal, subscriber memakai polling cadangan bersama tiap 30 detik. Rentang **Pilih sendiri** menonaktifkan update live karena merupakan rentang tetap. Status memakai komponen `LiveIndicator` yang sama dengan halaman IoT lain.
+
+Tombol **Ekspor ke Excel** mengunduh seluruh hasil filter, terpisah dari batas 2000 baris DOM. Tombol nonaktif dan alasannya harus jelas: **Ekspor butuh backend**, **Waktu mulai harus sebelum waktu akhir.**, **Rentang maksimal 31 hari.**, **Waktu akhir tidak boleh di masa depan.**, **Jumlah sampel belum tersedia.**, **Tidak ada sampel pada rentang ini.**, atau **Batas ekspor adalah 200.000 sampel.** Saat berjalan, tombol menjadi **Menyiapkan file...** dan status diumumkan. Setelah berhasil, tampilkan **File [nama file] sudah diunduh.** Jika gagal, tampilkan pesan API dan aksi **Coba lagi**. Pembatalan filter atau navigasi membatalkan request ekspor aktif.
+
+Semua filter dan aksi bisa dipakai dengan keyboard, memiliki indikator fokus, dan target sentuh minimal 44 px. Status pemuatan, error, hasil pemuatan halaman, status ekspor, dan perubahan state ambang memakai region status aksesibel; angka live tidak diumumkan satu per satu. Tampilan memakai token semantik dan tone Badge untuk mode terang/gelap dengan kontras WCAG AA. Pada lebar 360 px tabel berubah menjadi kartu per baris, label sensor tetap terlihat, kontrol membungkus, dan halaman tidak memiliki scroll horizontal.
 
 ## 6. Status dan teks
 
