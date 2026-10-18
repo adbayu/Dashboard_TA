@@ -12,6 +12,8 @@ test('monitoring is shared by both roles while role-only routes stay protected',
   assert.equal(roleCanOpenPath('pengguna', '/admin/iot'), false);
   assert.equal(roleCanOpenPath('pengelola', '/iot'), false);
   assert.equal(roleCanOpenPath('pengelola', `/iot/${deviceId}`), true);
+  assert.equal(roleCanOpenPath('pengelola', `/iot/${deviceId}/log`), true);
+  assert.equal(roleCanOpenPath('pengelola', `/iot/${deviceId}/log/extra`), false);
   assert.equal(roleCanOpenPath('pengelola', `/iot/${deviceId}/readings`), false);
   assert.equal(roleCanOpenPath('pengelola', '/iot/not-a-uuid'), false);
   assert.equal(roleCanOpenPath('pengguna', `/iot/${deviceId}`), true);
@@ -37,10 +39,14 @@ test('login destination accepts only one internal QR code path', () => {
 test('authenticated Shell and Login route through the same sanitized QR destination', async () => {
   const shellSource = await readFile(new URL('../SmartApp.jsx', import.meta.url), 'utf8');
   const loginSource = await readFile(new URL('../pages/Login.jsx', import.meta.url), 'utf8');
+  const listIotSource = await readFile(new URL('../pages/ListIot.jsx', import.meta.url), 'utf8');
 
   assert.match(shellSource, /isLoggedIn\s*&&\s*location\.pathname\s*===\s*'\/masuk'[\s\S]*?loginDestination\(role,\s*location\.state\?\.from\)/);
   const capturedReturnTo = loginSource.indexOf('const returnTo = location.state?.from;');
   const awaitedLogin = loginSource.indexOf('await login(email, password)');
   assert.ok(capturedReturnTo >= 0 && capturedReturnTo < awaitedLogin, 'Login must capture its return path before awaiting authentication.');
   assert.match(loginSource, /loginDestination\(hasil\.akun\.role,\s*returnTo\)/);
+  assert.match(shellSource, /path:\s*'\/iot\/:id\/log',[\s\S]*?title:\s*'Log sensor'/);
+  assert.match(shellSource, /<Route path="\/iot\/:id\/log" element={<DeviceLog \/>} \/>/);
+  assert.match(listIotSource, /Lihat log lengkap/);
 });

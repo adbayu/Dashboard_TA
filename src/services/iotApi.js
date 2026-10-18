@@ -1,5 +1,6 @@
 import { pilotApi } from './pilotApi.js';
 import { iotRequestGovernor } from './iotRequestGovernor.js';
+import { parseContentDispositionFilename } from '../utils/deviceLog.js';
 
 const DATA_CONTOH = 'Data contoh';
 const KODE_AKTIVASI_CONTOH = 'contoh-kode-aktivasi';
@@ -226,6 +227,73 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     };
   }
 
+  async function getDeviceLog(id, { from, to, sensor, cursor, limit = 50, signal, priority = 'history' } = {}) {
+    if (source === 'local') {
+      const device = localDevice(id);
+      if (!device) throw failedRequest('Device tidak ditemukan.');
+      return {
+        bucket: 'raw',
+        points: [],
+        total: 0,
+        nextCursor: null,
+        thresholds: [],
+        device: {
+          name: device.name,
+          code: device.code,
+          type: { code: device.type.code, kind: device.type.kind },
+          status: device.status,
+          hasReadings: false,
+          sensors: device.sensors.map(({ code, name, unit, decimals }) => ({ code, name, unit, decimals })),
+        },
+        source,
+        label: DATA_CONTOH,
+      };
+    }
+
+    const query = new URLSearchParams({ bucket: 'raw', from, to });
+    if (sensor) query.set('sensor', sensor);
+    if (cursor) query.set('cursor', cursor);
+    query.set('limit', String(limit));
+    return {
+      ...(await requestJson(`/v1/devices/${encodeURIComponent(id)}/readings?${query.toString()}`, signal ? { signal } : undefined, priority)),
+      source,
+      label: null,
+    };
+  }
+
+  async function exportDeviceLog(id, { from, to, sensor, tz, signal, priority = 'history' } = {}) {
+    if (source === 'local') throw failedRequest('Ekspor butuh backend', 405);
+    const query = new URLSearchParams({ from, to, tz });
+    if (sensor) query.set('sensor', sensor);
+    return requestGovernor.run(async requestSignal => {
+      const timeoutSignal = AbortSignal.timeout(180_000);
+      const combinedSignal = requestSignal ? AbortSignal.any([requestSignal, timeoutSignal]) : timeoutSignal;
+      let response;
+      try {
+        response = await fetchBinary(`/api/v1/devices/${encodeURIComponent(id)}/readings/export?${query.toString()}`, {
+          credentials: 'same-origin',
+          signal: combinedSignal,
+        });
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        if (timeoutSignal.aborted) {
+          throw Object.assign(new Error('Ekspor melewati batas waktu. Coba lagi.'), { name: 'TimeoutError' });
+        }
+        throw new Error('Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.');
+      }
+      requestGovernor.observeResponse(response);
+      if (!response.ok) {
+        let data;
+        try { data = await response.json(); } catch { data = null; }
+        throw Object.assign(new Error(data?.error?.message ?? 'Permintaan gagal.'), { status: response.status });
+      }
+      return {
+        blob: await response.blob(),
+        filename: parseContentDispositionFilename(response.headers?.get?.('content-disposition')),
+      };
+    }, { signal, priority });
+  }
+
   async function getDeviceEvents(id, { limit = 50, cursor, signal } = {}) {
     if (source === 'local') {
       if (!localDevice(id)) throw failedRequest('Device tidak ditemukan.');
@@ -375,6 +443,8 @@ export function createIotApi({ source = IOT_SOURCE, request = pilotApi, fetchBin
     getDevice,
     getDeviceLatest,
     getDeviceReadings,
+    getDeviceLog,
+    exportDeviceLog,
     getDeviceEvents,
     getSensorOverview,
     getEvents,

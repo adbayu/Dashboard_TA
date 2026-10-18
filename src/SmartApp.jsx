@@ -28,6 +28,7 @@ import AdminDetailInformation from './pages/admin/AdminDetailInformation';
 import { IOT_SOURCE } from './services/iotApi.js';
 import Developer from './pages/Developer.jsx';
 import Monitoring from './pages/Monitoring.jsx';
+import DeviceLog from './pages/DeviceLog.jsx';
 import { loginDestination, roleCanOpenPath } from './utils/roleAccess.js';
 
 // Judul halaman untuk top bar
@@ -45,6 +46,7 @@ const TITLES = [
   { path: '/profil', title: 'Profil Saya', subtitle: 'Ubah data diri, foto, dan password akun Anda' },
   { path: '/detail-informasi', title: 'Detail Information', subtitle: 'Pindai QR alat untuk penjelasan lengkap perangkat' },
   { path: '/iot', title: 'List IoT', subtitle: 'Perangkat yang terpasang di farm' },
+  { path: '/iot/:id/log', title: 'Log sensor', subtitle: 'Riwayat pembacaan sensor perangkat' },
   { path: '/area', title: 'Kelola Area', subtitle: 'HPP dan pemantauan kolam Anda' },
   { path: '/v-pet', title: 'Virtual Pet', subtitle: 'Pemantauan farm dalam bentuk hewan peliharaan' },
   { path: '/gamifikasi', title: 'Gamifikasi', subtitle: 'Misi, badge, dan papan peringkat' },
@@ -127,6 +129,7 @@ function Shell() {
 
   const match = TITLES.filter((row) => {
     if (row.path === '/') return location.pathname === '/' || location.pathname === '';
+    if (row.path === '/iot/:id/log') return /^\/iot\/[^/]+\/log$/.test(location.pathname);
     return location.pathname === row.path || location.pathname.startsWith(row.path + '/');
   }).sort((a, b) => b.path.length - a.path.length)[0];
 
@@ -149,6 +152,7 @@ function Shell() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/iot" element={<ListIot />} />
             <Route path="/iot/:id" element={<DeviceDetail />} />
+            <Route path="/iot/:id/log" element={<DeviceLog />} />
             <Route path="/detail-informasi" element={<DetailInformation />} />
             <Route path="/area" element={<KelolaArea />} />
             <Route path="/area/:id" element={<AreaDetail />} />

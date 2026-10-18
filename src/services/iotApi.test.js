@@ -286,3 +286,118 @@ test('mode local hanya menyediakan data contoh baca-saja untuk Kelola IoT', asyn
   assert.equal(api.canWrite, false);
   assert.throws(() => api.createDevice({ typeCode: 'AQ-X', name: 'Probe' }), /mode API/);
 });
+
+test('adapter mengambil halaman pertama log mentah dengan filter, cursor, dan metadata', async () => {
+  const calls = [];
+  const request = async (path, options) => {
+    calls.push({ path, options });
+    return {
+      bucket: 'raw',
+      total: 1,
+      points: [{ messageId: 'message-1', measuredAt: '2026-10-15T10:00:00.000Z', receivedAt: '2026-10-15T10:00:02.000Z', readings: [] }],
+      nextCursor: null,
+      device: { name: 'Probe', code: 'AQ-PH-001', type: { code: 'AQ-PH', kind: 'satuan' }, status: 'online', hasReadings: true, sensors: [] },
+      thresholds: [],
+    };
+  };
+  const api = createIotApi({ source: 'api', request });
+
+  const result = await api.getDeviceLog('device/id', {
+    from: '2026-10-14T10:00:00.000Z',
+    to: '2026-10-15T10:00:00.000Z',
+    sensor: 'ph',
+    cursor: 'cursor/1',
+    limit: 50,
+  });
+
+  assert.equal(result.device.name, 'Probe');
+  assert.equal(result.points[0].messageId, 'message-1');
+  assert.equal(calls[0].path, '/v1/devices/device%2Fid/readings?bucket=raw&from=2026-10-14T10%3A00%3A00.000Z&to=2026-10-15T10%3A00%3A00.000Z&sensor=ph&cursor=cursor%2F1&limit=50');
+});
+
+test('mode local log hanya mengembalikan metadata Data contoh tanpa telemetry', async () => {
+  const api = createIotApi({ source: 'local' });
+  const result = await api.getDeviceLog('contoh-device-01', {
+    from: '2026-10-14T10:00:00.000Z',
+    to: '2026-10-15T10:00:00.000Z',
+  });
+
+  assert.equal(result.label, 'Data contoh');
+  assert.equal(result.device.code, 'AQ-CONTOH-001');
+  assert.equal(result.device.hasReadings, false);
+  assert.deepEqual(result.points, []);
+  assert.equal(result.total, 0);
+  await assert.rejects(api.exportDeviceLog('contoh-device-01', {
+    from: '2026-10-14T10:00:00.000Z',
+    to: '2026-10-15T10:00:00.000Z',
+    tz: 'Asia/Jakarta',
+  }), /Ekspor butuh backend/);
+});
+
+test('ekspor log memakai same-origin, governor, zona, dan nama file respons yang aman', async () => {
+  const calls = [];
+  const priorities = [];
+  const api = createIotApi({
+    source: 'api',
+    request: async () => ({}),
+    governor: {
+      async run(operation, options) {
+        priorities.push(options.priority);
+        return operation(options.signal);
+      },
+      observeResponse() {},
+    },
+    fetchBinary: async (url, options) => {
+      calls.push({ url, options });
+      return {
+        ok: true,
+        headers: { get: name => name.toLowerCase() === 'content-disposition' ? 'attachment; filename="log-AQ-PH-001.xlsx"' : null },
+        blob: async () => new Blob(['xlsx']),
+      };
+    },
+  });
+
+  const result = await api.exportDeviceLog('device/id', {
+    from: '2026-10-14T10:00:00.000Z',
+    to: '2026-10-15T10:00:00.000Z',
+    sensor: 'ph',
+    tz: 'Asia/Jakarta',
+  });
+
+  assert.equal(priorities[0], 'history');
+  assert.match(calls[0].url, /^\/api\/v1\/devices\/device%2Fid\/readings\/export\?/);
+  assert.equal(new URL(calls[0].url, 'https://example.test').searchParams.get('tz'), 'Asia/Jakarta');
+  assert.equal(calls[0].options.credentials, 'same-origin');
+  assert.equal(result.filename, 'log-AQ-PH-001.xlsx');
+  assert.equal(await result.blob.text(), 'xlsx');
+});
+
+test('ekspor meneruskan pesan JSON backend dan membatalkan fetch saat sinyal halaman dibatalkan', async () => {
+  const failed = createIotApi({
+    source: 'api',
+    request: async () => ({}),
+    fetchBinary: async () => ({
+      ok: false,
+      status: 413,
+      headers: { get: () => null },
+      json: async () => ({ error: { message: 'Jumlah data melebihi batas ekspor.' } }),
+    }),
+  });
+  await assert.rejects(failed.exportDeviceLog('device-1', {
+    from: '2026-10-14T10:00:00.000Z', to: '2026-10-15T10:00:00.000Z', tz: 'Asia/Jakarta',
+  }), error => error.status === 413 && error.message === 'Jumlah data melebihi batas ekspor.');
+
+  const controller = new AbortController();
+  const cancelled = createIotApi({
+    source: 'api',
+    request: async () => ({}),
+    fetchBinary: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+    }),
+  });
+  const pending = cancelled.exportDeviceLog('device-1', {
+    from: '2026-10-14T10:00:00.000Z', to: '2026-10-15T10:00:00.000Z', tz: 'Asia/Jakarta', signal: controller.signal,
+  });
+  controller.abort();
+  await assert.rejects(pending, error => error.name === 'AbortError');
+});

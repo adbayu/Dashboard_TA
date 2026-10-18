@@ -502,7 +502,19 @@ export function DeviceDetail() {
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.85fr)]">
         <Card>
-          <SectionTitle eyebrow="Riwayat" title={selected ? `${selected.name || selected.label || selected.code}, 24 jam terakhir` : 'Riwayat sensor'} subtitle="Rata-rata per lima menit, dengan rentang minimum sampai maksimum dan ambang efektif." />
+          <SectionTitle
+            eyebrow="Riwayat"
+            title={selected ? `${selected.name || selected.label || selected.code}, 24 jam terakhir` : 'Riwayat sensor'}
+            subtitle="Rata-rata per lima menit, dengan rentang minimum sampai maksimum dan ambang efektif."
+            action={(
+              <Link
+                to={`/iot/${encodeURIComponent(device.id)}/log`}
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-outline-variant/60 px-3.5 text-sm font-semibold text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-outline-variant/60 dark:text-inverse-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
+              >
+                Lihat log lengkap
+              </Link>
+            )}
+          />
           {sensors.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Pilih sensor riwayat">
               {sensors.map(sensor => (

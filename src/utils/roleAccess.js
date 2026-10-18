@@ -1,6 +1,6 @@
 export function roleCanOpenPath(role, pathname) {
   const adminPath = pathname === '/admin' || pathname.startsWith('/admin/');
-  const deviceDetailPath = /^\/iot\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(pathname);
+  const deviceDetailPath = /^\/iot\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}(?:\/log)?$/i.test(pathname);
   if (role === 'pengguna') return !adminPath;
   if (role === 'pengelola') {
     return adminPath || pathname === '/profil' || pathname === '/developer' || pathname === '/monitoring' || deviceDetailPath;
