@@ -84,7 +84,7 @@ export default function Profil() {
             <p className="text-sm text-on-surface-variant">{form.jabatan || 'Belum ada jabatan'} · {form.email}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Badge tone="brand" icon={role === 'pengelola' ? 'shield_person' : 'person'}>
-                {role === 'pengelola' ? 'Pengelola' : 'Pengguna'}
+                {role === 'pengelola' ? 'Pengelola' : role === 'mitra' ? 'Mitra' : 'Pengguna'}
               </Badge>
               <Badge tone={currentUser.status === 'aktif' ? 'ok' : 'muted'}>
                 Akun {currentUser.status}

@@ -204,21 +204,19 @@ Total akun termasuk undangan tertunda dan admin dibatasi 10, total unit 20.
 
 ## 5. Validasi lokal
 
+Pastikan `.env` lokal sudah menunjuk ke cluster test terisolasi `C:\TA\pg-test`, host `127.0.0.1`, port `55432`, dan database `jagofarm_test`. Jangan mengubah `.env`, menampilkan URL koneksi, atau mencetak kredensial.
+
+Jalankan validasi berikut:
+
 ~~~powershell
 npm run typecheck
 npm run lint
 npm run build
-$env:TEST_DATABASE_URL = 'postgresql://pilot:pilot-local-only@localhost:5432/jagofarm'
 npm run test:pilot
-npm run db:size
+npm run test:v1
 ~~~
 
-Gunakan database pengujian, bukan produksi. Suite membuat schema acak khusus tes,
-menjalankan migrasi dua kali, lalu menghapus **schema tes tersebut saja**. Akun database
-tes perlu CREATE SCHEMA. TEST_DATABASE_URL wajib; tidak diam-diam memakai DATABASE_URL.
-Suite menguji akun kosong, undangan, pairing sekali pakai termasuk balapan, isolasi
-langsung API/admin, dua model, payload salah, deduplikasi, buffer terlambat, pagination,
-restart aplikasi, perpindahan unit, sesi/CSRF, batas akun/unit, dan database gagal. Uji browser tetap perlu.
+Kedua suite menggunakan database test terisolasi. Hentikan simulator setelah pengujian dan jangan arahkan suite ke database produksi.
 
 Checklist browser (Admin, A, B dalam profil/incognito terpisah):
 
@@ -231,11 +229,6 @@ Checklist browser (Admin, A, B dalam profil/incognito terpisah):
 - API mati menampilkan error, bukan demo. Restart API dan refresh mempertahankan sesi/data.
 - Uji pada lebar 390px dan desktop; keyboard dapat mengakses input, tombol, tabel.
 - /demo/ dan /demo/ai tetap diberi label contoh, tidak memicu email pilot.
-
-Ukur db:size sebelum dan setelah jumlah kiriman yang diketahui. Catat ukuran database,
-ukuran readings termasuk index, dan jumlah pesan. Gunakan database uji terpisah dan
-hentikan simulator setelah pengujian. Hosting hanya 2 GB: jangan menjalankan ingestion
-tanpa pemantauan atau menjanjikan retensi permanen. Tidak ada penghapusan otomatis.
 
 ## 6. Staging Kroombox — masih perlu verifikasi pengelola
 

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import QrScanner from '../components/QrScanner';
 import { iotApi, parseIotInput } from '../services/iotApi.js';
 import { Badge, Button, Card, Empty, Field, Input, SectionTitle } from '../components/ui';
+import PublicAreaLabel from '../components/iot/PublicAreaLabel.jsx';
 
 export default function DetailInformation() {
   const navigate = useNavigate();
@@ -114,6 +115,7 @@ export default function DetailInformation() {
         <Card>
           {preview.label && <p className="mb-3 text-xs font-bold text-on-surface-variant">{preview.label}</p>}
           <SectionTitle eyebrow="Pratinjau publik" title={preview.device.name} />
+          <PublicAreaLabel areaRef={preview.device.areaRef} />
           <dl className="grid gap-3 sm:grid-cols-2">
             <div className="min-w-0 rounded-xl panel-inset p-3">
               <dt className="text-xs text-on-surface-variant">Kode alat</dt>

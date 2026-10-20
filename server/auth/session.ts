@@ -7,7 +7,7 @@ export type Actor = {
   id: string;
   userId: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'partner';
   scopes: ApiScope[];
   environment: 'live' | 'test' | null;
   keyId: string | null;
@@ -16,7 +16,7 @@ export type Actor = {
 export function sessionScopes(role: Actor['role']): ApiScope[] {
   return role === 'admin'
     ? ['devices:read', 'devices:write', 'readings:read', 'admin']
-    : ['devices:read', 'devices:write', 'readings:read'];
+    : role === 'partner' ? [] : ['devices:read', 'devices:write', 'readings:read'];
 }
 
 export async function authenticateSession(pool: pg.Pool, token: string | undefined): Promise<Actor | null> {

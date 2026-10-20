@@ -22,6 +22,7 @@
     "@fastify/cookie": "^11.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/swagger": "^9.9.1",
+    "@scalar/fastify-api-reference": "1.75.0",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",

@@ -76,7 +76,7 @@ function Akun({ user, onKeluar }) {
       <h2>Identitas akun</h2>
       <dl>
         <div><dt>Email</dt><dd>{user.email}</dd></div>
-        <div><dt>Peran</dt><dd>{user.role === 'admin' ? 'Admin Pilot' : 'Operator'}</dd></div>
+        <div><dt>Peran</dt><dd>{user.role === 'admin' ? 'Admin Pilot' : user.role === 'partner' ? 'Mitra' : 'Operator'}</dd></div>
       </dl>
       <p>Perubahan data akun dan password dilakukan Admin Pilot. Unit pada akun ini hanya dapat dilihat oleh Anda.</p>
       <button type="button" className="pilot-button secondary" onClick={onKeluar}>Keluar dari akun ini</button>
@@ -123,6 +123,16 @@ function Login({ onLogin, invitation, onAccepted }) {
     {message && <p role="status">{message}</p>}
     <a className="pilot-link" href="/masuk">Kembali ke SmartDashboard Aquaponik</a>
   </section></div>;
+}
+
+function PartnerRedirect() {
+  useEffect(() => { window.location.replace('/developer'); }, []);
+  return <section className="pilot-panel">
+    <p className="pilot-eyebrow">AKSES MITRA</p>
+    <h1>Developer SmartDashboard</h1>
+    <p>Akun mitra tidak memiliki akses ke perangkat atau pemantauan kebun.</p>
+    <a className="pilot-link" href="/developer">Buka Developer</a>
+  </section>;
 }
 
 function RefreshBar({ state }) {
@@ -218,9 +228,10 @@ function Admin() {
   return <>
     <div className="pilot-heading"><div><p className="pilot-eyebrow">ADMIN PILOT / AKSES & UNIT</p><h1>Pengguna & alokasi simulator</h1><p>Maksimal 10 akun termasuk admin, total 20 unit. Admin tidak mendapat akses otomatis ke telemetri pengguna.</p></div></div>
     <ErrorNotice error={state.error || modelState.error} />
-    <div className="pilot-admin-grid"><section className="pilot-panel"><p className="pilot-eyebrow">01 / AKUN</p><h2>Undang pengguna</h2><p>Undangan dikirim melalui SMTP; gunakan mailbox uji saat pengembangan.</p>
+    <div className="pilot-admin-grid"><section className="pilot-panel"><p className="pilot-eyebrow">01 / AKUN</p><h2>Undang pengguna atau mitra</h2><p>Undangan dikirim melalui SMTP; gunakan mailbox uji saat pengembangan.</p>
       <ActionForm button="Kirim undangan" action={body => pilotApi('/admin/invitations', { method: 'POST', body })} onSuccess={result => { setMessage(result.message); void state.refresh(); }}>
         <Field label="Email pengguna" name="email" type="email" required maxLength={254} />
+        <div className="pilot-field"><label htmlFor="pilot-invitation-role">Peran</label><select id="pilot-invitation-role" name="role" defaultValue="user" required><option value="user">Pengguna</option><option value="partner">Mitra</option></select></div>
       </ActionForm><p role="status">{message}</p></section>
     <section className="pilot-panel"><p className="pilot-eyebrow">02 / PERANGKAT</p><h2>Alokasikan unit</h2><p>Siapkan unit baru atau terbitkan ulang akses unit yang sudah dilepas.</p>
       <ActionForm button="Terbitkan kode & kredensial" action={values => { const body = { ...values }; if (!body.deviceId) delete body.deviceId; return pilotApi('/admin/devices', { method: 'POST', body }); }} onSuccess={setProvision}>
@@ -232,7 +243,7 @@ function Admin() {
       {provision && <div role="status" className="pilot-secret"><h3>Simpan sekarang: rahasia hanya ditampilkan sekali</h3><p>Kirim kode aktivasi hanya ke pengguna tujuan. Kredensial hanya untuk operator simulator, jangan dimasukkan ke frontend atau Git.</p>
         <dl>{Object.entries(provision).map(([key, value]) => <div key={key}><dt>{key}</dt><dd><code>{value}</code></dd></div>)}</dl><button className="pilot-button secondary" onClick={() => setProvision(null)}>Sembunyikan rahasia</button></div>}
     </section></div>
-    <section className="pilot-panel"><h2>Akun pilot</h2><RefreshBar state={state} /><ul className="pilot-user-list">{state.data?.users.map(user => <li key={user.id}><div><strong>{user.email}</strong><span>{user.role === 'admin' ? 'Admin Pilot' : 'Pengguna'}</span></div><span className={'pilot-status ' + (user.verified ? 'online' : 'stale')}>{user.verified ? 'Terverifikasi' : 'Menunggu undangan'}</span></li>)}</ul></section>
+    <section className="pilot-panel"><h2>Akun pilot</h2><RefreshBar state={state} /><ul className="pilot-user-list">{state.data?.users.map(user => <li key={user.id}><div><strong>{user.email}</strong><span>{user.role === 'admin' ? 'Admin Pilot' : user.role === 'partner' ? 'Mitra' : 'Pengguna'}</span></div><span className={'pilot-status ' + (user.verified ? 'online' : 'stale')}>{user.verified ? 'Terverifikasi' : 'Menunggu undangan'}</span></li>)}</ul></section>
   </>;
 }
 
@@ -258,12 +269,12 @@ export default function PilotApp() {
   return <BrowserRouter basename={basename}><div className="pilot-shell">
     <a href="#pilot-main" className="pilot-skip">Langsung ke konten</a>
     <header className="pilot-header"><Link to="/" className="pilot-brand"><svg className="pilot-brand-symbol" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 26V14m0 5C7 20 5 14 6 7c7 0 12 3 10 12Zm0-4C16 7 21 5 27 5c1 7-3 11-11 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>JagoFarm</Link>
-      {user && <nav aria-label="Navigasi pilot"><NavLink to="/" end>Perangkat</NavLink>{user.role === 'admin' && <NavLink to="/admin">Admin Pilot</NavLink>}<button onClick={async () => {
+      {user && <nav aria-label="Navigasi pilot">{user.role !== 'partner' && <NavLink to="/" end>Perangkat</NavLink>}{user.role === 'admin' && <NavLink to="/admin">Admin Pilot</NavLink>}<button onClick={async () => {
         try { await pilotApi('/session/logout', { method: 'POST' }); setUser(null); setError(''); }
         catch (failure) { if (failure.status === 401) setUser(null); else setError(failure.message); }
       }}>Keluar</button></nav>}</header>
     <main id="pilot-main" className="pilot-main"><ErrorNotice error={error} />
-      {!ready ? <p role="status">Memeriksa sesi…</p> : !user || invitation ? <Login onLogin={value => { setUser(value); setError(''); }} invitation={invitation} onAccepted={() => setInvitation(null)} /> : <>
+      {!ready ? <p role="status">Memeriksa sesi…</p> : !user || invitation ? <Login onLogin={value => { setUser(value); setError(''); }} invitation={invitation} onAccepted={() => setInvitation(null)} /> : user.role === 'partner' ? <PartnerRedirect /> : <>
         <div className="pilot-account"><Akun user={user} onKeluar={async () => {
           try { await pilotApi('/session/logout', { method: 'POST' }); setUser(null); setError(''); }
           catch (failure) { if (failure.status === 401) setUser(null); else setError(failure.message); }

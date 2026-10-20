@@ -4,6 +4,14 @@ Semua perubahan pada `/api/v1` dan payload `POST /api/ingest` dicatat di sini, y
 
 ## Belum dirilis
 
+- Menambahkan role undangan `partner` dengan akses sesi hanya untuk Developer/profile dan key Test milik sendiri tanpa scope `admin`; menambahkan `areaRef` ke pratinjau QR publik dengan redaksi privat tetap berlaku. Hard maximum TDS kini 1000 ppm di firmware, API, dan data lewat migration 007; warning tetap 400/900 ppm. Inventaris saat ini: 3 perangkat satu-sensor dan 1 paket dengan ESP32 DevKit V1, PH-4502C, DS18B20, dan TDS Meter V1.0.
+
+- Memperbaiki validasi pola kode tipe yang gagal di Chrome 155; kontrak API tidak berubah.
+
+- Koreksi dokumentasi ingest legacy setelah membandingkan route: payload v1 dengan `measuredAt` sebelum `credential_since` menghasilkan HTTP 401 (`REQUEST_REJECTED`), sedangkan payload v2 menghasilkan HTTP 400 (`VALIDATION_FAILED`). Tidak ada perubahan route atau perilaku API.
+
+- Minggu 4 A: `/docs` menampilkan Scalar dengan asset lokal dan spec aktif yang tetap tersedia publik di `/docs/openapi.json`. OpenAPI kini memuat autentikasi, scope route, contoh request/response, serta error sesuai implementasi. Koreksi dokumentasi terhadap route aktual: status write jenis sensor/tipe device dan response tanpa body `204`, media QR SVG/PNG, daftar device maksimal 100 item dengan `cursor` yang belum dipakai (`nextCursor` selalu null), field `name`/`unit` pada overview, dan ingest v1 legacy bersama v2 satuan/paket. Tidak ada perubahan route, payload, seed, atau perilaku pilot.
+
 - `GET /devices/:id/readings?bucket=raw` kini menerima filter sensor opsional, menyertakan state tiap pembacaan, total dan metadata aman pada halaman pertama, serta cursor deterministik. `GET /devices/:id/readings/export` menghasilkan workbook XLSX dua sheet dengan ringkasan SQL dan streaming ber-batch, dibatasi ownership/environment, jumlah baris, laju request, dan ekspor bersamaan.
 
 - Klarifikasi kriteria Test Plan sejak baseline `7798e12`: V1-14 menetapkan bahwa `POST /api/v1/devices/claim` dengan key Test dan tanpa Origin tetap menghasilkan `404 NOT_FOUND` karena resource sandbox tersembunyi, bukan karena Origin ditolak. V1-18 menetapkan klaim serentak atas device live yang sama oleh dua akun menghasilkan tepat satu HTTP 200 dan satu HTTP 409. HW-08 kini mencantumkan reprovisioning dengan credential baru dan penolakan `400 VALIDATION_FAILED` untuk record buffer dengan `measuredAt` sebelum `credential_since` baru; observasi fisik state Halted/LED tetap menunggu bench.
@@ -32,7 +40,7 @@ Semua perubahan pada `/api/v1` dan payload `POST /api/ingest` dicatat di sini, y
 - Minggu 2: key `test` dibatasi ke device sandbox dan key `live` ke device non-sandbox, dengan isolasi ownership dan response 404 untuk resource yang tidak dapat diakses.
 - Minggu 2: rate limit API key 60 request/menit untuk `live` dan 30 request/menit untuk `test`. Usage dan `last_used_at` dicatat secara non-blocking dengan route template Fastify. Query retensi 30 hari didokumentasikan, belum dijadwalkan.
 - Firmware membekukan `meta.rssi` di record buffer (36 menjadi 40 byte) supaya retry setelah balasan hilang mendapat `duplicate: true`, bukan 409. Sampel yang direkam saat Wi-Fi putus dikirim tanpa `rssi`. Tes A2 kini mencakup retry sampel online dan sampel buffer offline.
-- Menambahkan migrasi PostgreSQL bernomor dan backfill tipe sensor, tipe perangkat, serta tiga device legacy. Batas fisik TDS 5000 ppm masih sementara, menunggu spesifikasi modul sebenarnya.
+- Menambahkan migrasi PostgreSQL bernomor dan backfill tipe sensor, tipe perangkat, serta tiga device legacy. Migration 002 semula mengisi max TDS 5000 ppm; migration maju 007 mengubah nilai tersimpan menjadi 1000 ppm sesuai keputusan.
 - Pratinjau QR publik dibatasi ke ringkasan device tanpa area, readings, akun, credential, atau kode aktivasi. Kode aktivasi boleh ada hanya di URL isi QR dan request pratinjau sesuai kontrak 6.3. Halaman klaim menghapusnya dari entri riwayat aktif, memakai kebijakan referrer tanpa pengiriman, dan meminta input manual sesudah refresh.
 - Gate Minggu 1 mencakup V1-28 dan V1-29 sesuai cakupan pemilik.
 - Payload idempoten membandingkan versi, model/tipe, waktu ukur, readings, dan `meta`; perubahan metadata pada `messageId` yang sama mendapat 409 `CONFLICT`.

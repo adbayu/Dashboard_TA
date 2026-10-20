@@ -31,6 +31,6 @@ Kalau isinya berbeda, file di folder ini yang jadi acuan.
 - Keputusan teknis yang sulit dibalik dicatat sebagai ADR baru.
 - Teks di dokumen dan UI tidak memakai em dash, sesuai `DESIGN.md`.
 
-## Hal yang masih menunggu jawaban
+## Status keputusan Q1-Q7
 
-Daftar lengkapnya ada di [PRD bagian 11](01-prd.md#11-pertanyaan-terbuka). Yang paling mendesak sebelum minggu 1: model alat yang sudah dirakit (Q6) dan tempat hosting (Q7).
+Keputusan Q1-Q7 sudah dijawab untuk kondisi saat ini; rinciannya ada di [PRD bagian 11](01-prd.md#11-pertanyaan-terbuka). Implementasi role `partner`, area pada pratinjau QR publik, dan batas maksimum TDS 1000 ppm sudah diverifikasi di branch `feat/iot-system`, tetapi belum dideploy. Inventaris saat ini adalah 3 unit satu-sensor dan 1 unit paket; perangkat dan jumlahnya dapat bertambah.

@@ -23,7 +23,7 @@ Semua yang dibutuhkan disiapkan oleh satu skrip (Docker Desktop, database, Mailp
 API, dev server, pratinjau). Di PowerShell:
 
 ```powershell
-cd C:\JagoFarm_TA\Dashboard_TA
+cd C:\TA\Dashboard_TA
 powershell -ExecutionPolicy Bypass -File scripts\start-pilot.ps1
 ```
 
@@ -66,7 +66,7 @@ Karena itu database pilot dipindah ke **5433** lewat `compose.local.yaml`, supay
 PostgreSQL Anda tidak diganggu. Jangan hapus berkas itu.
 
 ```powershell
-cd C:\JagoFarm_TA\Dashboard_TA
+cd C:\TA\Dashboard_TA
 docker compose -f compose.yaml -f compose.local.yaml up -d
 docker compose ps
 ```
@@ -97,7 +97,7 @@ Mailpit (kotak surat uji untuk undangan) bisa dibuka di browser:
 Terminal 1:
 
 ```powershell
-cd C:\JagoFarm\Dashboard_TA
+cd C:\TA\Dashboard_TA
 npm run api
 ```
 
@@ -141,7 +141,7 @@ Harapan: `Simulator through backend. Commands: offline, online. Sampling every
 Terminal 2:
 
 ```powershell
-cd C:\JagoFarm_TA\Dashboard_TA
+cd C:\TA\Dashboard_TA
 npm run dev
 ```
 
@@ -320,9 +320,11 @@ Harapan: `401`
 $body = @{ email='admin@jagofarm.test'; password='<password admin Anda>' } | ConvertTo-Json
 $sesi = Invoke-WebRequest http://127.0.0.1:3001/api/session/login -Method Post -Body $body -ContentType 'application/json' -Headers @{ Origin='http://localhost:5173' } -SessionVariable web -UseBasicParsing
 $sesi.StatusCode
-$sesi.Headers['Set-Cookie']
+$cookieHeader = @($sesi.Headers['Set-Cookie']) -join ';'
+$cookieAttributesValid = ($cookieHeader -match '(?i)(?:^|;\s*)HttpOnly(?:;|$)') -and ($cookieHeader -match '(?i)(?:^|;\s*)SameSite=Strict(?:;|$)') -and ($cookieHeader -match '(?i)(?:^|;\s*)Path=/api(?:;|$)')
+if ($cookieAttributesValid) { 'Cookie attributes: OK' } else { 'Cookie attributes: mismatch' }
 ```
-Harapan: `200`, dan cookie mengandung `HttpOnly`, `SameSite=Strict`, `Path=/api`.
+Harapan: `200` dan status `Cookie attributes: OK`; nilai cookie tidak dicetak.
 
 4) POST dari origin asing harus ditolak
 ```powershell
@@ -367,7 +369,7 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 
 # Kontainer
-cd C:\JagoFarm_TA\Dashboard_TA
+cd C:\TA\Dashboard_TA
 docker compose -f compose.yaml -f compose.local.yaml down
 ```
 
@@ -402,7 +404,7 @@ Docker Desktop juga boleh ditutup dari ikonnya di system tray.
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\stop-pilot.ps1 -HapusData
 powershell -ExecutionPolicy Bypass -File scripts\start-pilot.ps1
-cd C:\JagoFarm_TA\Dashboard_TA
+cd C:\TA\Dashboard_TA
 npm run db:migrate
 $env:ADMIN_EMAIL = 'admin@jagofarm.test'
 $secure = Read-Host 'Password admin (minimal 12 karakter)' -AsSecureString

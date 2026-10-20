@@ -12,7 +12,7 @@ Uji fisik belum dilakukan. Catat board dan modul yang benar-benar dipakai, hasil
 - Ponsel dengan Wi-Fi untuk HW-09.
 - Komputer dengan PlatformIO Core, kabel USB data untuk flash/monitor serial, dan akses ke Wi-Fi/API uji.
 - Catu daya mandiri untuk HW-09 setelah kabel komputer dilepas.
-- Buffer pH 7,00 dan 4,00 yang belum kedaluwarsa, air bilas, serta wadah bersih untuk HW-02.
+- Buffer pH 6,86 dan 4,00 (plus 9,18 untuk verifikasi) yang belum kedaluwarsa, air bilas, serta wadah bersih untuk HW-02.
 - Larutan standar TDS untuk HW-03; nilai label/SDS dan batch/lot hanya diisi dari kemasan yang benar-benar dipakai.
 - Router/access point Wi-Fi uji 2,4 GHz untuk HW-06–HW-08 dan tunnel API sementara sesuai preflight di bawah.
 - Checklist ini dan media untuk mencatat hasil ukur/bukti.
@@ -111,7 +111,7 @@ Jika tiga hostname gagal, hentikan preflight dan laporkan hasilnya. Jika DNS dan
 | `satuan_tds` | `pio run -d firmware -e satuan_tds -t upload` | `pio device monitor -d firmware -e satuan_tds -b 115200` |
 | `paket_water` | `pio run -d firmware -e paket_water -t upload` | `pio device monitor -d firmware -e paket_water -b 115200` |
 
-**Serial:** firmware menampilkan asumsi Q6 dan status sampling. Nilai serial bukan pengganti pengukuran multimeter untuk kriteria HW-01.
+**Serial:** firmware menampilkan inventaris perangkat, batas maksimum TDS 1000 ppm, dan status sampling. Nilai serial bukan pengganti pengukuran multimeter untuk kriteria HW-01.
 
 **Kriteria lulus:** tegangan maksimum output tiap modul yang akan disambungkan ke pin ADC ESP32 tidak lebih dari **3,3 V**.
 
@@ -126,10 +126,10 @@ Bukti/catatan: _______________________________________________________________
 
 **Status: belum diuji (menunggu uji fisik owner).**
 
-**Alat:** ESP32 varian `satuan_ph` atau `paket_water`, probe/modul pH, buffer pH 7,00 dan 4,00 yang belum kedaluwarsa, air bilas, wadah bersih, komputer untuk flash/monitor, dan akses dashboard/database uji.
+**Alat:** ESP32 varian `satuan_ph` atau `paket_water`, probe/modul pH, buffer pH 6,86, 4,00, dan 9,18 yang belum kedaluwarsa, air bilas, wadah bersih, komputer untuk flash/monitor, dan akses dashboard/database uji.
 
 1. Catat board, modul/probe, tanggal kedaluwarsa buffer, suhu larutan, dan kondisi wiring. Jangan mengubah konstanta sensor untuk membuat hasil tampak lulus.
-2. Flash varian yang benar; ikuti instruksi probe/modul untuk mengukur buffer 7,00 dan 4,00. Bilas probe di antara larutan.
+2. Flash varian yang benar; ikuti instruksi probe/modul untuk mengukur buffer 6,86 dan 4,00. Bilas probe di antara larutan.
 3. Catat tegangan buffer pada parameter kalibrasi yang diminta portal, simpan provisioning, lalu ukur kembali kedua buffer setelah pembacaan stabil. Catat hasil serial dan hitung selisih absolut terhadap nilai nominal.
 4. **Dashboard:** buka Monitoring atau detail `/iot/<device-id>`, pilih pembacaan pH pada waktu uji, dan cocokkan nilai serta `measuredAt` dengan catatan bench.
 5. **Database:** pada database bench yang sesuai, jalankan `SELECT measured_at, readings->>'ph' AS ph FROM readings WHERE device_id = :'device_id'::uuid ORDER BY measured_at DESC LIMIT 20;` melalui `psql` setelah mengisi variabel `device_id`. Cocokkan waktu dan nilai yang terkirim dengan serial serta tabel hasil; jangan menganggap angka dashboard sebagai bukti kalibrasi fisik tanpa catatan buffer.
@@ -138,7 +138,7 @@ Bukti/catatan: _______________________________________________________________
 
 | Buffer | Nilai nominal pH | Serial sebelum kalibrasi | Hasil ukur ulang pH | Selisih absolut pH | Lulus/Gagal | Tanggal/inisial |
 | --- | --- | --- | --- | --- | --- | --- |
-| 7,00 |  |  |  |  |  |  |
+| 6,86 |  |  |  |  |  |  |
 | 4,00 |  |  |  |  |  |  |
 
 Probe/modul, lot/kedaluwarsa buffer, suhu, bukti/catatan: ______________________
@@ -150,7 +150,7 @@ Probe/modul, lot/kedaluwarsa buffer, suhu, bukti/catatan: ______________________
 **Alat:** ESP32 varian `satuan_tds` atau `paket_water`, modul/probe TDS, larutan standar yang label/SDS-nya tersedia, wadah bersih, air bilas, alat ukur suhu atau DS18B20, komputer untuk flash/monitor, dan akses dashboard/database uji.
 
 1. Salin nilai standar persis dari label/SDS ke tabel; catat produsen, batch/lot, tanggal kedaluwarsa, dan kondisi/suhu pengukuran. **Jangan mengasumsikan atau mengarang nilai ppm.**
-2. Catat board, modul, wiring dan faktor kalibrasi yang dipakai. Q6/Q7 dan konstanta TDS firmware masih asumsi provisional, bukan spesifikasi yang telah dikonfirmasi.
+2. Catat board, modul, wiring dan faktor kalibrasi yang dipakai. Inventaris dan hosting telah diputuskan; formula/faktor kalibrasi TDS tetap perlu dibuktikan dengan datasheet dan larutan standar. Hard maximum TDS adalah 1000 ppm.
 3. Ikuti prosedur kalibrasi modul memakai larutan yang dipilih, ukur setelah stabil, lalu ulangi pengukuran. Bilas probe sesuai instruksi modul di antara larutan.
 4. **Dashboard:** buka Monitoring atau `/iot/<device-id>` dan cocokkan nilai TDS serta `measuredAt` dengan serial dan tabel hasil. Periksa bahwa nilai mentah yang dikirim memakai satuan/interpretasi yang sama dengan label/SDS.
 5. **Database:** jalankan `SELECT measured_at, readings->>'tds' AS tds FROM readings WHERE device_id = :'device_id'::uuid ORDER BY measured_at DESC LIMIT 20;` via `psql` setelah mengisi `device_id`. Cocokkan record dan waktunya; catat selisih terhadap nilai standar dari kemasan.
@@ -162,7 +162,7 @@ Probe/modul, lot/kedaluwarsa buffer, suhu, bukti/catatan: ______________________
 |  |  |  |  |  |  |  |  |
 |  |  |  |  |  |  |  |  |
 
-Modul/faktor kalibrasi (asumsi Q6/Q7)/bukti/catatan: ___________________________
+Modul/faktor kalibrasi/bukti/catatan: ___________________________
 
 ## HW-04: bandingkan pH saat TDS menyala dan dimatikan
 

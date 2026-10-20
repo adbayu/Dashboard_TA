@@ -9,6 +9,99 @@ import react from '@vitejs/plugin-react';
 import { createServer } from 'vite';
 import viteConfig from '../vite.config.js';
 
+test('SmartTopBar subtitle wraps instead of truncating', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const [{ default: SmartTopBar }, { SmartProvider }] = await Promise.all([
+    vite.ssrLoadModule('/src/components/SmartTopBar.jsx'),
+    vite.ssrLoadModule('/src/store/SmartStore.jsx'),
+  ]);
+  const markup = renderToStaticMarkup(React.createElement(
+    MemoryRouter,
+    null,
+    React.createElement(SmartProvider, null, React.createElement(SmartTopBar, {
+      title: 'Monitoring',
+      subtitle: 'A long subtitle that should wrap on narrow screens',
+      onMenuClick() {},
+    })),
+  ));
+  const subtitleClass = markup.match(/<p class="([^"]*)">A long subtitle that should wrap on narrow screens<\/p>/)?.[1];
+
+  assert.ok(subtitleClass, 'subtitle should render in its own paragraph');
+  assert.doesNotMatch(subtitleClass, /\btruncate\b/);
+  assert.match(subtitleClass, /\bbreak-words\b/);
+});
+
+test('partner sidebar exposes Developer without farm or monitoring menus', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { MENUS } = await vite.ssrLoadModule('/src/components/SmartSidebar.jsx');
+  assert.deepEqual(MENUS.mitra.flatMap(section => section.items.map(item => item.to)), ['/developer']);
+});
+
+test('public QR surfaces render the allowed areaRef with an Indonesian area label', async t => {
+  const [claimSource, detailSource] = await Promise.all([
+    readFile(new URL('./pages/DeviceClaim.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./pages/DetailInformation.jsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(claimSource, /PublicAreaLabel/);
+  assert.match(detailSource, /PublicAreaLabel/);
+
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const PublicAreaLabel = (await vite.ssrLoadModule('/src/components/iot/PublicAreaLabel.jsx')).default;
+  const markup = renderToStaticMarkup(React.createElement(PublicAreaLabel, { areaRef: 'AR-01' }));
+  assert.match(markup, /Area/);
+  assert.match(markup, /AR-01/);
+  assert.equal(renderToStaticMarkup(React.createElement(PublicAreaLabel, { areaRef: null })), '');
+});
+
+test('pilot invitation form offers admin-assigned user and partner roles', async () => {
+  const source = await readFile(new URL('./PilotApp.jsx', import.meta.url), 'utf8');
+  assert.match(source, /id="pilot-invitation-role"\s+name="role"/);
+  assert.match(source, /defaultValue="user"[\s\S]*?<option value="partner">Mitra<\/option>/);
+});
+
+test('partner sessions are redirected out of Pilot device routes', async () => {
+  const source = await readFile(new URL('./PilotApp.jsx', import.meta.url), 'utf8');
+  assert.match(source, /user\.role === 'partner' \? <PartnerRedirect \/> : <>/);
+  assert.match(source, /function PartnerRedirect\(\)[\s\S]*?window\.location\.replace\('\/developer'\)/);
+  assert.match(source, /user\.role !== 'partner' && <NavLink to="\/" end>Perangkat<\/NavLink>/);
+});
+
+test('pilot invitation email opens the route that reads its invite token', async () => {
+  const [pilotSource, serverSource] = await Promise.all([
+    readFile(new URL('./PilotApp.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../server/index.ts', import.meta.url), 'utf8'),
+  ]);
+  assert.match(pilotSource, /new URLSearchParams\(window\.location\.hash\.slice\(1\)\)\.get\('invite'\)/);
+  assert.match(serverSource, /origin\.origin \+ '\/pilot\/#invite='/);
+  assert.doesNotMatch(serverSource, /origin\.origin \+ '\/#invite='/);
+});
+
 function exposeShellForRouteTests() {
   return {
     name: 'expose-smart-app-shell-for-route-tests',

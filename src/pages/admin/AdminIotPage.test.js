@@ -22,3 +22,24 @@ test('rotation loading exposes a busy status while credentials rotate', async t 
   assert.match(markup, /role="status"/);
   assert.match(markup, /Merotasi credential/);
 });
+
+test('device type codes use the Unicode Sets pattern', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { DEVICE_TYPE_CODE_PATTERN } = await vite.ssrLoadModule('/src/pages/admin/AdminIotPage.jsx');
+
+  assert.equal(typeof DEVICE_TYPE_CODE_PATTERN, 'string', 'DEVICE_TYPE_CODE_PATTERN must be a string');
+
+  const pattern = new RegExp('^(?:' + DEVICE_TYPE_CODE_PATTERN + ')$', 'v');
+  assert.match('AQ-WATER-01', pattern);
+  assert.match('AQ-W4-PACK', pattern);
+  assert.doesNotMatch('AQ W4 PACK', pattern);
+});

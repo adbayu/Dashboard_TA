@@ -10,6 +10,169 @@ import { authenticateApiKey, parseApiKey } from './auth/api-key.js';
 import { authenticateSession } from './auth/session.js';
 import { HEARTBEAT_INTERVAL_MS, StreamHub, type StreamClock } from './v1/stream.js';
 
+test('Scalar dan OpenAPI mendokumentasikan semua route IoT tanpa credential nyata', async () => {
+  const pool = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown as pg.Pool;
+  const app = await buildApp({ pool, origin: 'http://localhost:5173', sendInvite: async () => undefined });
+  const routes = [
+    ['GET', '/api/v1/sensor-types'],
+    ['POST', '/api/v1/sensor-types'],
+    ['PATCH', '/api/v1/sensor-types/:code'],
+    ['DELETE', '/api/v1/sensor-types/:code'],
+    ['GET', '/api/v1/device-types'],
+    ['POST', '/api/v1/device-types'],
+    ['PATCH', '/api/v1/device-types/:id'],
+    ['GET', '/api/v1/devices'],
+    ['GET', '/api/v1/devices/:id'],
+    ['POST', '/api/v1/devices'],
+    ['POST', '/api/v1/devices/:id/activation'],
+    ['POST', '/api/v1/devices/:id/credentials/rotate'],
+    ['POST', '/api/v1/devices/:id/qr'],
+    ['POST', '/api/v1/devices/claim'],
+    ['PATCH', '/api/v1/devices/:id'],
+    ['POST', '/api/v1/devices/:id/release'],
+    ['GET', '/api/v1/devices/:id/latest'],
+    ['GET', '/api/v1/devices/:id/readings'],
+    ['GET', '/api/v1/devices/:id/readings/export'],
+    ['GET', '/api/v1/sensors/:code/overview'],
+    ['PUT', '/api/v1/areas/:ref/thresholds'],
+    ['GET', '/api/v1/events'],
+    ['GET', '/api/v1/stream'],
+    ['GET', '/api/v1/keys'],
+    ['POST', '/api/v1/keys'],
+    ['DELETE', '/api/v1/keys/:id'],
+    ['GET', '/api/v1/keys/:id/usage'],
+    ['GET', '/api/v1/sandbox/devices'],
+    ['PUT', '/api/v1/sandbox/devices/:id/scenario'],
+    ['POST', '/api/ingest'],
+  ] as const;
+  const requiredScopes: Record<string, string> = {
+    'GET /api/v1/sensor-types': 'devices:read',
+    'POST /api/v1/sensor-types': 'admin',
+    'PATCH /api/v1/sensor-types/:code': 'admin',
+    'DELETE /api/v1/sensor-types/:code': 'admin',
+    'GET /api/v1/device-types': 'devices:read',
+    'POST /api/v1/device-types': 'admin',
+    'PATCH /api/v1/device-types/:id': 'admin',
+    'GET /api/v1/devices': 'devices:read',
+    'GET /api/v1/devices/:id': 'devices:read',
+    'POST /api/v1/devices': 'admin',
+    'POST /api/v1/devices/:id/activation': 'admin',
+    'POST /api/v1/devices/:id/credentials/rotate': 'admin',
+    'POST /api/v1/devices/:id/qr': 'admin',
+    'POST /api/v1/devices/claim': 'devices:write',
+    'PATCH /api/v1/devices/:id': 'devices:write',
+    'POST /api/v1/devices/:id/release': 'devices:write',
+    'GET /api/v1/devices/:id/latest': 'readings:read',
+    'GET /api/v1/devices/:id/readings': 'readings:read',
+    'GET /api/v1/devices/:id/readings/export': 'readings:read',
+    'GET /api/v1/sensors/:code/overview': 'readings:read',
+    'PUT /api/v1/areas/:ref/thresholds': 'admin',
+    'GET /api/v1/events': 'readings:read',
+    'GET /api/v1/stream': 'readings:read',
+    'GET /api/v1/sandbox/devices': 'devices:read',
+    'PUT /api/v1/sandbox/devices/:id/scenario': 'devices:write',
+  };
+
+  try {
+    for (const [method, url] of routes) {
+      assert.equal(app.hasRoute({ method, url }), true, `Route aktual tidak ditemukan: ${method} ${url}`);
+    }
+
+    const scalarPage = await app.inject({ method: 'GET', url: '/docs' });
+    assert.equal(scalarPage.statusCode, 200, scalarPage.body);
+    assert.match(scalarPage.body, /\/docs\/js\/scalar\.js/);
+    assert.doesNotMatch(scalarPage.body, /cdn\.(?:jsdelivr|scalar)\.com/i);
+    assert.match(scalarPage.body, /preferredSecurityScheme[\s\S]{0,200}ApiKeyBearer/);
+    const scalarAsset = await app.inject({ method: 'GET', url: '/docs/js/scalar.js' });
+    assert.equal(scalarAsset.statusCode, 200);
+    assert.match(scalarAsset.headers['content-type'] ?? '', /javascript/i);
+
+    const response = await app.inject({ method: 'GET', url: '/docs/openapi.json' });
+    assert.equal(response.statusCode, 200, response.body);
+    const spec = response.json();
+    assert.match(spec.info.description, /jf_test_/);
+    assert.match(spec.info.description, /jf_live_/);
+    assert.match(spec.info.description, /sandbox/i);
+    assert.match(spec.info.description, /Jangan pernah memasukkan atau menguji key jf_live_/i);
+    assert.ok(spec.components.securitySchemes.ApiKeyBearer);
+    assert.match(spec.info.description, /Key Live hanya diterbitkan pengelola \(admin\)/i);
+    assert.match(spec.info.description, /key untuk mitra tidak boleh diberi scope admin/i);
+    assert.match(spec.components.securitySchemes.ApiKeyBearer.description, /Key Live hanya diterbitkan pengelola \(admin\)/i);
+    assert.match(spec.components.securitySchemes.ApiKeyBearer.description, /key untuk mitra tidak boleh diberi scope admin/i);
+    assert.ok(spec.components.securitySchemes.PilotSessionCookie);
+    assert.ok(spec.components.securitySchemes.DeviceCredentialBearer);
+    const tdsExample = spec.paths['/api/v1/sensor-types'].get.responses['200'].content['application/json'].examples.success.value.sensorTypes.find((sensor: { code: string }) => sensor.code === 'tds');
+    assert.deepEqual(tdsExample, { code: 'tds', name: 'TDS', unit: 'ppm', min: 0, max: 1000, decimals: 0, warnLow: 400, warnHigh: 900 });
+    const qrExample = spec.paths['/api/v1/devices'].get['x-success-example'].alternatives[0].value.device;
+    assert.equal(qrExample.areaRef, 'AR-01');
+    for (const privateField of ['readings', 'ownerId', 'ownerEmail', 'credential', 'activationCode']) assert.equal(Object.hasOwn(qrExample, privateField), false, privateField);
+
+    const actualOperations = new Set<string>();
+    const sandboxListDescription = spec.paths['/api/v1/sandbox/devices'].get.description;
+    assert.match(sandboxListDescription, /devices:read/);
+    assert.match(sandboxListDescription, /API key live.*404/i);
+    for (const [method, path] of routes) {
+      const openApiPath = path.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, '{$1}');
+      const operation = spec.paths[openApiPath]?.[method.toLowerCase()];
+      assert.ok(operation, `Spec tidak memuat ${method} ${path}`);
+      actualOperations.add(`${method} ${path}`);
+      assert.equal(typeof operation.summary, 'string', `summary tidak ada: ${method} ${path}`);
+      assert.ok(operation.summary.length > 0);
+      assert.equal(typeof operation.description, 'string', `description tidak ada: ${method} ${path}`);
+      assert.ok(operation.description.length > 0);
+      assert.ok(Array.isArray(operation.security), `security/pengecualian tidak dijelaskan: ${method} ${path}`);
+      assert.ok(operation['x-required-scope'] || operation['x-access-notes'], `scope/pengecualian tidak dijelaskan: ${method} ${path}`);
+      assert.ok(operation['x-try-it-example'], `contoh request tidak ada: ${method} ${path}`);
+      assert.equal(operation['x-try-it-example'].method, method);
+      assert.equal(typeof operation['x-try-it-example'].url, 'string');
+      if (operation.requestBody) {
+        assert.ok(Object.keys(operation.requestBody.content?.['application/json']?.examples ?? {}).length > 0, `contoh body tidak ada: ${method} ${path}`);
+      }
+      assert.ok(operation['x-success-example'], `contoh sukses tidak ada: ${method} ${path}`);
+      if (requiredScopes[`${method} ${path}`]) {
+        assert.equal(operation['x-required-scope'], requiredScopes[`${method} ${path}`], `scope salah: ${method} ${path}`);
+      }
+      if (path.startsWith('/api/v1/keys')) {
+        assert.deepEqual(operation.security, [{ PilotSessionCookie: [] }], `route key harus session-only: ${method} ${path}`);
+        assert.match(operation['x-access-notes'], /sesi.*saja/i);
+      }
+      if (method === 'GET' && path === '/api/v1/devices') {
+        assert.ok(operation.security.some((requirement: Record<string, unknown>) => Object.keys(requirement).length === 0), JSON.stringify(operation.security));
+        assert.match(operation['x-access-notes'], /pratinjau QR publik/i);
+      }
+      if (method !== 'GET' && path.startsWith('/api/v1/')) {
+        const originError = Object.values(operation.responses['403']?.content?.['application/json']?.examples ?? {}) as Array<{ value?: { error?: { code?: string } } }>;
+        assert.ok(originError.some(error => error.value?.error?.code === 'ORIGIN_REJECTED'), `ORIGIN_REJECTED tidak didokumentasikan: ${method} ${path}`);
+      }
+
+      const documentedErrors = Object.entries(operation.responses)
+        .filter(([status]) => Number(status) >= 400)
+        .flatMap(([, value]: [string, any]) => Object.values(value.content?.['application/json']?.examples ?? {}) as Array<{ value?: unknown }>);
+      assert.ok(documentedErrors.length > 0, `contoh error tidak ada: ${method} ${path}`);
+      for (const error of documentedErrors) {
+        const code = (error.value as { error?: { code?: string } })?.error?.code;
+        assert.ok(code, `kode error kosong: ${method} ${path}`);
+        assert.ok(new Set(['VALIDATION_FAILED', 'AMBIGUOUS_AUTH', 'UNAUTHENTICATED', 'FORBIDDEN_SCOPE', 'ORIGIN_REJECTED', 'NOT_FOUND', 'CONFLICT', 'RATE_LIMITED', 'UNAVAILABLE', 'REQUEST_REJECTED']).has(code), `kode error di luar kontrak: ${method} ${path} ${code}`);
+        if (path.startsWith('/api/v1/')) assert.notEqual(code, 'REQUEST_REJECTED', `route v1 memakai kode pilot: ${method} ${path}`);
+      }
+    }
+    const ingestOperation = spec.paths['/api/ingest'].post;
+    const ingestExamples = ingestOperation.requestBody.content['application/json'].examples;
+    assert.ok(ingestExamples.v2_satuan);
+    assert.ok(ingestExamples.v2_paket);
+    assert.deepEqual(ingestOperation.security, [{ DeviceCredentialBearer: [] }]);
+    const qrResponseContent = spec.paths['/api/v1/devices/{id}/qr'].post.responses['200'].content;
+    assert.ok(qrResponseContent['image/svg+xml']);
+    assert.ok(qrResponseContent['image/png']);
+    assert.equal(actualOperations.size, routes.length);
+    const examplesAndDescriptions = JSON.stringify(spec);
+    assert.doesNotMatch(examplesAndDescriptions, /Bearer\s+(?:jf_(?:live|test)_)?[a-f0-9]{64}/i);
+    assert.doesNotMatch(examplesAndDescriptions, /"activationCode"\s*:\s*"[a-f0-9]{64}"/i);
+  } finally {
+    await app.close();
+  }
+});
+
 test('serializer request hanya mencatat method, bukan URL, body, atau header', async () => {
   const request = {
     method: 'POST',
@@ -96,7 +259,7 @@ test('V1 migration upgrades an existing pilot schema and backfills IoT metadata 
 
     assert.deepEqual(
       (await pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version),
-      [1, 2, 3, 4, 5],
+      [1, 2, 3, 4, 5, 6, 7],
     );
     assert.equal((await pool.query("SELECT to_regclass('api_keys_prefix_lookup') AS name")).rows[0].name, 'api_keys_prefix_lookup');
     assert.equal((await pool.query("SELECT to_regclass('device_events_state_lookup') AS name")).rows[0].name, 'device_events_state_lookup');
@@ -112,6 +275,11 @@ test('V1 migration upgrades an existing pilot schema and backfills IoT metadata 
         (SELECT count(*) FROM devices WHERE legacy_id IS NOT NULL) AS legacy_devices
     `);
     assert.deepEqual(seedCounts.rows[0], { sensors: '6', types: '6', type_sensors: '11', legacy_devices: '3' });
+    assert.deepEqual(
+      (await pool.query("SELECT max_value,warn_low,warn_high FROM sensor_types WHERE code='tds'")).rows[0],
+      { max_value: 1000, warn_low: 400, warn_high: 900 },
+    );
+    await pool.query("INSERT INTO users(id,email,role) VALUES($1,'partner-migrated@example.test','partner')", [randomUUID()]);
 
     const legacyDevices = [
       ['IOT-001', 'AQ-PH-001', 'AQ-PH'],
@@ -153,6 +321,89 @@ test('V1 migration upgrades an existing pilot schema and backfills IoT metadata 
   }
 });
 
+test('V1-40 forward migrations extend partner roles and lower an existing TDS range without changing warning thresholds', async () => {
+  assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
+  const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = 'v1_forward_migration_test_' + randomUUID().replaceAll('-', '');
+  await control.query('CREATE SCHEMA ' + schema);
+  const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 2 });
+
+  try {
+    await pool.query(`
+      CREATE TABLE schema_migrations (version integer PRIMARY KEY);
+      INSERT INTO schema_migrations(version) VALUES (1),(2),(3),(4),(5);
+      CREATE TABLE users (
+        id uuid PRIMARY KEY,
+        role text NOT NULL CONSTRAINT users_role_check CHECK (role IN ('admin', 'user'))
+      );
+      CREATE TABLE sensor_types (
+        code text PRIMARY KEY,
+        min_value double precision NOT NULL,
+        max_value double precision NOT NULL,
+        warn_low double precision,
+        warn_high double precision
+      );
+      INSERT INTO sensor_types(code,min_value,max_value,warn_low,warn_high) VALUES('tds',0,5000,400,900);
+    `);
+
+    await migrate(pool);
+
+    assert.deepEqual(
+      (await pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version),
+      [1, 2, 3, 4, 5, 6, 7],
+    );
+    assert.deepEqual(
+      (await pool.query("SELECT min_value,max_value,warn_low,warn_high FROM sensor_types WHERE code='tds'")).rows[0],
+      { min_value: 0, max_value: 1000, warn_low: 400, warn_high: 900 },
+    );
+    await pool.query("INSERT INTO users(id,role) VALUES($1,'partner')", [randomUUID()]);
+    await assert.rejects(pool.query("INSERT INTO users(id,role) VALUES($1,'owner')", [randomUUID()]), { code: '23514' });
+  } finally {
+    await pool.end();
+    await control.query('DROP SCHEMA ' + schema + ' CASCADE');
+    await control.end();
+  }
+});
+
+test('V1-27: database unavailable returns a structured 503 without device data', async () => {
+  assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
+  const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = 'v1_unavailable_test_' + randomUUID().replaceAll('-', '');
+  let pool: pg.Pool | undefined;
+  let poolClosed = false;
+  let schemaCreated = false;
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  try {
+    await control.query('CREATE SCHEMA ' + schema);
+    schemaCreated = true;
+    pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: '-c search_path=' + schema, max: 2 });
+    await migrate(pool);
+    await pool.end();
+    poolClosed = true;
+    app = await buildApp({ pool, origin: 'http://localhost:5173', sendInvite: async () => undefined });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices',
+      headers: { authorization: 'Bearer jf_test_' + 'a'.repeat(64) },
+    });
+    assert.equal(response.statusCode, 503, response.body);
+    const body = response.json();
+    assert.deepEqual(Object.keys(body).sort(), ['error']);
+    assert.equal(body.error.code, 'UNAVAILABLE');
+    assert.equal(typeof body.error.message, 'string');
+    assert.equal(typeof body.error.requestId, 'string');
+    assert.equal(Object.hasOwn(body, 'devices'), false);
+    assert.doesNotMatch(response.body, /AQ-|"devices"\s*:/);
+  } finally {
+    await app?.close();
+    if (pool && !poolClosed) await pool.end();
+    if (schemaCreated) await control.query('DROP SCHEMA ' + schema + ' CASCADE');
+    await control.end();
+  }
+});
+
 test('V1 device management contracts', async context => {
   assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to a dedicated PostgreSQL test database');
   const control = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
@@ -163,13 +414,15 @@ test('V1 device management contracts', async context => {
   const password = 'Farm-v1-integration-test';
   const adminId = randomUUID();
   const userId = randomUUID();
+  const invitations = new Map<string, string>();
   let app: Awaited<ReturnType<typeof buildApp>> | undefined;
 
   try {
     await migrate(pool);
     const encodedPassword = await passwordHash(password);
     await pool.query("INSERT INTO users(id,email,password_hash,role) VALUES ($1,'admin-v1@example.test',$2,'admin'),($3,'user-v1@example.test',$2,'user')", [adminId, encodedPassword, userId]);
-    app = await buildApp({ pool, origin, sendInvite: async () => undefined });
+    app = await buildApp({ pool, origin, sendInvite: async (email, invite) => { invitations.set(email, invite); } });
+    app.get('/api/v1/keys/:id/partner-allowlist-probe', async () => ({ exposed: true }));
 
     const login = async (email: string) => {
       const response = await app!.inject({ method: 'POST', url: '/api/session/login', headers: { origin }, payload: { email, password } });
@@ -178,7 +431,7 @@ test('V1 device management contracts', async context => {
     };
     const admin = await login('admin-v1@example.test');
     const user = await login('user-v1@example.test');
-    const request = async (method: 'GET' | 'POST' | 'PATCH', url: string, cookie?: string, payload?: object, headers: Record<string, string> = {}) => {
+    const request = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, cookie?: string, payload?: object, headers: Record<string, string> = {}) => {
       const response = await app!.inject({ method, url, headers: { ...(cookie ? { cookie } : {}), ...(cookie && method !== 'GET' ? { origin } : {}), ...headers }, payload });
       return response;
     };
@@ -187,6 +440,91 @@ test('V1 device management contracts', async context => {
       assert.equal(response.statusCode, 201, response.body);
       return response.json();
     };
+
+    await context.test('V1-41 invited partner sessions are restricted to their own Test keys and sandbox', async () => {
+      const inviteResponse = await request('POST', '/api/admin/invitations', admin, {
+        email: 'partner-v1@example.test', role: 'partner',
+      });
+      assert.equal(inviteResponse.statusCode, 200, inviteResponse.body);
+      const token = invitations.get('partner-v1@example.test');
+      assert.ok(token);
+      const accepted = await app!.inject({
+        method: 'POST', url: '/api/invitations/accept', headers: { origin },
+        payload: { token, password },
+      });
+      assert.equal(accepted.statusCode, 200, accepted.body);
+      const partnerLogin = await app!.inject({
+        method: 'POST', url: '/api/session/login', headers: { origin },
+        payload: { email: 'partner-v1@example.test', password },
+      });
+      assert.equal(partnerLogin.statusCode, 200, partnerLogin.body);
+      assert.equal(partnerLogin.json().user.role, 'partner');
+      const partnerCookie = String(partnerLogin.headers['set-cookie']).split(';')[0];
+      const session = await request('GET', '/api/session', partnerCookie);
+      assert.equal(session.json().user.role, 'partner');
+      const partnerId = session.json().user.id;
+      assert.deepEqual((await pool.query('SELECT role FROM users WHERE id=$1', [partnerId])).rows[0], { role: 'partner' });
+
+      assert.equal((await request('GET', '/api/admin/users', partnerCookie)).statusCode, 403);
+      assert.equal((await request('GET', '/api/devices', partnerCookie)).statusCode, 403);
+      assert.equal((await request('GET', '/api/models', partnerCookie)).statusCode, 403);
+      const legacyStream = await request('GET', '/api/v1/stream', partnerCookie, undefined, { accept: 'text/event-stream' });
+      assert.equal(legacyStream.statusCode, 403, legacyStream.body);
+      assert.equal(legacyStream.json().error.code, 'FORBIDDEN_SCOPE');
+      const keyPrefixProbe = await request('GET', '/api/v1/keys/partner-test/partner-allowlist-probe', partnerCookie);
+      assert.equal(keyPrefixProbe.statusCode, 403, keyPrefixProbe.body);
+      assert.equal(keyPrefixProbe.json().error.code, 'FORBIDDEN_SCOPE');
+      const directDeviceAccess = await request('GET', '/api/v1/devices', partnerCookie);
+      assert.equal(directDeviceAccess.statusCode, 403, directDeviceAccess.body);
+      assert.equal(directDeviceAccess.json().error.code, 'FORBIDDEN_SCOPE');
+
+      const liveKeyDenied = await request('POST', '/api/v1/keys', partnerCookie, {
+        name: 'Partner live denied', environment: 'live', scopes: ['devices:read'],
+      });
+      assert.equal(liveKeyDenied.statusCode, 403, liveKeyDenied.body);
+      const adminScopeDenied = await request('POST', '/api/v1/keys', partnerCookie, {
+        name: 'Partner admin denied', environment: 'test', scopes: ['devices:read', 'admin'],
+      });
+      assert.equal(adminScopeDenied.statusCode, 403, adminScopeDenied.body);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM api_keys WHERE user_id=$1', [partnerId])).rows[0].count), 0);
+
+      const createdKey = await request('POST', '/api/v1/keys', partnerCookie, {
+        name: 'Partner sandbox', environment: 'test', scopes: ['devices:read', 'devices:write', 'readings:read'],
+      });
+      assert.equal(createdKey.statusCode, 201, createdKey.body);
+      assert.match(createdKey.json().secret, /^jf_test_[a-f0-9]{64}$/);
+      assert.deepEqual(createdKey.json().key.scopes, ['devices:read', 'devices:write', 'readings:read']);
+      const storedKey = await pool.query('SELECT user_id,environment,scopes FROM api_keys WHERE id=$1', [createdKey.json().key.id]);
+      assert.deepEqual(storedKey.rows[0], { user_id: partnerId, environment: 'test', scopes: ['devices:read', 'devices:write', 'readings:read'] });
+      const partnerKeyList = await request('GET', '/api/v1/keys', partnerCookie);
+      assert.equal(partnerKeyList.statusCode, 200, partnerKeyList.body);
+      assert.deepEqual(partnerKeyList.json().keys.map((key: { id: string }) => key.id), [createdKey.json().key.id]);
+      const partnerKeyUsage = await request('GET', `/api/v1/keys/${createdKey.json().key.id}/usage`, partnerCookie);
+      assert.equal(partnerKeyUsage.statusCode, 200, partnerKeyUsage.body);
+
+      const userKey = await request('POST', '/api/v1/keys', user, {
+        name: 'User sandbox isolation', environment: 'test', scopes: ['devices:read'],
+      });
+      assert.equal(userKey.statusCode, 201, userKey.body);
+      const userSandbox = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, {
+        authorization: 'Bearer ' + userKey.json().secret,
+      });
+      assert.equal(userSandbox.statusCode, 200, userSandbox.body);
+
+      const sandbox = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, {
+        authorization: 'Bearer ' + createdKey.json().secret,
+      });
+      assert.equal(sandbox.statusCode, 200, sandbox.body);
+      assert.equal(sandbox.json().devices.length, 1);
+      const sandboxId = sandbox.json().devices[0].id;
+      assert.notEqual(sandboxId, userSandbox.json().devices[0].id);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM ownerships WHERE device_id=$1 AND user_id=$2 AND ended_at IS NULL', [sandboxId, partnerId])).rows[0].count), 1);
+      assert.equal((await pool.query('SELECT is_sandbox FROM devices WHERE id=$1', [sandboxId])).rows[0].is_sandbox, true);
+      const revokedPartnerKey = await request('DELETE', `/api/v1/keys/${createdKey.json().key.id}`, partnerCookie);
+      assert.equal(revokedPartnerKey.statusCode, 204, revokedPartnerKey.body);
+      const partnerLogout = await request('POST', '/api/session/logout', partnerCookie);
+      assert.equal(partnerLogout.statusCode, 200, partnerLogout.body);
+    });
 
     await context.test('OpenAPI JSON memuat endpoint IoT v1', async () => {
       const response = await app!.inject({ method: 'GET', url: '/docs/openapi.json' });
@@ -245,7 +583,8 @@ test('V1 device management contracts', async context => {
       assert.equal(preview.json().device.code, device.code);
       assert.equal(preview.json().device.name, device.name);
       assert.equal(preview.json().device.claimed, false);
-      for (const privateField of ['legacyId', 'areaRef', 'readings', 'credential', 'activationCode', 'allocatedTo', 'ownerId']) {
+      assert.equal(preview.json().device.areaRef, 'AR-01');
+      for (const privateField of ['legacyId', 'readings', 'credential', 'credentialHash', 'activationCode', 'activationHash', 'allocatedTo', 'ownerId', 'ownerEmail']) {
         assert.equal(Object.hasOwn(preview.json().device, privateField), false, privateField + ' must not be public');
       }
     });
@@ -333,7 +672,7 @@ test('V1 device management contracts', async context => {
       assert.equal(overLimit.statusCode, 409, overLimit.body);
       assert.equal(overLimit.json().error.code, 'CONFLICT');
       assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=false')).rows[0].count), 20);
-      assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=true')).rows[0].count), 5);
+      assert.equal(Number((await pool.query('SELECT count(*) FROM devices WHERE is_sandbox=true')).rows[0].count), 7);
     });
   } finally {
     await app?.close();
@@ -523,6 +862,40 @@ test('V1 API key contracts and access controls', async context => {
       assert.equal(Number((await pool.query("SELECT count(*) FROM device_events WHERE device_id=$1 AND sensor_code='ph' AND type='threshold_low'", [userSandboxId])).rows[0].count), 1);
     });
 
+    await context.test('Sandbox routes enforce device scopes and hide foreign or live devices', async () => {
+      const noReadScope = await createKey(user, 'test', ['readings:read']);
+      const noRead = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, { authorization: 'Bearer ' + noReadScope.value.secret });
+      assert.equal(noRead.statusCode, 403, noRead.body);
+      assert.equal(noRead.json().error.code, 'FORBIDDEN_SCOPE');
+
+      const readOnlyKey = await createKey(user, 'test', ['devices:read']);
+      const readOnly = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, { authorization: 'Bearer ' + readOnlyKey.value.secret });
+      assert.equal(readOnly.statusCode, 200, readOnly.body);
+      assert.deepEqual(readOnly.json().devices.map((device: { id: string }) => device.id), [userSandboxId]);
+      assert.equal(readOnly.json().devices.some((device: { id: string }) => device.id === otherSandboxId), false);
+      const deniedWrite = await request('PUT', `/api/v1/sandbox/devices/${userSandboxId}/scenario`, undefined, { scenario: 'suhu_naik' }, { authorization: 'Bearer ' + readOnlyKey.value.secret });
+      assert.equal(deniedWrite.statusCode, 403, deniedWrite.body);
+      assert.equal(deniedWrite.json().error.code, 'FORBIDDEN_SCOPE');
+
+      const writeOnlyKey = await createKey(user, 'test', ['devices:write']);
+      const deniedRead = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, { authorization: 'Bearer ' + writeOnlyKey.value.secret });
+      assert.equal(deniedRead.statusCode, 403, deniedRead.body);
+      assert.equal(deniedRead.json().error.code, 'FORBIDDEN_SCOPE');
+      const updated = await request('PUT', `/api/v1/sandbox/devices/${userSandboxId}/scenario`, undefined, { scenario: 'suhu_naik' }, { authorization: 'Bearer ' + writeOnlyKey.value.secret });
+      assert.equal(updated.statusCode, 200, updated.body);
+      assert.equal(updated.json().scenario, 'suhu_naik');
+      const hiddenForeign = await request('PUT', `/api/v1/sandbox/devices/${otherSandboxId}/scenario`, undefined, { scenario: 'suhu_naik' }, { authorization: 'Bearer ' + writeOnlyKey.value.secret });
+      assert.equal(hiddenForeign.statusCode, 404, hiddenForeign.body);
+      assert.equal(hiddenForeign.json().error.code, 'NOT_FOUND');
+      const restored = await request('PUT', `/api/v1/sandbox/devices/${userSandboxId}/scenario`, undefined, { scenario: 'normal' }, { authorization: 'Bearer ' + writeOnlyKey.value.secret });
+      assert.equal(restored.statusCode, 200, restored.body);
+
+      const liveKey = await createKey(admin, 'live', ['devices:read', 'devices:write']);
+      const hiddenSandbox = await request('GET', '/api/v1/sandbox/devices', undefined, undefined, { authorization: 'Bearer ' + liveKey.value.secret });
+      assert.equal(hiddenSandbox.statusCode, 404, hiddenSandbox.body);
+      assert.equal(hiddenSandbox.json().error.code, 'NOT_FOUND');
+    });
+
     await context.test('V1-32: retensi menjaga event state terakhir sandbox dan tidak menyentuh readings/events live', async () => {
       const { cleanupSandboxRetention, runSandboxCycle } = await import('./sandbox/runner.js');
       const sandboxDevice = await fixtureDevice(true, userId);
@@ -649,17 +1022,22 @@ test('V1 API key contracts and access controls', async context => {
       assert.equal(firstStored.credential_hash, hash(firstCredential));
       assert.equal(new Date(firstStored.credential_since).toISOString(), rotated.json().credentialSince);
 
-      const ingest = (deviceCredential: string, messageId: string) => app!.inject({
+      const ingest = (deviceCredential: string, messageId: string, measuredAt = new Date(Date.now() + 30_000).toISOString()) => app!.inject({
         method: 'POST', url: '/api/ingest',
         headers: { authorization: 'Bearer ' + deviceCredential },
         payload: {
           version: 2, deviceId: device.id, type: 'AQ-PH', messageId,
-          measuredAt: new Date(Date.now() + 30_000).toISOString(), readings: { ph: 7.0 },
+          measuredAt, readings: { ph: 7.0 },
         },
       });
       const oldCredential = await ingest(originalCredential, randomUUID());
       assert.equal(oldCredential.statusCode, 401);
       assert.equal(oldCredential.json().error.code, 'UNAUTHENTICATED');
+      const bufferedBeforeRotation = randomUUID();
+      const beforeCredentialSince = await ingest(firstCredential, bufferedBeforeRotation, new Date(firstSince - 1).toISOString());
+      assert.equal(beforeCredentialSince.statusCode, 400, beforeCredentialSince.body);
+      assert.equal(beforeCredentialSince.json().error.code, 'VALIDATION_FAILED');
+      assert.equal(Number((await pool.query('SELECT count(*) FROM readings WHERE device_id=$1 AND message_id=$2', [device.id, bufferedBeforeRotation])).rows[0].count), 0);
       const newCredential = await ingest(firstCredential, randomUUID());
       assert.equal(newCredential.statusCode, 200);
 
@@ -1132,8 +1510,8 @@ test('V1 ingest validates v2 readings and continues accepting pilot v1', async c
       await pool.query("UPDATE ownerships SET started_at=now()-interval '1 minute' WHERE device_id=$1 AND ended_at IS NULL", [value.device.id]);
       return value;
     };
-    const ingest = (payload: object, credential: string) => app!.inject({
-      method: 'POST', url: '/api/ingest', headers: { authorization: 'Bearer ' + credential }, payload,
+    const ingest = (payload: object, credential: string, remoteAddress = '127.0.0.1') => app!.inject({
+      method: 'POST', url: '/api/ingest', remoteAddress, headers: { authorization: 'Bearer ' + credential }, payload,
     });
 
     await context.test('A2 accepts exact firmware v2 payloads for all registered sensor types after buffering', async () => {
@@ -1188,6 +1566,27 @@ test('V1 ingest validates v2 readings and continues accepting pilot v1', async c
           });
         }
       }
+    });
+
+    await context.test('V1-42 TDS accepts 1000 ppm and rejects values above the hard maximum', async () => {
+      const device = await createAndClaim('AQ-TDS', 'Batas maksimum TDS');
+      const message = {
+        version: 2,
+        deviceId: device.device.id,
+        type: 'AQ-TDS',
+        messageId: randomUUID(),
+        measuredAt: new Date().toISOString(),
+        readings: { tds: 1000 },
+      };
+      const accepted = await ingest(message, device.credential);
+      assert.equal(accepted.statusCode, 200, accepted.body);
+      assert.deepEqual(accepted.json(), { accepted: true, duplicate: false });
+
+      const rejectedMessage = { ...message, messageId: randomUUID(), readings: { tds: 1000.01 } };
+      const rejected = await ingest(rejectedMessage, device.credential);
+      assert.equal(rejected.statusCode, 400, rejected.body);
+      assert.equal(rejected.json().error.code, 'VALIDATION_FAILED');
+      assert.equal(Number((await pool.query('SELECT count(*) FROM readings WHERE device_id=$1 AND message_id=$2', [device.device.id, rejectedMessage.messageId])).rows[0].count), 0);
     });
 
     await context.test('V1-05 accepts a one-sensor v2 device and retries idempotently', async () => {
@@ -1262,6 +1661,189 @@ test('V1 ingest validates v2 readings and continues accepting pilot v1', async c
       assert.deepEqual(accepted.json(), { accepted: true, duplicate: false });
       const saved = await pool.query('SELECT ingest_version,ingest_type,ingest_meta FROM readings WHERE device_id=$1 AND message_id=$2', [device.deviceId, message.messageId]);
       assert.deepEqual(saved.rows[0], { ingest_version: 1, ingest_type: 'water-v1', ingest_meta: {} });
+    });
+
+    await context.test('V2 ingest enforces the controlled clock and meta schema boundaries', async () => {
+      const device = await createAndClaim('AQ-PH', 'Sensor batas waktu dan metadata');
+      const previousDateNow = Date.now;
+      const controlledNow = previousDateNow();
+      const makeMessage = (overrides: Record<string, unknown> = {}) => ({
+        version: 2,
+        deviceId: device.device.id,
+        type: 'AQ-PH',
+        messageId: randomUUID(),
+        measuredAt: new Date(controlledNow).toISOString(),
+        readings: { ph: 7.0 },
+        ...overrides,
+      });
+      const assertRejectedWithoutReading = async (message: Record<string, unknown>) => {
+        const response = await ingest(message, device.credential);
+        assert.equal(response.statusCode, 400, response.body);
+        assert.equal(response.json().error.code, 'VALIDATION_FAILED');
+        assert.equal(Number((await pool.query('SELECT count(*) FROM readings WHERE device_id=$1 AND message_id=$2', [device.device.id, message.messageId])).rows[0].count), 0);
+      };
+
+      try {
+        Date.now = () => controlledNow;
+        await pool.query('UPDATE devices SET credential_since=$2 WHERE id=$1', [device.device.id, new Date(controlledNow - 10 * 60_000).toISOString()]);
+        await pool.query('UPDATE ownerships SET started_at=$2 WHERE device_id=$1 AND ended_at IS NULL', [device.device.id, new Date(controlledNow - 10 * 60_000).toISOString()]);
+
+        const futureAtLimit = makeMessage({
+          measuredAt: new Date(controlledNow + 60_000).toISOString(),
+          meta: { rssi: -32768, fw: 'f'.repeat(32) },
+        });
+        const acceptedAtLimit = await ingest(futureAtLimit, device.credential);
+        assert.equal(acceptedAtLimit.statusCode, 200, acceptedAtLimit.body);
+        assert.deepEqual(acceptedAtLimit.json(), { accepted: true, duplicate: false });
+        const savedAtLimit = await pool.query('SELECT ingest_meta FROM readings WHERE device_id=$1 AND message_id=$2', [device.device.id, futureAtLimit.messageId]);
+        assert.deepEqual(savedAtLimit.rows[0].ingest_meta, { rssi: -32768, fw: 'f'.repeat(32) });
+
+        const maximumRssi = makeMessage({ meta: { rssi: 32767 } });
+        assert.deepEqual((await ingest(maximumRssi, device.credential)).json(), { accepted: true, duplicate: false });
+        const withoutMeta = makeMessage();
+        assert.deepEqual((await ingest(withoutMeta, device.credential)).json(), { accepted: true, duplicate: false });
+        const savedWithoutMeta = await pool.query('SELECT ingest_meta FROM readings WHERE device_id=$1 AND message_id=$2', [device.device.id, withoutMeta.messageId]);
+        assert.deepEqual(savedWithoutMeta.rows[0].ingest_meta, {});
+
+        await assertRejectedWithoutReading(makeMessage({ measuredAt: new Date(controlledNow + 60_001).toISOString() }));
+        await assertRejectedWithoutReading(makeMessage({ measuredAt: '2026-10-18T00:00:00Z' }));
+        await assertRejectedWithoutReading(makeMessage({ meta: null }));
+        await assertRejectedWithoutReading(makeMessage({ meta: { fw: '0.4.0', extra: true } }));
+        await assertRejectedWithoutReading(makeMessage({ meta: { rssi: -32769 } }));
+        await assertRejectedWithoutReading(makeMessage({ meta: { rssi: 32768 } }));
+        await assertRejectedWithoutReading(makeMessage({ meta: { rssi: -61.5 } }));
+        await assertRejectedWithoutReading(makeMessage({ meta: { fw: 'f'.repeat(33) } }));
+      } finally {
+        Date.now = previousDateNow;
+      }
+    });
+
+    await context.test('48-hour PostgreSQL ingest replays a 45-minute Wi-Fi buffer exactly once', async () => {
+      const device = await createAndClaim('AQ-WATER-01', 'AQ-WATER-01 simulasi 48 jam');
+      const previousDateNow = Date.now;
+      const durationMs = 48 * 60 * 60 * 1000;
+      const intervalMs = 30_000;
+      const sampleCount = 5_760;
+      const outageStartIndex = 2_400;
+      const outageSampleCount = 90;
+      const outageEndIndex = outageStartIndex + outageSampleCount;
+      const startMs = previousDateNow() - durationMs;
+      let simulatedNow = startMs;
+      let newestMessageId = '';
+      const bufferedPayloads: Array<{
+        version: number;
+        deviceId: string;
+        type: string;
+        messageId: string;
+        measuredAt: string;
+        readings: { ph: number; tds: number; water_temperature: number };
+        meta: { rssi: number; fw: string };
+      }> = [];
+
+      try {
+        Date.now = () => simulatedNow;
+        await pool.query('UPDATE devices SET credential_since=$2 WHERE id=$1', [device.device.id, new Date(startMs - 60_000).toISOString()]);
+        await pool.query('UPDATE ownerships SET started_at=$2 WHERE device_id=$1 AND ended_at IS NULL', [device.device.id, new Date(startMs - 60_000).toISOString()]);
+        const { runOfflineDetection } = await import('./v1/offline.js');
+        const sendSample = async (payload: (typeof bufferedPayloads)[number], receivedAtMs: number, duplicate: boolean) => {
+          const originalIndex = Math.round((Date.parse(payload.measuredAt) - startMs) / intervalMs);
+          const remoteAddress = `192.0.2.${(originalIndex % 50) + 1}`;
+          const response = await ingest(payload, device.credential, remoteAddress);
+          assert.equal(response.statusCode, 200, response.body);
+          assert.deepEqual(response.json(), { accepted: true, duplicate });
+          if (!duplicate) {
+            await pool.query(
+              'UPDATE readings SET received_at=$3 WHERE device_id=$1 AND message_id=$2',
+              [device.device.id, payload.messageId, new Date(receivedAtMs).toISOString()],
+            );
+          }
+        };
+
+        for (let index = 0; index < sampleCount; index++) {
+          const measuredAtMs = startMs + index * intervalMs;
+          simulatedNow = measuredAtMs;
+          const payload = {
+            version: 2,
+            deviceId: device.device.id,
+            type: 'AQ-WATER-01',
+            messageId: randomUUID(),
+            measuredAt: new Date(measuredAtMs).toISOString(),
+            readings: { ph: 7.0, tds: 500, water_temperature: 26.0 },
+            meta: { rssi: -61, fw: '0.4.0' },
+          };
+          if (index === sampleCount - 1) newestMessageId = payload.messageId;
+
+          if (index >= outageStartIndex && index < outageEndIndex) {
+            bufferedPayloads.push(payload);
+            if (index === outageStartIndex + 6) {
+              assert.equal(await runOfflineDetection(pool, simulatedNow), 1);
+            }
+            continue;
+          }
+
+          if (index === outageEndIndex) {
+            assert.equal(bufferedPayloads.length, outageSampleCount);
+            for (const buffered of bufferedPayloads) await sendSample(buffered, measuredAtMs, false);
+          }
+          await sendSample(payload, measuredAtMs, false);
+        }
+
+        assert.equal(bufferedPayloads.length, outageSampleCount);
+        const retryIndex = Math.round((Date.parse(bufferedPayloads[42].measuredAt) - startMs) / intervalMs);
+        const retry = await ingest(bufferedPayloads[42], device.credential, `192.0.2.${(retryIndex % 50) + 1}`);
+        assert.equal(retry.statusCode, 200, retry.body);
+        assert.deepEqual(retry.json(), { accepted: true, duplicate: true });
+
+        const rowCounts = await pool.query(
+          `SELECT sensor.sensor_code,count(*)::text AS samples
+           FROM readings r CROSS JOIN LATERAL jsonb_object_keys(r.readings) AS sensor(sensor_code)
+           WHERE r.device_id=$1 GROUP BY sensor.sensor_code ORDER BY sensor.sensor_code`,
+          [device.device.id],
+        );
+        assert.deepEqual(rowCounts.rows, [
+          { sensor_code: 'ph', samples: '5760' },
+          { sensor_code: 'tds', samples: '5760' },
+          { sensor_code: 'water_temperature', samples: '5760' },
+        ]);
+        assert.equal(Number((await pool.query('SELECT count(*) FROM readings WHERE device_id=$1', [device.device.id])).rows[0].count), sampleCount);
+        assert.equal(Number((await pool.query(
+          `SELECT count(*) FROM (
+             SELECT device_id,message_id FROM readings WHERE device_id=$1
+             GROUP BY device_id,message_id HAVING count(*)>1
+           ) duplicates`,
+          [device.device.id],
+        )).rows[0].count), 0);
+
+        const connectionEvents = await pool.query(
+          `SELECT id::text AS id,type,at FROM device_events
+           WHERE device_id=$1 AND sensor_code IS NULL AND type IN ('offline','online') ORDER BY id`,
+          [device.device.id],
+        );
+        assert.deepEqual(connectionEvents.rows.map(event => event.type), ['offline', 'online']);
+        assert.ok(BigInt(connectionEvents.rows[0].id) < BigInt(connectionEvents.rows[1].id));
+        assert.equal(new Date(connectionEvents.rows[0].at).toISOString(), new Date(startMs + (outageStartIndex + 6) * intervalMs).toISOString());
+
+        const bufferedIds = bufferedPayloads.map(payload => payload.messageId);
+        const bufferedLag = await pool.query(
+          `SELECT count(*) FILTER (WHERE received_at-measured_at>interval '90 seconds')::text AS over_90_seconds,
+             max(extract(epoch FROM received_at-measured_at))::text AS max_seconds
+           FROM readings WHERE device_id=$1 AND message_id=ANY($2::uuid[])`,
+          [device.device.id, bufferedIds],
+        );
+        assert.equal(bufferedLag.rows[0].over_90_seconds, '87');
+        assert.ok(Number(bufferedLag.rows[0].max_seconds) > 90);
+
+        const latest = (await pool.query(
+          `SELECT message_id,measured_at,readings FROM readings
+           WHERE device_id=$1 ORDER BY measured_at DESC,message_id DESC LIMIT 1`,
+          [device.device.id],
+        )).rows[0];
+        assert.equal(latest.message_id, newestMessageId);
+        assert.equal(new Date(latest.measured_at).toISOString(), new Date(startMs + (sampleCount - 1) * intervalMs).toISOString());
+        assert.deepEqual(latest.readings, { ph: 7.0, tds: 500, water_temperature: 26.0 });
+      } finally {
+        Date.now = previousDateNow;
+      }
     });
   } finally {
     await app?.close();
@@ -1479,13 +2061,17 @@ test('V1 raw readings history pagination and access contracts', async context =>
       const device = await createAndClaim('AQ-PH');
       const from = '2026-05-01T00:00:00.000Z';
       const to = '2026-05-02T00:00:00.000Z';
-      await insertReading(device.id, device.ownershipId, from, { ph: 7 });
+      const readingId = await insertReading(device.id, device.ownershipId, from, { ph: 7 });
       const foreign = await request('GET', rawUrl(device.id, from, to), otherCookie);
       assertV1Error(foreign, 404, 'NOT_FOUND');
 
       const testKey = await makeKey(userId, 'test', ['readings:read']);
       const crossEnvironment = await request('GET', rawUrl(device.id, from, to), undefined, undefined, { authorization: 'Bearer ' + testKey });
       assertV1Error(crossEnvironment, 404, 'NOT_FOUND');
+      const readKey = await makeKey(userId, 'live', ['readings:read']);
+      const scopedRead = await request('GET', rawUrl(device.id, from, to), undefined, undefined, { authorization: 'Bearer ' + readKey });
+      assert.equal(scopedRead.statusCode, 200, scopedRead.body);
+      assert.deepEqual(scopedRead.json().points.map((point: { messageId: string }) => point.messageId), [readingId]);
       const noScopeKey = await makeKey(userId, 'live', ['devices:read']);
       const missingScope = await request('GET', rawUrl(device.id, from, to), undefined, undefined, { authorization: 'Bearer ' + noScopeKey });
       assertV1Error(missingScope, 403, 'FORBIDDEN_SCOPE');
@@ -1700,6 +2286,29 @@ test('V1 readings export streams an ExcelJS workbook with bounded access and cle
       assert.equal(selectedBook.getWorksheet('Log sensor')!.getCell(1, column('EC (mS/cm)')).value, 'EC (mS/cm)');
     });
 
+    await context.test('V1-37 export hides cross-environment devices and requires readings:read', async () => {
+      const device = await createDevice(1);
+      await insertReading(device, '2025-01-15T03:04:05.678Z', { ph: 7 });
+      const makeApiKey = async (environment: 'live' | 'test', scopes: string[]) => {
+        const value = `jf_${environment}_${secret()}`;
+        await pool.query(
+          'INSERT INTO api_keys(id,user_id,name,prefix,key_hash,scopes,environment) VALUES($1,$2,$3,$4,$5,$6,$7)',
+          [randomUUID(), actorIds[1], 'V1-37 export scope', value.slice(0, 12), hash(value), scopes, environment],
+        );
+        return value;
+      };
+
+      const crossEnvironmentKey = await makeApiKey('test', ['readings:read']);
+      const hidden = await exportRequest(device.id, '', {}, { authorization: 'Bearer ' + crossEnvironmentKey });
+      await assertError(hidden, 404, 'NOT_FOUND');
+      assert.doesNotMatch(String(hidden.headers.get('content-type')), /spreadsheet/);
+
+      const insufficientScopeKey = await makeApiKey('live', ['devices:read']);
+      const forbidden = await exportRequest(device.id, '', {}, { authorization: 'Bearer ' + insufficientScopeKey });
+      await assertError(forbidden, 403, 'FORBIDDEN_SCOPE');
+      assert.doesNotMatch(String(forbidden.headers.get('content-type')), /spreadsheet/);
+    });
+
     await context.test('local Excel dates use the requested IANA timezone, including UTC and Makassar', async () => {
       const device = await createDevice(1);
       await insertReading(device, '2025-01-15T03:04:05.678Z', { ph: 7 });
@@ -1733,6 +2342,28 @@ test('V1 readings export streams an ExcelJS workbook with bounded access and cle
       await assertError(unknownSensor, 404, 'NOT_FOUND');
       const unknownDevice = await exportRequest(randomUUID(), cookies[2]);
       await assertError(unknownDevice, 404, 'NOT_FOUND');
+
+      const previousDateNow = Date.now;
+      const controlledNow = previousDateNow();
+      try {
+        Date.now = () => controlledNow;
+        const futureDevice = await createDevice(3);
+        await insertReading(futureDevice, new Date(controlledNow - 30_000).toISOString(), { ph: 7.0 });
+        await insertReading(futureDevice, new Date(controlledNow + 30 * 60_000).toISOString(), { ph: 7.5 });
+        const truncated = await exportRequest(futureDevice.id, cookies[3], {
+          from: new Date(controlledNow - 60_000).toISOString(),
+          to: new Date(controlledNow + 60 * 60_000).toISOString(),
+        });
+        assert.equal(truncated.status, 200);
+        const workbook = await workbookFrom(truncated);
+        const log = workbook.getWorksheet('Log sensor')!;
+        const summary = workbook.getWorksheet('Ringkasan')!;
+        assert.equal(log.actualRowCount, 2);
+        assert.equal(log.getCell(2, 2).value, new Date(controlledNow - 30_000).toISOString());
+        assert.equal(summaryValue(summary, 'Rentang sampai (UTC)'), new Date(controlledNow).toISOString());
+      } finally {
+        Date.now = previousDateNow;
+      }
     });
 
     await context.test('a valid empty range creates a readable workbook with zero data rows', async () => {
@@ -1864,7 +2495,7 @@ test('V1 readings export streams an ExcelJS workbook with bounded access and cle
       }
     });
 
-    await context.test('disconnect cancels the export query and releases its connection and actor slot', async () => {
+    await context.test('mid-stream disconnect cancels the export query and releases its connection and actor slot', async () => {
       const device = await createDevice(8);
       const followupDevice = await createDevice(8, 'Disconnect follow-up');
       await pool.query(
@@ -1878,7 +2509,12 @@ test('V1 readings export streams an ExcelJS workbook with bounded access and cle
       );
       const response = await fetch(exportUrl(device.id), { headers: { cookie: cookies[8] } });
       assert.equal(response.status, 200);
-      await response.body?.cancel();
+      const reader = response.body?.getReader();
+      assert.ok(reader);
+      const firstChunk = await reader.read();
+      assert.equal(firstChunk.done, false);
+      assert.ok(firstChunk.value && firstChunk.value.byteLength > 0, 'the client must disconnect after streaming has begun');
+      await reader.cancel();
 
       const deadline = Date.now() + 5000;
       while (Date.now() < deadline && (pool.waitingCount > 0 || pool.idleCount !== pool.totalCount)) {
@@ -2052,7 +2688,7 @@ test('V1 readings, ambang, kejadian, dan deteksi offline memakai PostgreSQL', as
       assert.equal(testEvents.json().events.some((event: { deviceId: string }) => event.deviceId === thresholdDeviceId || event.deviceId === otherDevice.id), false);
     });
 
-    await context.test('V1-23: SSE menjaga akses actor, replay ID event, tanpa ID reading, heartbeat terkendali, batas 5, dan cleanup peer/app.close', async () => {
+    await context.test('V1-23: SSE menjaga akses actor, replay ID event, tanpa ID reading, heartbeat terkendali, batas 5, dan cleanup peer/app.close; V1-34 route mendahulukan komentar awal', async () => {
       const unauthenticated = await app!.inject({ method: 'GET', url: '/api/v1/stream', headers: { accept: 'text/event-stream' } });
       assert.equal(unauthenticated.statusCode, 401, unauthenticated.body);
       const invalidReplay = await app!.inject({
@@ -2112,10 +2748,20 @@ test('V1 readings, ambang, kejadian, dan deteksi offline memakai PostgreSQL', as
         initialStreamReader = initialStreamResponse.body!.getReader();
         const firstFrame = await initialStreamReader.read();
         assert.equal(firstFrame.done, false);
-        assert.ok(
-          new TextDecoder().decode(firstFrame.value).startsWith(': connected\n\n'),
-          'SSE must flush an initial comment before replay frames',
-        );
+        const decoder = new TextDecoder();
+        const firstChunk = decoder.decode(firstFrame.value);
+        const frameBoundary = firstChunk.indexOf('\n\n');
+        assert.notEqual(frameBoundary, -1, 'SSE must flush a complete initial comment frame');
+        assert.equal(firstChunk.slice(0, frameBoundary), ': connected', 'the first frame must contain no event or ID');
+        let replayText = firstChunk.slice(frameBoundary + 2);
+        const replayIds = () => replayText.split('\n').filter(line => line.startsWith('id: ')).map(line => line.slice(4));
+        for (let read = 0; read < 4 && replayIds().length < 2; read++) {
+          const replayFrame: ReadableStreamReadResult<Uint8Array> = await initialStreamReader.read();
+          assert.equal(replayFrame.done, false, 'replay must follow the connected comment');
+          replayText += decoder.decode(replayFrame.value);
+        }
+        assert.deepEqual(replayIds(), [liveEventId, sandboxEventId]);
+        assert.equal(replayText.includes(`id: ${otherEventId}\n`), false, 'replay must exclude events owned by another actor');
       } finally {
         try { await initialStreamReader?.cancel(); } catch { /* The test assertion may close the stream first. */ }
         initialStreamController.abort();

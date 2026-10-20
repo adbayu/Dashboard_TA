@@ -160,7 +160,7 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
     if (query.code) {
       if (query.type || query.area || query.legacyId || query.cursor) failV1(400, 'VALIDATION_FAILED', 'Pratinjau QR tidak dapat digabung dengan filter lain.');
       const row = (await pool.query(
-        `SELECT d.code,d.name,d.type_id,t.code AS type_code,t.kind,
+        `SELECT d.code,d.name,d.area_ref,d.type_id,t.code AS type_code,t.kind,
            EXISTS(SELECT 1 FROM ownerships o WHERE o.device_id=d.id AND o.ended_at IS NULL) AS claimed,
            (d.activation_hash=$2 AND d.activation_expires>now()) AS activation_valid
          FROM devices d JOIN device_types t ON t.id=d.type_id WHERE d.code=$1 AND d.is_sandbox=false`,
@@ -168,10 +168,10 @@ export function registerDeviceRoutes(app: FastifyInstance, pool: pg.Pool, origin
       )).rows[0];
       if (!row) failV1(404, 'NOT_FOUND', 'Device tidak ditemukan.');
       const sensors = await sensorsForDevice(pool, row.type_id, null);
-      // TODO(Q4): area tetap tersembunyi sampai kepemilikan datanya diputuskan.
-      return { device: {
-        code: row.code,
-        name: row.name,
+       return { device: {
+         code: row.code,
+         name: row.name,
+         areaRef: row.area_ref,
         type: { code: row.type_code, kind: row.kind },
         sensors: sensors.map(sensor => ({ code: sensor.code, name: sensor.name, unit: sensor.unit, label: sensor.label })),
         claimed: row.claimed,

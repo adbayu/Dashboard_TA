@@ -51,7 +51,6 @@ export function registerSensorTypeRoutes(app: FastifyInstance, pool: pg.Pool) {
     schema: { tags: ['IoT'], summary: 'Daftar jenis sensor' },
     config: { scope: 'devices:read' },
   }, async () => {
-    // TODO(Q6): rentang maksimum TDS masih sementara sampai modul fisik dikonfirmasi.
     const result = await pool.query('SELECT code,name,unit,min_value,max_value,decimals,warn_low,warn_high FROM sensor_types ORDER BY code');
     return { sensorTypes: result.rows.map(present) };
   });

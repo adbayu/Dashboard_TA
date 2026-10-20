@@ -38,6 +38,7 @@ test('pratinjau publik hanya mengembalikan field yang diizinkan kontrak QR', () 
     sensors: [{ code: 'ph', name: 'pH Air', unit: 'pH', label: 'Probe pH' }],
     claimed: true,
     activationValid: false,
+    areaRef: 'AR-01',
   });
 });
 

@@ -28,7 +28,7 @@ export async function authenticateApiKey(pool: pg.Pool, parsed: ParsedApiKey): P
     id: string;
     user_id: string;
     email: string;
-    role: 'admin' | 'user';
+    role: Actor['role'];
     key_hash: string;
     scopes: ApiScope[];
     environment: ApiKeyEnvironment;

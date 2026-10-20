@@ -168,12 +168,14 @@ Rilis dianggap selesai kalau semua gate di [Test Plan](07-test-plan.md) lulus. R
 
 ## 11. Pertanyaan terbuka
 
-| No | Pertanyaan | Ditanyakan ke |
-| --- | --- | --- |
-| Q1 | Apakah interpretasi "Dashboard API" (API publik + portal developer) sudah sesuai? | Tim |
-| Q2 | Siapa yang boleh membuat key live untuk mitra: hanya admin, atau user juga? | Tim |
-| Q3 | Mitra masuk ke portal pakai akun apa? Perlu peran baru `partner` atau cukup `user`? | Tim |
-| Q4 | Data area/kolam tanggung jawab modul siapa? | Tim |
-| Q5 | Modul "Kelola ..." di sisi kanan papan dipegang siapa saja, dan data IoT apa yang mereka butuhkan? | Tim |
-| Q6 | Model persis ESP32 dan modul sensor yang sudah dirakit, serta jumlah unit satuan dan paket | Haykal |
-| Q7 | Keputusan hosting produksi final setelah pilot | Tim |
+Status per 20 Oktober 2026. Keputusan dalam tabel diberikan Haykal. Marker `TODO(Q#)` yang masih ada menandai implementasi yang belum mengikuti keputusan, bukan keputusan yang masih terbuka.
+
+| No | Pertanyaan | Ditanyakan ke | Status | Jawaban atau default sementara |
+| --- | --- | --- | --- | --- |
+| Q1 | Apakah interpretasi "Dashboard API" (API publik + portal developer) sudah sesuai? | Tim | Terjawab | Ya. Dashboard API berarti API publik `/api/v1` beserta portal `/developer`. |
+| Q2 | Siapa yang boleh membuat key live untuk mitra: hanya admin, atau user juga? | Tim | Terjawab (untuk sekarang) | Key live hanya bisa dibuat pengelola (`admin`), user hanya key test. Diputuskan Haykal 18 Oktober 2026 dan bisa ditinjau ulang nanti. Catatan: device yang terlihat ditentukan scope key, bukan peran pembuatnya. Key live dari akun admin tanpa scope `admin` hanya melihat device milik akun admin. Dengan scope `admin`, key melihat semua device dan bisa memakai endpoint admin, jadi key untuk mitra tidak boleh diberi scope `admin`. |
+| Q3 | Mitra masuk ke portal pakai akun apa? Perlu peran baru `partner` atau cukup `user`? | Tim | Terjawab; implementasi di branch | Mitra memakai role khusus `partner`, ditetapkan admin melalui undangan. Role ini hanya dapat memakai Developer/profile dan membuat key Test tanpa scope `admin`; sandbox dan key dibatasi ke akun mitra. Perubahan tersedia di `feat/iot-system` dan belum dideploy. |
+| Q4 | Data area/kolam tanggung jawab modul siapa? | Tim | Terjawab; implementasi di branch | Data area/kolam milik JagoFarm dan IoT mereferensikannya melalui `devices.area_ref`. Pratinjau QR publik menampilkan `areaRef` yang ada, tanpa readings, identitas pemilik, credential, atau kode aktivasi. Perubahan tersedia di `feat/iot-system` dan belum dideploy. |
+| Q5 | Modul "Kelola ..." di sisi kanan papan dipegang siapa saja, dan data IoT apa yang mereka butuhkan? | Tim | Terjawab | Haykal mengelola modul tersebut. Data IoT yang diperlukan: nilai sensor pH, TDS, dan suhu air. |
+| Q6 | Model persis ESP32 dan modul sensor yang sudah dirakit, serta jumlah unit satuan dan paket | Haykal | Terjawab untuk perangkat saat ini | Saat ini ada 3 unit satu-sensor dan 1 unit paket. Perangkatnya: ESP32 DevKit V1; pH Meter Module PH-4502C with probe; sensor suhu air DS18B20; dan TDS Meter V1.0. Jumlah unit dan perangkat dapat bertambah ke depannya. Batas maksimum TDS ditetapkan 1000 ppm; warning tetap 400/900 ppm. Implementasi firmware, API, dan migration maju 007 telah diverifikasi di branch `feat/iot-system`; migration produksi belum dijalankan karena branch belum dideploy. |
+| Q7 | Keputusan hosting produksi final setelah pilot | Tim | Terjawab | VPS pada `iot.jagofarm.dev` sudah ditetapkan sebagai hosting produksi. |

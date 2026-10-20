@@ -1,15 +1,17 @@
 # JagoFarm — SmartDashboard Aquaponik (Dashboard TA)
 
 Sistem dashboard berbasis web untuk monitoring **aquaponik** (kolam ikan + sayur dalam satu
-siklus air) yang terintegrasi dengan perangkat **IoT**. Aplikasi memiliki **2 role**
-(Pengguna dan Pengelola/Admin) dengan fitur yang berbeda.
+siklus air) yang terintegrasi dengan perangkat **IoT**. Aplikasi memiliki tiga role:
+Pengguna, Pengelola/Admin, dan Mitra (`partner`).
 
 Stack: **Vite 8 + React 19 + Tailwind CSS 3 + react-router-dom 7**, tema visual "Lumina Aqua".
-Repo: https://github.com/adbayu/Dashboard_TA.git — branch kerja: **`dev/antigravity`**.
+Repo: https://github.com/adbayu/Dashboard_TA.git — branch pengembangan IoT: **`feat/iot-system`**.
 
 > Dokumen pilot backend (Fastify + PostgreSQL, Sprint 1) tetap ada di
 > [PILOT-SETUP.md](PILOT-SETUP.md) dan [PERSIAPAN-PILOT.md](PERSIAPAN-PILOT.md).
 > Dokumen ini fokus pada SmartDashboard Aquaponik.
+
+![Tampilan Dashboard JagoFarm](preview.jpg)
 
 ---
 
@@ -18,8 +20,8 @@ Repo: https://github.com/adbayu/Dashboard_TA.git — branch kerja: **`dev/antigr
 ### Mode pengembangan (hot reload)
 
 ```bash
-cd C:\JagoFarm_TA\Dashboard_TA
-npm install
+cd C:\TA\Dashboard_TA
+npm ci
 npm run dev
 ```
 
@@ -28,26 +30,35 @@ Buka `http://localhost:5173/`.
 ### Mode hasil build (uji produksi)
 
 ```bash
-cd C:\JagoFarm_TA\Dashboard_TA
-node node_modules/vite/bin/vite.js build
-node node_modules/vite/bin/vite.js preview --port 4173 --host 127.0.0.1
+cd C:\TA\Dashboard_TA
+npm run build
+npm run preview -- --port 4173 --host 127.0.0.1
 ```
 
 Buka `http://127.0.0.1:4173/`.
-
-> Catatan Windows: gunakan `node node_modules/vite/bin/vite.js build` langsung, bukan
-> `npm run build` melalui shell background — proses npm/npx di host ini menggantung
-> sampai timeout walaupun build-nya sendiri selesai dalam ~1,4 detik.
 
 ### Perintah lain
 
 | Perintah | Fungsi |
 | --- | --- |
-| `npx --no-install oxlint src` | Lint kode frontend |
+| `npm run lint` | Lint kode frontend |
 | `npm run typecheck` | Type-check backend (`server/tsconfig.json`) |
 | `npm run api` | Jalankan backend pilot (Fastify) |
 | `npm run simulator` | Jalankan simulator pengirim telemetri ke backend pilot |
 | `npm run test:pilot` | Uji kontrak backend pilot |
+| `npm run test:v1` | Uji kontrak API v1 |
+| `node --test 'src/**/*.test.js'` | Unit test frontend di `src/` |
+
+### Pilot backend (lokal)
+
+~~~powershell
+Copy-Item .env.example .env
+docker compose up -d
+npm run db:migrate
+npm run api
+~~~
+
+Untuk konfigurasi dan checklist lengkap, lihat [PILOT-SETUP.md](PILOT-SETUP.md).
 
 ---
 
@@ -69,59 +80,18 @@ UI demo lama (`/demo/*`, `src/App.jsx`) **sudah dihapus seluruhnya**.
 
 ### Cara masuk
 
-Aplikasi kini punya halaman masuk (`/masuk`) dan halaman **daftar akun** (`/daftar`). Tanpa
-login, semua alamat otomatis dialihkan ke halaman masuk. Akun demo (semuanya berpassword `jagofarm123`):
+Dalam mode API, SmartDashboard memvalidasi login melalui backend dan menggunakan cookie sesi `pilot_session` berdurasi 12 jam. Password dan token sesi tidak disimpan di SmartStore atau `localStorage`. Panduan ini tidak menyediakan akun atau password demo.
 
-| Email | Password | Nama | Role | Area |
-| --- | --- | --- | --- | --- |
-| budi@jagofarm.id | jagofarm123 | Budi Santoso | Pengguna | AR-01, AR-03 |
-| siti@jagofarm.id | jagofarm123 | Siti Rahmawati | Pengguna | AR-02 |
-| hendra@jagofarm.id | jagofarm123 | Hendra Wicaksono | Pengelola | — |
-| agus@jagofarm.id | jagofarm123 | Agus Priyanto | Pengguna (nonaktif) | AR-03 |
+Dalam mode API, akun disediakan melalui undangan/backend. Role backend dipetakan ke role UI: `user` menjadi Pengguna, `admin` menjadi Pengelola, dan `partner` menjadi Mitra.
 
-Halaman masuk menyediakan tombol **isi otomatis** untuk tiga akun utama, jadi tidak
-perlu mengetik password saat demo.
+- Pengguna diarahkan ke beranda `/` dan hanya dapat membuka halaman pengguna.
+- Pengelola diarahkan ke `/admin` dan dapat membuka menu pengelolaan.
+- Akses langsung ke halaman yang tidak sesuai role dialihkan kembali.
+- Tombol **Keluar** ada di halaman **Profil**; halaman `/profil` tersedia untuk kedua role.
 
-Setelah masuk, **role ditentukan oleh akun** — bukan lagi pilihan manual:
+### Sumber data IoT
 
-- Akun Pengguna → beranda `/`, hanya boleh membuka halaman pengguna.
-- Akun Pengelola → beranda `/admin`, membuka menu pengelolaan.
-- Bila alamat dipaksa (mis. pengguna mengetik `/admin`), otomatis dialihkan kembali.
-- Sesi bertahan setelah halaman di-refresh; tombol **Keluar** ada di halaman **Profil**
-  (bukan di sidebar), bersebelahan dengan ringkasan akun.
-- Halaman `/profil` tersedia untuk kedua role.
-
-### Alur pembuatan akun (dua jalur)
-
-**Jalur 1 — pendaftaran sendiri di `/daftar`.** Tautan "Daftar di sini" ada di halaman masuk.
-Pendaftar memilih peran, dan perannya menentukan perlakuan akun:
-
-| Peran yang dipilih | Status setelah daftar | Bisa langsung masuk? |
-| --- | --- | --- |
-| **Operator Farm** (pengguna) | `aktif` | Ya — langsung diarahkan ke beranda `/` |
-| **Pengelola Farm** | `menunggu` | Tidak — harus disetujui pengelola yang sudah ada |
-
-Alasannya: hak pengelola itu akses penuh ke seluruh farm, jadi tidak boleh didapat dari
-formulir publik. Pendaftar pengelola melihat layar "Pengajuan terkirim" dan diminta menghubungi
-pengelola. Bila mencoba masuk, pesannya jelas: akun masih menunggu persetujuan.
-
-Operator farm boleh langsung aktif karena aksesnya terbatas pada area yang ditugaskan
-pengelola — akun baru belum punya area, jadi belum ada data yang bisa dibuka.
-
-**Jalur 2 — dibuat pengelola di `/admin/pengguna`.** Tombol **Tambah pengguna** membuka
-formulir berisi nama, email, peran, status, **password awal**, dan area yang dikelola. Bila
-kolom password dikosongkan, akun memakai password demo `jagofarm123` dan password itu
-ditampilkan pada pesan konfirmasi supaya bisa diserahkan ke pemilik akun. Email dijaga unik —
-email yang sudah dipakai akun lain ditolak.
-
-**Persetujuan pengajuan.** Bila ada pendaftar pengelola, halaman `/admin/pengguna` menampilkan
-panel **Perlu Persetujuan** di atas tabel (kartu "Menunggu Persetujuan" ikut menghitungnya),
-dengan tombol **Setujui** / **Tolak**. Tombol setujui cepat juga tersedia di baris tabel yang
-berstatus menunggu. Status akun memakai tiga nilai: `aktif`, `menunggu`, `nonaktif`.
-
-**Validasi di sisi store (bukan hanya HTML).** Nama/email/password wajib, format email
-diperiksa, password minimal 6 karakter, konfirmasi password harus sama, dan email tidak boleh
-duplikat. Pesan galat tampil di formulir dengan `role="alert"`.
+Sumber IoT default adalah `VITE_IOT_SOURCE=api`. Hanya `VITE_IOT_SOURCE=local` yang mengaktifkan mode **Data contoh**; pengaturan ini bukan jalur login atau autentikasi.
 
 ### Halaman profil (`/profil`)
 
@@ -129,16 +99,13 @@ Foto dan identitas di sidebar bisa diklik untuk membuka halaman ini. Yang bisa d
 
 - Nama, email, nomor telepon, jabatan, dan "tentang saya"
 - Foto profil dari 6 pilihan avatar
-- Ganti password (wajib mengisi password lama, minimal 6 karakter, konfirmasi harus sama)
+- Ganti password (hanya tersedia pada mode local; API mode mengelola password melalui backend)
 - **Keluar dari akun** (tombol merah di kartu ringkasan akun) — ditaruh di sini supaya
   sidebar hanya berisi navigasi
 
-Perubahan langsung tampil di sidebar dan tersimpan di `localStorage`.
+Perubahan metadata profil langsung tampil di sidebar. Metadata profil dan preferensi UI yang diperlukan disimpan di SmartStore/`localStorage`.
 
-> **Catatan keamanan:** ini login demo untuk keperluan tugas akhir. Password disimpan
-> apa adanya di `localStorage` browser — tidak terenkripsi dan tidak aman untuk produksi.
-> Bila nanti dipakai sungguhan, autentikasi harus dipindahkan ke backend (hash password
-> + token sesi).
+> Penggantian password dari halaman Profil hanya tersedia pada mode local. Pada mode API, sesi memakai cookie backend `pilot_session`; password dan token sesi tidak disimpan di SmartStore/`localStorage`.
 
 ### Tata letak & responsif
 
@@ -159,12 +126,15 @@ tidak ada geser horizontal di semua kombinasi.
 
 | Route | Halaman | Isi |
 | --- | --- | --- |
-| `/masuk` | Masuk | Login + tautan ke pendaftaran + kartu akun demo |
-| `/daftar` | Daftar akun | Pilih peran (Operator Farm / Pengelola Farm), data diri, password, foto profil |
+| `/masuk` | Masuk | Login backend dengan cookie sesi pada mode API; login lokal pada mode local |
+| `/daftar` | Daftar akun (mode local) | Pendaftaran lokal; pada mode API akun disediakan melalui undangan/backend |
 | `/` | Dashboard | Telemetri kunci (pH, suhu air, TDS — tiga sensor yang benar-benar ada), **statistik harian kolam** (terendah/rata-rata/tertinggi hari ini + status terhadap ambang), **histori harian per tanggal** (14 hari ke belakang: rata-rata + rentang tiap parameter, status ambang, dan ikan mati), ringkasan area, total HPP, peringatan device, jumlah ikan mati hari ini, kondisi virtual pet, catatan pemantauan terbaru |
-| `/iot` | List IoT | Daftar seluruh perangkat + filter (cari, kategori, area, status) |
-| `/iot/:id` | Detail Information / Device | Deskripsi & **fungsi alat**, parameter yang diukur, ambang ideal, diagnostik (baterai, sinyal, tanggal kalibrasi), pindah area, **QR alat**, catatan area terkait |
-| `/detail-informasi` | Detail Information (QR) | **Pindai QR alat** pakai kamera → penjelasan lengkap alat: jenis, fungsi, parameter + ambang ideal, pembacaan saat ini, arti tiap status, dan catatan perawatan. Bisa juga lewat input manual kode alat |
+| `/iot` | List IoT | Daftar perangkat dari API pada mode API, dengan filter yang tersedia |
+| `/iot/:id` | Detail device | Telemetry/status, ambang efektif, riwayat pembacaan, dan kejadian yang tersedia dari API |
+| `/iot/:id/log` | Log sensor | Log pembacaan perangkat dan ekspor melalui API |
+| `/detail-informasi` | Detail Information (QR) | Pada mode API, pratinjau publik menampilkan identitas dasar, `areaRef`, sensor, status klaim, dan validitas kode; pemindai kamera memiliki input manual sebagai fallback |
+| `/monitoring` | Monitoring | Tampilan sensor, area, dan kejadian perangkat dari API |
+| `/developer` | Developer | API key, pemakaian, dan referensi API |
 | `/area` | Kelola Area | Daftar area produksi (kolam/growbed/tandon) + HPP tercatat |
 | `/area/:id` | Detail Area | **Input item HPP** (perhitungan total & per unit otomatis), **statistik harian sensor**, **catat ikan mati harian** (kolam saja, populasi ikut disesuaikan), **pemantauan kolam** (pH, suhu, TDS, catatan), **catat panen** + margin untung/rugi, daftar device di area |
 | `/v-pet` | V-Pet | Karakter 2D (mirip hewan arcade) yang **bereaksi terhadap sensor IoT area tertaut**: suhu terlalu dingin/panas, pH asam/basa, TDS kurang/pekat masing-masing memicu ekspresi, latar kolam, sikap gerak, dan kalimat sendiri; ditambah pakan, bermain, bersihkan, rawat; level, tahap evolusi, dan aksesori yang ikut naik level |
@@ -177,15 +147,26 @@ tidak ada geser horizontal di semua kombinasi.
 | --- | --- | --- |
 | `/admin` | Dashboard Pengelola | Ringkasan seluruh farm, pintasan menu, unit yang butuh tindakan, **laporan ikan mati hari ini**, peringkat poin |
 | `/admin/pengguna` | Kelola User | Tambah/ubah/hapus akun, peran (pengguna/pengelola), status aktif, **hak akses area**, penyesuaian poin, sebaran area per akun |
-| `/admin/iot` | Kelola IoT | Registrasi perangkat, kategori, penempatan area, status, baterai, **kalibrasi**, hapus, dan **QR alat** — modal QR kini menampilkan panel penjelasan lengkap yang sama dengan yang dibaca pengguna |
-| `/admin/detail-informasi` | Detail Information (pengelola) | **Penjelasan alat yang SAMA dengan yang dibaca pengguna**: tempel isi QR atau pilih alat dari daftar, lalu lihat fungsi, parameter + ambang, pembacaan, arti status, dan catatan perawatan persis seperti tampilan pengguna |
+| `/admin/iot` | Kelola IoT | Kelola tipe dan perangkat, buat QR, catat kalibrasi, serta rotasi credential |
+| `/monitoring` | Monitoring | Tampilan sensor, area, dan kejadian perangkat dari API |
+| `/developer` | Developer | API key, pemakaian, dan referensi API |
+| `/admin/detail-informasi` | Detail Information (pengelola) | Panel informasi perangkat berbasis SmartStore; bukan pratinjau publik API |
 | `/admin/kategori` | Kategori Device | Jenis alat: nama, ikon, warna, deskripsi, dan daftar **parameter + ambang ideal** (min–max) |
 | `/admin/area` | Kelola Area | Area (kolam yang sudah dipasangi IoT): tipe, lokasi, volume, komoditas, populasi, **ambang ideal khusus area** (opsional), pemilihan device, penanggung jawab |
 | `/admin/v-pet` | Kelola Virtual Pet | Nama & jenis pet, area pemantauan tertaut, kondisi (kenyang/kebahagiaan/kebersihan/kesehatan), jalur evolusi, reset pet, pratinjau seluruh ekspresi aset, dan karakter yang sama dengan tampilan pengguna (reaksi sensor terlihat dari sisi pengelola) |
 | `/admin/point` | Sistem Point | Aturan perolehan poin (aktivitas, poin, batas harian, aktif/nonaktif), badge (ikon + ambang poin), saldo & penyesuaian poin pengguna, audit riwayat poin |
 
-**QR alat**: berisi URL halaman perangkat (`/iot/:id`). Saat dipindai, yang muncul adalah
-nama alat, kategori, deskripsi, daftar fungsi, lokasi, dan status unit.
+### 3.3 Role Mitra (`partner`)
+
+| Route | Akses |
+| --- | --- |
+| `/developer` | API key Test milik akun dan sandbox sendiri |
+| `/profil` | Profil akun dan keluar |
+
+Mitra tidak dapat membuka halaman farm, monitoring, atau admin. Key Live dan scope `admin`
+hanya tersedia untuk pengelola sesuai kebijakan backend.
+
+Alur QR klaim pada mode API dijelaskan pada bagian **Detail Information — memindai QR alat**.
 
 ---
 
@@ -200,18 +181,18 @@ src/data/seed.js                   319  Seluruh data awal + basis pengetahuan ch
 src/components/ui.jsx              294  Komponen dasar + sistem ukuran (UKURAN: sm/md/lg) & IconButton
 src/components/SmartSidebar.jsx    155  Sidebar + definisi menu per role
 src/components/SmartTopBar.jsx      72  Top bar: status device, tema, reset demo (IconButton)
-src/components/QrCode.jsx           46  QR asli (paket qrcode) berisi kode alat
+src/components/QrCode.jsx           46  QR lokal lama (paket qrcode)
 src/components/QrScanner.jsx       180  Pemindai QR kamera (BarcodeDetector bawaan browser), dipakai pengguna & pengelola
-src/components/PanelInfoAlat.jsx   312  Panel penjelasan alat — dipakai BERSAMA pengguna & pengelola
-src/components/AksiQr.jsx           210  Tombol Unduh PNG / Salin isi QR / Cetak label (satu sumber, keempat pintu QR)
+src/components/PanelInfoAlat.jsx   312  Panel informasi perangkat untuk alur QR mode local
+src/components/AksiQr.jsx           210  Tombol QR untuk alur mode local
 src/services/aquaBot.js            139  Mesin pencarian jawaban chatbot
-src/services/iotInfo.js             62  Resolver isi QR alat (3 format: kode ringkas/URL/kode alat)
+src/services/iotInfo.js             62  Resolver QR untuk alur mode local
 
 src/pages/Login.jsx                174  Masuk + tautan ke pendaftaran
 src/pages/Daftar.jsx               274  Daftar akun sendiri (operator langsung aktif, pengelola perlu persetujuan)
 src/pages/Dashboard.jsx            342  Role pengguna
-src/pages/ListIot.jsx              362  (termasuk komponen DeviceDetail; modal QR pakai panel bersama)
-src/pages/DetailInformation.jsx    183  Pindai QR alat -> penjelasan lengkap perangkat (panel bersama)
+src/pages/ListIot.jsx              362  (termasuk komponen DeviceDetail; alur QR local lama)
+src/pages/DetailInformation.jsx    183  Pratinjau publik terbatas pada mode API; alur local lama tetap terpisah
 src/pages/KelolaArea.jsx           169
 src/pages/AreaDetail.jsx           433
 src/pages/VPet.jsx                 169
@@ -221,79 +202,15 @@ src/pages/Profil.jsx               237  Termasuk tombol Keluar
 
 ### Detail Information — memindai QR alat
 
-Menu **Detail Information** (`/detail-informasi`) ada di sidebar pengguna. Halaman ini
-menerima tiga bentuk isi QR, karena label lama mungkin sudah dicetak/ditempel di alat:
+Keterangan berikut hanya berlaku pada mode API. QR klaim membawa URL
+`/d/:code?c=<kode aktivasi>`. Halaman publik `/d/:code` membaca parameter query lalu
+menghapusnya dari alamat setelah dibaca. Kode aktivasi rahasia hanya berada pada URL tujuan
+QR dan body/request API yang memang dikontrak; nilainya tidak dicantumkan di dokumentasi.
+Kode aktivasi berlaku 24 jam dan pengguna harus login untuk mengklaim perangkat.
 
-| Isi QR | Contoh | Dikenali sebagai |
-| --- | --- | --- |
-| Kode ringkas | `JAGOFARM\|AQ-PH-001\|IOT-001` | format yang dicetak aplikasi |
-| URL halaman | `http://.../iot/IOT-001` | ambil ID perangkat dari URL |
-| Kode alat saja | `AQ-PH-001` | cari perangkat lewat kode alat |
-
-Resolver-nya `cariPerangkat(devices, teks)` di `src/services/iotInfo.js`, dan isi QR-nya
-dihasilkan oleh **satu** fungsi `ambilKodeAlat(device)` di store — dipakai halaman List IoT
-dan Kelola IoT. Jadi label yang dicetak pengelola pasti terbaca oleh pengguna.
-
-Hasil pemindaian menjelaskan: jenis & lokasi alat, fungsi alat dalam sistem, tiap parameter
-beserta ambang idealnya, pembacaan saat ini dibanding ambang, arti tiap status, dan catatan
-perawatan yang menyesuaikan jenis alat.
-
-Pemindai kamera memakai `BarcodeDetector` bawaan Chrome/Edge — tanpa library tambahan.
-Browser yang belum mendukungnya mendapat pesan jujur, dan kolom kode tetap tersedia di
-kartu yang sama. Hak akses dijaga: pengguna hanya bisa membuka alat di area yang diampu.
-
-**Penjelasan alat itu satu sumber, dipakai EMPAT tempat.** Isi penjelasannya tinggal di
-`src/components/PanelInfoAlat.jsx` dan dipakai oleh:
-
-| Tempat | Role | Cara membuka |
-| --- | --- | --- |
-| `/detail-informasi` | pengguna | pindai QR dengan kamera, atau ketik kode alat |
-| `/iot/:id` → modal **QR alat** | pengguna | tombol QR di halaman detail perangkat |
-| `/admin/detail-informasi` | pengelola | tempel isi QR, atau pilih alat dari daftar + pencarian |
-| modal **QR alat** di `/admin/iot` | pengelola | tombol QR pada baris alat |
-
-Sebelum disatukan, penjelasan ada di TIGA tempat dengan isi berbeda: halaman pengguna
-menjelaskan semuanya, modal QR di Kelola IoT hanya nama/kategori/fungsi, dan modal QR di
-List IoT memakai `QrPanel` sendiri. Akibatnya penjelasan yang dibaca pengelola tidak sama
-dengan yang dibaca pengguna. Sekarang teks, ambang, arti status, dan catatan perawatan
-berbunyi dari satu komponen, jadi menyuntingnya di satu tempat cukup. Yang tetap berbeda
-hanya pintu masuknya dan tombol aksi di kartu QR: pengguna melihat tombol menuju halaman
-perangkat, pengelola melihat tombol menuju halaman pengelola.
-
-### Mengatur QR: yang bisa & belum bisa dilakukan pengelola
-
-**Tombol aksi pada kartu QR** (untuk KEDUA role, karena semuanya berasal dari satu
-komponen `src/components/AksiQr.jsx`):
-
-| Tombol | Yang terjadi |
-| --- | --- |
-| **Unduh PNG** | Mengunduh **label siap tempel** `qr-<KODE>.png` — bukan QR mentah: kanvas 900×1100 px berisi QR + kode alat + nama perangkat + area + isi QR, dibuat saat tombol diklik |
-| **Salin isi QR** | Menyalin `JAGOFARM|<kode>|<id>` ke papan klip untuk diuji di kolom pencarian (ada fallback `execCommand` untuk alamat non-HTTPS) |
-| **Cetak label** | Membuka jendela cetak berisi label 76 mm; bisa langsung ke printer atau "Simpan sebagai PDF" |
-
-Yang **sudah** bisa dilakukan pengelola sekarang:
-
-| Tindakan | Di mana |
-| --- | --- |
-| Perangkat baru otomatis punya QR (isi dibentuk dari `code` + `id`) | Tambah perangkat di Kelola IoT |
-| Mengubah kode alat (karena itu isi QR ikut berubah) | Ubah perangkat di Kelola IoT |
-| Mengunduh label PNG, menyalin isi QR, mencetak label | tombol QR di Kelola IoT, `/admin/detail-informasi`, dan panel di halaman pengguna |
-| Menghapus perangkat beserta QR-nya | tombol hapus di Kelola IoT |
-| Memeriksa isi QR persis seperti yang dibaca pengguna | `/admin/detail-informasi`, modal QR |
-| Memindai label fisik yang sudah ditempel di lapangan | `/admin/detail-informasi` → **Pindai QR alat** (kamera) |
-
-Yang **belum** ada (jangan diklaim ada):
-
-- **Mencetak gambar QR langsung dari data lama.** QR yang sudah dicetak/ditempel di alat
-  (berisi tautan `http://127.0.0.1:4173/iot/IOT-001`) tetap terbaca karena pembacanya
-  menerima tiga format. Tapi kalau alamat server berubah (mis. dipasang di domain nyata),
-  label lama itu perlu dicetak ulang dari aplikasi — dan mencetak ulang berarti kode alat
-  harus diubah dulu supaya isi QR-nya ikut berubah.
-- **Riwayat cetak label** (siapa mencetak & kapan) — belum ada jejaknya.
-
-Catatan penting saat memindai: **kamera tidak bisa membaca QR di layar yang sama**. Karena
-itu pemindai sisi pengelola berguna untuk menguji label yang sudah ditempel, bukan untuk
-menguji QR yang sedang tampil di monitor.
+Pada `/detail-informasi`, QR dapat dipindai dengan kamera dan input manual tersedia sebagai
+fallback. Memasukkan kode alat secara manual menampilkan pratinjau publik terbatas pada
+identitas dasar, sensor, status klaim, dan validitas kode aktivasi.
 
 Catatan perawatan menyesuaikan jenis sensor: pH memakai larutan buffer 4,0 & 7,0, suhu
 memakai uji air es + air hangat, TDS memakai larutan standar 707 ppm.
@@ -372,8 +289,7 @@ Isi state:
 | `kematian` | Catatan ikan mati harian per kolam (diisi manual, satu baris per area per tanggal) |
 | `chat` | Riwayat percakapan chatbot |
 
-**Penyimpanan**: `localStorage` dengan kunci `aquasmart_smart_v1`. Data bertahan setelah
-halaman di-refresh. Tombol **↻** di top bar mengembalikan data demo ke kondisi awal.
+**Penyimpanan SmartStore**: metadata profil dan preferensi UI yang diperlukan disimpan di `localStorage` dengan kunci `aquasmart_smart_v1`. Pada mode API, cookie backend `pilot_session` berdurasi 12 jam menangani sesi; password dan token sesi tidak disimpan di SmartStore/`localStorage`. Sumber IoT default adalah `VITE_IOT_SOURCE=api`, sedangkan `local` hanya mode **Data contoh**. Tombol **↻** di top bar mengembalikan data demo ke kondisi awal.
 
 **Perhitungan turunan** yang disediakan store:
 
@@ -414,81 +330,56 @@ juga menampilkan seluruh aturan yang dikonfigurasi.
 
 ---
 
-## 6. Status saat ini: SEMUA DATA MASIH DUMMY
+## 6. Status data SmartStore dan IoT
 
-**Belum ada perangkat IoT fisik yang tersambung.** Ini penting diketahui:
+`VITE_IOT_SOURCE=api` adalah sumber default. Pada mode API, daftar perangkat, telemetry,
+status, riwayat pembacaan, dan kejadian IoT berasal dari backend. Hanya mode
+`VITE_IOT_SOURCE=local` yang menampilkan IoT sebagai **Data contoh**.
 
 | Yang tampak hidup | Sebenarnya |
 | --- | --- |
-| Nilai sensor berubah tiap 5 detik | `setInterval` di `SmartStore.jsx` menambah angka acak kecil (simulasi) |
-| 3 perangkat IoT (IOT-001 … IOT-003: pH, suhu, TDS) | Data tulisan tangan di `src/data/seed.js` |
-| Riwayat harian (titik tiap 30 menit) | Dibuat sekali saat app dimuat dari pola acak, bukan hasil pembacaan alat |
-| Status Terhubung/Perlu perhatian/Offline | Teks statis di data, bukan hasil ping ke alat |
-| QR alat | QR asli & valid, tetapi isinya URL halaman web — bukan data dari alat |
+| Daftar, telemetry, status, riwayat per perangkat, dan kejadian (mode API) | Data dari backend IoT |
+| Daftar dan telemetry IoT (mode local) | **Data contoh**; bukan pembacaan dari backend |
+| Statistik harian SmartStore | Perhitungan statistik harian yang ada tetap terpisah dari telemetry API IoT |
+| QR klaim (mode API) | Tautan klaim; bukan payload telemetry |
 | Jawaban chatbot | Pencarian teks pada 12 artikel lokal di `seed.js` — tanpa LLM, tanpa internet |
 
-Aplikasi tetap "berjalan" walau jaringan dimatikan — itu tandanya data masih dummy.
+Haykal melaporkan uji lapangan lebih dari 48 jam telah dilakukan. Hasil pengukuran mentah dan akurasi sensor tidak diaudit ulang dalam run ini; tidak ada klaim akurasi pengukuran.
 
-> Backend Fastify + PostgreSQL di `server/` **sudah ada** (pilot Sprint 1) tetapi
-> **belum** dihubungkan ke SmartDashboard.
+> Modul IoT SmartDashboard memakai backend Fastify + PostgreSQL di `server/`; sumber default `VITE_IOT_SOURCE=api`. Mode `local` hanya menampilkan Data contoh.
 
-### Titik penyambungan IoT nanti
+### Catatan integrasi IoT
 
-1. **Backend endpoint** untuk menerima kiriman sensor (HTTP POST atau MQTT), lalu simpan ke
-   PostgreSQL. Data dummy di `seed.js` + interval simulasi diganti pemanggilan API
-   (mis. `pilotApi('/devices')`), UI di atasnya tidak perlu diubah karena semua membaca
-   dari satu store.
+1. **Sumber API**: modul IoT SmartDashboard meminta data melalui backend. `VITE_IOT_SOURCE=api` adalah default; hanya `local` yang berlabel Data contoh dan kegagalan API tidak menggantinya secara diam-diam.
 2. **Kontrak nama parameter** sudah ditetapkan lewat `metric.key` dan **dibatasi ke tiga
    sensor yang benar-benar ada**: `ph`, `temp` (suhu air), `tds`. Perangkat cukup mengirim
    dengan kunci yang sama — kunci lain (DO, EC, turbidity, lux, kelembapan, flow, daya)
    sengaja tidak dipakai lagi di data, UI, maupun formulir.
-3. **Ambang ideal** (pH 6,2–7,6; suhu 23,5–30,5 °C; TDS 520–980 ppm di `METRIC_RANGE`)
-   dikelola di menu **Kategori Device** — pastikan nilainya cocok dengan alat yang dipakai.
-4. **Status online/stale/offline** sebaiknya dihitung dari waktu kiriman terakhir diterima,
-   bukan diset manual seperti sekarang.
-5. **Kalibrasi**: field `lastCalibration` per device dapat diisi otomatis dari jadwal kalibrasi.
+3. **Ambang** mengikuti nilai efektif dari API: ambang area bila tersedia, selain itu ambang bawaan.
+4. **Status koneksi** diturunkan dari waktu pengukuran/penerimaan terakhir: stale setelah 90 detik dan offline setelah 180 detik.
+5. **Kalibrasi** dicatat melalui Kelola IoT.
+6. **Batas TDS**: hard maximum ingest adalah 1000 ppm; warning tetap 400/900 ppm. Migration 007 menyelaraskan data tersimpan tanpa mengubah migration 002.
 
 ---
 
 ## 7. Catatan pengujian yang sudah dilakukan
 
-- `node node_modules/vite/bin/vite.js build` → **sukses**
+- `npm run build` → **sukses**
 - `npx --no-install oxlint src` → **0 error**
 - 15 route (7 pengguna + 8 admin, termasuk halaman detail) ditelusuri di browser
   sungguhan → **0 gagal, tanpa error runtime**
 - Uji fungsional: tambah item HPP (Rp1.530.000 → Rp1.605.000; Rp3.060 → Rp3.210 per ekor),
   catat pemantauan (poin 1.240 → 1.255), beri pakan V-Pet (kenyang 72% → 90%, poin +10),
   QR tergenerate, data bertahan setelah refresh
-- Sesi login & profil: login benar/salah, akun nonaktif ditolak, isi otomatis akun demo,
-  ubah data profil & foto (tersimpan ke `localStorage`), ganti password (validasi password
-  lama, panjang minimal, konfirmasi sama), logout, sesi bertahan setelah refresh
+- Sesi login & profil: login benar/salah, akun nonaktif ditolak,
+  ubah metadata profil & foto (tersimpan di `localStorage`), ganti password pada mode local,
+  logout, sesi API bertahan setelah refresh
 - Statistik harian kolam: terendah/rata-rata/tertinggi + jam pembacaan terakhir dihitung
   dari `readings`, status ambang diwarnai benar (di dalam / di luar ambang)
-- **Detail Information selaras antar role** — `PanelInfoAlat.jsx` dipakai bersama; diuji
-  dengan menempel kode alat yang sama di `/detail-informasi` dan `/admin/detail-informasi`
-  lalu membandingkan teks hasil render: **identik** untuk 3 alat berbeda (AQ-PH-001 2031
-  karakter, AQ-TMP-002 1997, AQ-TDS-003 2059). Modal QR di Kelola IoT juga memuat panel
-  lengkap itu (3068 karakter), bukan lagi ringkasan nama/kategori/fungsi
-- **Detail Information (pindai QR)** — menu pengguna untuk memindai QR alat lewat kamera,
-  lalu menampilkan penjelasan lengkap alat tersebut. Tata letaknya diukur pada 6 lebar
-  (760–1440px, termasuk 841px = lebar efektif layar pengguna): tombol rata dalam satu baris,
-  tidak ada elemen meluber keluar kartu, `scrollX` tetap 0, kontras 0 gagal di kedua mode
-- **Aksi QR (unduh/salin/cetak)** — `AksiQr.jsx` dipakai keempat pintu QR (pengguna:
-  `/detail-informasi` & modal di `/iot/:id`; pengelola: `/admin/detail-informasi` & modal di
-  `/admin/iot`). Diuji dengan mengklik tombolnya sungguhan, menangkap `a.download` dan
-  `window.open`:
-  - keempatnya menampilkan **tepat 3 tombol** (32px, satu baris) — pernah muncul 6 di modal
-    Kelola IoT karena tombolnya ikut dipasang di modal DAN di panel bersama; duplikat dibuang
-  - unduh → `qr-AQ-PH-001.png`, dan gambarnya diperiksa dengan `Image.onload`:
-    **900×1100 px, ~50 KB** — label siap tempel, bukan QR 200px yang diperbesar
-  - salin → papan klip berisi `JAGOFARM|AQ-PH-001|IOT-001` (persis yang dicari resolver)
-  - cetak → jendela cetak dibuka lalu `print()` dipanggil
-  - 0 error runtime, 0 gagal kontras di kedua mode
-- **Pemindai kamera sisi pengelola** — `/admin/detail-informasi` kini juga bisa memindai
-  label fisik, bukan hanya menempel isi QR. Diuji dengan menimpa `getUserMedia` +
-  `BarcodeDetector`: `videoWidth` 320 (kamera benar-benar tersambung — bukti elemen `<video>`
-  ter-mount sebelum `srcObject` dipasang), 2 kali deteksi, hasil muncul ("Cocok lewat ID
-  perangkat")
+- **QR dan Detail Information (mode API)** — QR klaim membawa URL `/d/:code?c=<kode aktivasi>`;
+  halaman publik menghapus query setelah membacanya. Klaim memerlukan login dan kode aktivasi
+  berlaku 24 jam. `/detail-informasi` menampilkan pratinjau publik terbatas; input manual
+  tersedia sebagai fallback kamera.
 - **Histori harian per tanggal**: 14 baris (hari ini + 13 hari ke belakang) tampil di
   dashboard dengan label tanggal/bulan/tahun ("Min, 27 Sep 2026"), rata-rata + rentang
   tiap parameter, status ambang, dan kolom ikan mati
@@ -645,13 +536,13 @@ lingkungan uji (teks ligatur seperti `restaurant` merentang sampai 130px). Selal
 
 ## 10. Yang belum ada
 
-- Autentikasi berbasis server: password masih tersimpan apa adanya di `localStorage`
-  (tidak terenkripsi, tidak ada token sesi) — lihat catatan keamanan di bagian 3
-- Verifikasi email saat pendaftaran (sekarang email hanya diperiksa format & keunikannya)
-- Lupa password / reset mandiri (password hanya bisa diganti sendiri lewat Profil, atau
-  ditimpa pengelola lewat Kelola User)
+- Penggantian password dari Profil pada mode API belum tersedia; perubahan password hanya
+  didukung pada mode local.
+- Verifikasi email untuk pendaftaran mode local (email hanya diperiksa format & keunikannya)
+- Lupa password / reset mandiri pada mode local (password hanya bisa diganti lewat Profil,
+  atau diubah pengelola lewat Kelola User)
 - Riwayat persetujuan akun (siapa menyetujui pengajuan & kapan) — statusnya disimpan, jejaknya belum
-- Penyambungan data IoT asli (lihat bagian 6)
+- Hasil rinci uji lapangan >48 jam dilaporkan pemilik; verifikasi independen atas metrik lapangan dan akurasi hardware belum dilakukan.
 - Payment gateway, notifikasi email/WhatsApp
 - Ekspor data dan unggah foto profil sendiri (sekarang memilih dari 6 avatar)
 - Riwayat pembacaan sensor per **device** (grafik tren jangka panjang) — yang sudah ada baru

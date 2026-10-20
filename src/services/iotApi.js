@@ -68,6 +68,7 @@ export function sanitizePublicPreview(device) {
       : [],
     claimed: Boolean(device.claimed),
     activationValid: Boolean(device.activationValid),
+    areaRef: device.areaRef ?? null,
   };
 }
 

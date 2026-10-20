@@ -80,7 +80,7 @@ try {
       trustProxyHops: boundedInteger('TRUST_PROXY_HOPS', 0, 0, 5),
       sendInvite: async (email, token) => {
         await transport.sendMail({ from, to: email, subject: 'Undangan Pilot JagoFarm',
-          text: 'Buka ' + origin.origin + '/#invite=' + token + '\nBerlaku 24 jam. Buat password untuk memverifikasi alamat email. Jangan bagikan tautan ini.',
+          text: 'Buka ' + origin.origin + '/pilot/#invite=' + token + '\nBerlaku 24 jam. Buat password untuk memverifikasi alamat email. Jangan bagikan tautan ini.',
         });
       },
     });

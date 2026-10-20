@@ -2,7 +2,7 @@
 
 Proyek ini memakai satu source untuk empat varian ESP32. **Semua nilai board, pin, modul, formula, dan rentang pengukuran masih berupa asumsi** dan belum dikonfirmasi pada perangkat yang dirakit. Asumsi kode dipusatkan di `include/hardware_config.h`; ID board dikonfigurasi hanya di bagian `[board_config]` pada `platformio.ini`.
 
-> Q6 dan Q7 masih terbuka. Model modul pH/TDS, formula, dan rentang TDS aktual menunggu konfirmasi Q6. Hosting/API dan rantai sertifikat menunggu keputusan Q7. Nilai sementara di firmware bukan konfirmasi hardware atau rentang yang didukung.
+> Inventaris perangkat saat ini terkonfirmasi: 3 unit satu-sensor dan 1 unit paket, memakai ESP32 DevKit V1, pH Meter Module PH-4502C with probe, DS18B20, dan TDS Meter V1.0. Batas maksimum TDS adalah 1000 ppm; warning 400/900 ppm tidak berubah. Formula dan kalibrasi TDS masih perlu verifikasi bench. Hosting produksi ditetapkan di VPS `iot.jagofarm.dev`; checklist lokal tidak membuktikan deployment.
 
 ## Instalasi PlatformIO Core di Windows
 
@@ -63,9 +63,9 @@ Saat konfigurasi belum lengkap atau tombol BOOT ditahan 5 detik, ESP32 membuka p
 
 Credential disimpan di NVS dan tidak dicetak ke serial. Firmware menerima root CA ISRG Root X1 yang diterbitkan Let's Encrypt. Kalau hosting memakai CA lain, sertifikat akar harus diganti di `include/root_ca.h` sebelum alat dipakai.
 
-- pH belum dikirim sebelum `V7` dan `V4` valid. Isi keduanya dalam volt setelah pembacaan buffer pH 7,00 dan 4,00.
-- TDS memakai faktor `k`, bawaan 1,0. Formula Gravity-style dan batas 5000 ppm hanya asumsi sementara Q6, bukan keputusan modul atau rentang aktual. Nilai awal database disimpan di migration 002; setelah Q6 diputuskan, selaraskan database dengan migration maju baru, bukan mengubah file migration yang sudah diterapkan.
-- Hosting masih menunggu keputusan Q7. Root CA bawaan hanya cocok jika rantai sertifikat host berujung ke ISRG Root X1.
+- pH belum dikirim sebelum `V7` dan `V4` valid. Isi keduanya dalam volt setelah pembacaan buffer pH 6,86 (kolom `V7`) dan 4,00 (kolom `V4`). Buffer 9,18 dipakai sebagai titik verifikasi.
+- TDS memakai faktor `k`, bawaan 1,0, dengan hard maximum 1000 ppm. Migration 007 menyelaraskan row TDS yang sudah ada tanpa mengubah migration 002. Formula dan faktor kalibrasi perlu dibandingkan dengan datasheet serta larutan standar.
+- Root CA bawaan hanya cocok jika rantai sertifikat host berujung ke ISRG Root X1.
 
 ## Sampling, buffer, dan pengiriman
 

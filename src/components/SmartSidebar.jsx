@@ -6,6 +6,7 @@ import { iotMonitoringStore } from '../services/iotMonitoringStore.js';
 import { Avatar } from './ui';
 import AttentionBadge from './iot/AttentionBadge.jsx';
 import { countAttentionDevices } from '../utils/monitoring.js';
+import { shouldConnectIotMonitoring } from '../utils/roleAccess.js';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
 // oxlint-disable-next-line react/only-export-components -- Shared menu data stays beside its existing consumer.
@@ -64,6 +65,12 @@ export const MENUS = {
       items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key dan pemakaian' }],
     },
   ],
+  mitra: [
+    {
+      group: 'Integrasi',
+      items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key Test dan sandbox' }],
+    },
+  ],
 };
 
 // ── Sidebar per role: menu diambil dari MENUS sesuai role aktif (dari URL) ───
@@ -79,9 +86,9 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
     : null;
 
   useEffect(() => {
-    if (IOT_SOURCE !== 'api') return undefined;
+    if (IOT_SOURCE !== 'api' || !shouldConnectIotMonitoring(role)) return undefined;
     return iotMonitoringStore.connect(currentUser?.id);
-  }, [currentUser?.id]);
+  }, [currentUser?.id, role]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -126,7 +133,7 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
             <div className="min-w-0 flex-1">
               <p className="text-white text-sm font-bold truncate">{currentUser.name}</p>
               <p className="text-[11px] text-white/60 truncate">
-                {role === 'pengelola' ? 'Akun Pengelola' : 'Akun Pengguna'}
+                 {role === 'pengelola' ? 'Akun Pengelola' : role === 'mitra' ? 'Akun Mitra' : 'Akun Pengguna'}
               </p>
             </div>
             <span className="material-symbols-outlined text-[18px] text-white/50 group-hover:text-white">chevron_right</span>

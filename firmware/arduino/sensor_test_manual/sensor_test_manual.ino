@@ -60,7 +60,7 @@ constexpr int kTdsPowerPin = 25;
 constexpr uint32_t kLoopDelayMs = 500;
 constexpr float kAdcWarnHighV = 3.0F;
 constexpr float kAdcWarnLowV = 0.05F;
-constexpr float kTdsMaxPpm = 5000.0F;
+constexpr float kTdsMaxPpm = 1000.0F;
 constexpr float kReferenceTempC = 25.0F;
 constexpr float kDefaultPhV7 = 2.50F;
 constexpr float kDefaultPhV4 = 3.04F;
@@ -139,7 +139,7 @@ void readTds(float temperatureC) {
   Serial.print(", tanpa sensor suhu");
 #endif
   Serial.print(")");
-  if (!std::isfinite(ppm) || ppm < 0.0F || ppm > kTdsMaxPpm) Serial.print("  [di luar 0 sampai 5000 ppm, firmware akan menolak sampel ini]");
+  if (!std::isfinite(ppm) || ppm < 0.0F || ppm > kTdsMaxPpm) Serial.print("  [di luar 0 sampai 1000 ppm, firmware akan menolak sampel ini]");
   Serial.println();
 }
 #endif

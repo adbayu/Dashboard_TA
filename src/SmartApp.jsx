@@ -125,7 +125,8 @@ function Shell() {
 
   // Pengguna biasa tidak boleh membuka alamat /admin, dan sebaliknya.
   // (Bila dipaksa lewat alamat, langsung dialihkan ke beranda role-nya.)
-  if (!roleCanOpenPath(role, location.pathname)) return <Navigate to={role === 'pengelola' ? '/admin' : '/'} replace />;
+  const homePath = role === 'pengelola' ? '/admin' : role === 'mitra' ? '/developer' : '/';
+  if (!roleCanOpenPath(role, location.pathname)) return <Navigate to={homePath} replace />;
 
   const match = TITLES.filter((row) => {
     if (row.path === '/') return location.pathname === '/' || location.pathname === '';
@@ -172,7 +173,7 @@ function Shell() {
 
             {/* Alamat tak dikenal: kembali ke beranda role yang sesuai */}
             <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
-            <Route path="*" element={<Navigate to={role === 'pengelola' ? '/admin' : '/'} replace />} />
+            <Route path="*" element={<Navigate to={homePath} replace />} />
           </Routes>
         </main>
 

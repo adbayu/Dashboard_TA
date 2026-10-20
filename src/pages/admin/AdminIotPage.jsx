@@ -7,6 +7,7 @@ const EMPTY_DEVICE = { typeCode: '', name: '', areaRef: '', firmware: '' };
 const EMPTY_TYPE = { code: '', name: '', kind: 'satuan', description: '', sensors: [] };
 const EMPTY_SENSOR = { code: '', name: '', unit: '', min: '', max: '', decimals: 2, warnLow: '', warnHigh: '' };
 const EMPTY_LIST = [];
+export const DEVICE_TYPE_CODE_PATTERN = '[A-Z0-9\\x2D]{3,32}';
 export function RotationBusyState() {
   return <p role="status" className="text-sm text-on-surface-variant">Merotasi credential</p>;
 }
@@ -760,7 +761,7 @@ export default function AdminIotPage() {
       <Modal open={typeOpen} onClose={() => setTypeOpen(false)} title={typeEditing ? `Ubah tipe ${typeEditing.code}` : 'Tambah tipe IoT'} wide>
         <form onSubmit={submitType} className="space-y-4">
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            {!typeEditing && <Field label="Kode tipe"><Input value={typeForm.code} onChange={value => setTypeForm(current => ({ ...current, code: value.toUpperCase() }))} placeholder="AQ-PH" pattern="[A-Z0-9-]{3,32}" maxLength={32} required /></Field>}
+            {!typeEditing && <Field label="Kode tipe"><Input value={typeForm.code} onChange={value => setTypeForm(current => ({ ...current, code: value.toUpperCase() }))} placeholder="AQ-PH" pattern={DEVICE_TYPE_CODE_PATTERN} maxLength={32} required /></Field>}
             <Field label="Nama tipe"><Input value={typeForm.name} onChange={value => setTypeForm(current => ({ ...current, name: value }))} maxLength={100} required /></Field>
             {!typeEditing && <fieldset className="min-w-0">
               <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Jenis tipe</legend>

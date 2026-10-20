@@ -2,6 +2,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
+import ScalarApiReference from '@scalar/fastify-api-reference';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { transaction } from './db.js';
@@ -13,6 +14,7 @@ import { failV1 } from './v1/common.js';
 import { ingestV2, type V2IngestBody } from './v1/ingest.js';
 import { registerV1Routes } from './v1/index.js';
 import { OFFLINE_SCAN_INTERVAL_MS, runOfflineDetection } from './v1/offline.js';
+import { enrichOpenApiDocument } from './v1/openapi.js';
 import { recordReadingEvents } from './v1/monitoring-state.js';
 import { StreamHub } from './v1/stream.js';
 import { startSandboxRunner, type SandboxScheduler } from './sandbox/runner.js';
@@ -203,7 +205,17 @@ export async function buildApp(options: Options) {
       }
     }
   });
-  const publicRoutes = new Set(['/api/health', '/api/session/login', '/api/invitations/accept', '/api/ingest', '/docs/openapi.json']);
+  const publicRoutes = new Set([
+    '/api/health', '/api/session/login', '/api/invitations/accept', '/api/ingest',
+    '/docs', '/docs/', '/docs/js/scalar.js', '/docs/openapi.json',
+  ]);
+  const partnerSessionRoutes = new Set([
+    '/api/session',
+    '/api/session/logout',
+    '/api/v1/keys',
+    '/api/v1/keys/:id',
+    '/api/v1/keys/:id/usage',
+  ]);
   app.addHook('preHandler', async request => {
     if (publicRoutes.has(request.routeOptions.url ?? '')) return;
     if (request.routeOptions.url === '/api/v1/devices' && request.method === 'GET' && typeof (request.query as { code?: unknown }).code === 'string') return;
@@ -214,6 +226,14 @@ export async function buildApp(options: Options) {
       : await authenticateSession(pool, request.cookies.pilot_session);
     if (!request.actor) {
       failSessionAuth(request.cookies.pilot_session, isV1);
+    }
+    if (request.actor.role === 'partner' && request.actor.kind === 'session') {
+      const route = request.routeOptions.url ?? '';
+      const allowed = partnerSessionRoutes.has(route);
+      if (!allowed) {
+        if (isV1) failV1(403, 'FORBIDDEN_SCOPE', 'Sesi mitra hanya dapat mengelola API key Test.');
+        fail(403, 'Akun mitra tidak memiliki akses farm.');
+      }
     }
     if (isV1 && request.routeOptions.url?.startsWith('/api/v1/keys') && request.actor.kind !== 'session') {
       failV1(401, 'UNAUTHENTICATED', 'Endpoint kunci hanya dapat digunakan dengan sesi.');
@@ -244,7 +264,7 @@ export async function buildApp(options: Options) {
   });
   app.get('/docs/openapi.json', {
     schema: { tags: ['Dokumentasi'], summary: 'Skema OpenAPI untuk API IoT' },
-  }, async () => app.swagger());
+  }, async () => enrichOpenApiDocument(app.swagger()));
   app.get('/api/health', async () => {
     await pool.query('SELECT 1 FROM schema_migrations WHERE version=1');
     return { status: 'ok' };
@@ -272,17 +292,18 @@ export async function buildApp(options: Options) {
   });
   app.get('/api/models', async () => ({ models }));
   app.get('/api/admin/users', async () => ({ users: (await pool.query('SELECT id,email,role,(password_hash IS NOT NULL) AS verified FROM users ORDER BY email')).rows }));
-  app.post<{ Body: { email: string } }>('/api/admin/invitations', {
-    schema: { body: object({ email }) }, config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+  app.post<{ Body: { email: string; role?: 'user' | 'partner' } }>('/api/admin/invitations', {
+    schema: { body: object({ email, role: { type: 'string', enum: ['user', 'partner'] } }, ['email']) }, config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
   }, async request => {
     const address = request.body.email.toLowerCase();
+    const role = request.body.role ?? 'user';
     const invite = secret();
     await transaction(pool, async client => {
       await client.query('LOCK TABLE users IN EXCLUSIVE MODE');
       const existing = (await client.query('SELECT password_hash FROM users WHERE email=$1', [address])).rows[0];
       if (existing?.password_hash) fail(409, 'Akun sudah aktif.');
       if (!existing && Number((await client.query('SELECT count(*) FROM users')).rows[0].count) >= 10) fail(409, 'Batas pilot 10 akun tercapai.');
-      await client.query("INSERT INTO users(id,email,role,invite_hash,invite_expires) VALUES ($1,$2,'user',$3,now()+interval '24 hours') ON CONFLICT(email) DO UPDATE SET invite_hash=$3,invite_expires=now()+interval '24 hours'", [randomUUID(), address, hash(invite)]);
+      await client.query("INSERT INTO users(id,email,role,invite_hash,invite_expires) VALUES ($1,$2,$3,$4,now()+interval '24 hours') ON CONFLICT(email) DO UPDATE SET role=$3,invite_hash=$4,invite_expires=now()+interval '24 hours'", [randomUUID(), address, role, hash(invite)]);
       await options.sendInvite(address, invite);
     });
     return { message: 'Undangan dikirim. Periksa kotak surat uji.' };
@@ -417,6 +438,21 @@ export async function buildApp(options: Options) {
       return { accepted: true, duplicate: result.duplicate };
     });
   registerV1Routes(app, pool, options.origin, streamHub);
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.url !== '/docs') return;
+    const page = await app.inject({ method: 'GET', url: '/docs/' });
+    reply.code(page.statusCode).type(page.headers['content-type'] ?? 'text/html; charset=utf-8');
+    return reply.send(page.body);
+  });
+  await app.register(ScalarApiReference, {
+    routePrefix: '/docs',
+    configuration: {
+      title: 'JagoFarm IoT API',
+      url: '/docs/openapi.json',
+      cdn: '/docs/js/scalar.js',
+      authentication: { preferredSecurityScheme: 'ApiKeyBearer' },
+    },
+  });
   return app;
 }
 

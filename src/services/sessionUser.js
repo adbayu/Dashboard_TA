@@ -9,7 +9,7 @@ export function mapSessionUser(user, existingUsers = []) {
     id: user.id,
     email,
     name: profile?.name?.trim() || email,
-    role: user.role === 'admin' ? 'pengelola' : 'pengguna',
+    role: user.role === 'admin' ? 'pengelola' : user.role === 'partner' ? 'mitra' : 'pengguna',
     status: 'aktif',
   };
 }

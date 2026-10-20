@@ -84,13 +84,12 @@ function requireCookieSession(request: FastifyRequest): Actor {
 }
 
 function authorizeKeyCreation(actor: Actor, environment: ApiKeyEnvironment, scopes: ApiScope[]) {
-  // TODO(Q2): konfirmasi bahwa hanya pengelola yang dapat menerbitkan key live.
-  // TODO(Q3): mitra tetap memakai peran user sampai peran khusus diputuskan.
+  // Q2 (diputuskan 18 Oktober 2026): hanya pengelola yang dapat menerbitkan key live.
   if (actor.role !== 'admin' && environment !== 'test') {
-    failV1(403, 'FORBIDDEN_SCOPE', 'Akun pengguna hanya dapat membuat key test.');
+    failV1(403, 'FORBIDDEN_SCOPE', 'Akun non-admin hanya dapat membuat key test.');
   }
   if (actor.role !== 'admin' && scopes.includes('admin')) {
-    failV1(403, 'FORBIDDEN_SCOPE', 'Akun pengguna tidak dapat memberi scope admin pada key.');
+    failV1(403, 'FORBIDDEN_SCOPE', 'Akun non-admin tidak dapat memberi scope admin pada key.');
   }
 }
 

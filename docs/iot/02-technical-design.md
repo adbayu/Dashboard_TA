@@ -84,15 +84,15 @@ server/
 
 | Kredensial | Bentuk | Dipakai oleh | Route |
 | --- | --- | --- | --- |
-| Sesi | Cookie `pilot_session` (64 hex), berlaku 12 jam | UI SmartDashboard, portal developer | Semua `/api/v1` |
+| Sesi | Cookie `pilot_session` (64 hex), berlaku 12 jam | UI SmartDashboard, portal developer | Semua `/api/v1` sesuai role dan scope |
 | API key | `Authorization: Bearer jf_live_<64 hex>` atau `jf_test_<64 hex>` | Modul tim, mitra | `/api/v1` sesuai scope |
 | Credential device | `Authorization: Bearer <64 hex>` | ESP32, simulator | Hanya `/api/ingest` |
 
 Urutan pengecekan di hook `preHandler`:
 
-1. Route publik (`/api/health`, `/api/session/login`, `/api/invitations/accept`, `/api/ingest`, `/api/v1/devices?code=...`, `/docs/*`) dilewati. Pratinjau QR hanya mengembalikan ringkasan device yang aman.
+1. Route publik (`/api/health`, `/api/session/login`, `/api/invitations/accept`, `/api/ingest`, `/api/v1/devices?code=...`, `/docs`, `/docs/*`) dilewati. Pratinjau QR hanya mengembalikan ringkasan device yang aman.
 2. Header yang cocok persis dengan `Bearer jf_(live|test)_<64 hex>` diproses sebagai API key. Server mencari baris dengan prefix, lalu mencocokkan `hash()` dari `domain.ts` dan memastikan key belum dicabut. Hasilnya `request.actor` membawa `kind`, `id`, `userId`, `email`, `role`, `scopes`, `environment`, dan `keyId`. Key tidak dikenal atau dicabut mendapat 401 `UNAUTHENTICATED`.
-3. Jika bukan API key, cookie sesi dicek lewat `server/auth/session.ts`. Perilaku token SHA-256, masa berlaku 12 jam, dan bentuk response sesi pilot tetap sama. Sesi `user` mendapat `devices:read`, `devices:write`, `readings:read`; sesi `admin` mendapat keempat scope.
+3. Jika bukan API key, cookie sesi dicek lewat `server/auth/session.ts`. Perilaku token SHA-256, masa berlaku 12 jam, dan bentuk response sesi pilot tetap sama. Sesi `user` mendapat `devices:read`, `devices:write`, `readings:read`; sesi `admin` mendapat keempat scope. Sesi `partner` tidak mendapat scope API langsung dan hanya dapat membaca sesi serta mengelola API key miliknya.
 4. Tidak ada kredensial yang valid berarti 401. Pengelolaan key di `/api/v1/keys` hanya menerima sesi cookie, bukan API key.
 
 Pengecekan Origin (proteksi CSRF) di hook `onRequest` hanya berlaku untuk request ber-cookie. Request dengan API key tidak membawa cookie, jadi tidak rentan CSRF dan tidak boleh ditolak karena tidak mengirim `Origin`. Kalau request membawa cookie dan API key sekaligus, request ditolak 400 supaya tidak ambigu.
@@ -242,7 +242,7 @@ Aturan yang tidak bisa ditulis sebagai `CHECK` dijaga di lapisan aplikasi, di da
 
 ### 5.3 Backfill data lama
 
-1. Seed `sensor_types`: `ph`, `tds`, `water_temperature`, plus `ec`, `air_temperature`, `humidity` supaya data pilot lama tetap punya definisi. Nilai `min_value` dan `max_value` mengikuti `models` di `domain.ts`, sedangkan ambang mengikuti `SEED_CATEGORIES` di `seed.js` (pH 6,2 sampai 7,6, suhu 24 sampai 30 °C, TDS 400 sampai 900 ppm). Batas fisik TDS 5000 ppm hanya nilai sementara dari contoh kontrak API, menunggu modul sebenarnya dikonfirmasi.
+1. Seed `sensor_types`: `ph`, `tds`, `water_temperature`, plus `ec`, `air_temperature`, `humidity` supaya data pilot lama tetap punya definisi. Nilai `min_value` dan `max_value` mengikuti model sensor; batas TDS saat ini 0–1000 ppm. Ambang peringatan tetap pH 6,2–7,6, suhu 24–30 °C, dan TDS 400–900 ppm. Migration 002 dipertahankan; migration maju 007 menyelaraskan data TDS yang sudah ada.
 2. Seed `device_types` aktif: `AQ-PH`, `AQ-TMP`, `AQ-TDS` (satuan) dan `AQ-WATER-01` (paket pH + TDS + suhu air).
 3. Seed `device_types` nonaktif untuk model pilot: `PILOT-WATER-V1` (suhu air, pH, EC) dan `PILOT-ENV-V1` (suhu udara, kelembapan). Device pilot yang sudah ada diisi `type_id`-nya ke sini.
 4. Tiga device di `SEED_DEVICES` dibuat sebagai IoT satuan dengan kode `AQ-PH-001`, `AQ-TMP-002`, `AQ-TDS-003`, `legacy_id` `IOT-001`, `IOT-002`, `IOT-003`, dan area `AR-01`. Baris ini belum diprovisikan, jadi `model`, `credential_hash`, dan `allocated_to` bernilai `NULL` serta tidak memiliki readings.
@@ -351,7 +351,7 @@ Jika klien memutus koneksi saat query database berjalan, route meminta PostgreSQ
 
 ### 9.1 Sesi
 
-Login SmartDashboard sekarang berjalan di `localStorage` (akun demo di `seed.js`). Supaya halaman IoT bisa membaca API, login perlu memakai `POST /api/session/login`. Profil tambahan yang belum ada di backend (avatar, jabatan, bio) tetap disimpan di `SmartStore`, dengan key berupa `user.id` dari backend.
+Login SmartDashboard memakai `POST /api/session/login` dan sesi backend melalui cookie `pilot_session` yang berlaku 12 jam. Role backend `admin`, `user`, dan `partner` dipetakan berturut-turut ke role UI Pengelola, Pengguna, dan Mitra. Mitra hanya dapat membuka Developer dan profil; metadata profil yang belum tersedia di backend (avatar, jabatan, bio) dapat disimpan di `SmartStore`, dengan key berupa `user.id` dari backend.
 
 ### 9.2 Adapter
 
@@ -361,7 +361,7 @@ Login SmartDashboard sekarang berjalan di `localStorage` (akun demo di `seed.js`
 
 ### 9.3 Proxy dev
 
-Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0.1:3001`. Referensi API pada halaman Developer membuka `/docs/openapi.json`; tampilan Scalar tetap direncanakan untuk Minggu 4.
+Server pengembangan Vite mem-proxy `/api` dan `/docs` ke backend `http://127.0.0.1:3001`. Referensi API pada halaman Developer membuka `/docs/openapi.json`; backend juga menampilkan Scalar di `/docs` dengan bundle JavaScript lokal pada `/docs/js/scalar.js`. Spec JSON publik tetap dibuat dari schema aktif `@fastify/swagger` dan dipakai Scalar melalui URL same-origin `/docs/openapi.json`.
 
 ### 9.4 Telemetry live dan rotasi credential
 

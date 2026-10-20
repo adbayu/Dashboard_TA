@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSmart } from '../store/SmartStore';
 import { iotApi, IOT_SOURCE } from '../services/iotApi.js';
 import { Badge, Button, Card, Empty, IconButton } from '../components/ui';
+import PublicAreaLabel from '../components/iot/PublicAreaLabel.jsx';
 import { claimedDeviceState } from '../utils/frontendReview.js';
 import { activationCodeMemory, claimAndForgetActivationCode } from '../utils/activationCodeMemory.js';
 
@@ -158,6 +159,7 @@ export default function DeviceClaim() {
       </p>
       <h1 className="mt-2 text-2xl font-extrabold text-on-surface break-words">{viewPreview.device.name}</h1>
       <p className="mt-1 font-mono text-sm text-on-surface-variant break-all">{viewPreview.device.code}</p>
+      <PublicAreaLabel areaRef={viewPreview.device.areaRef} />
       <div className="mt-4 flex flex-wrap gap-2">
         <Badge tone={viewPreview.device.claimed ? 'muted' : 'info'} icon={viewPreview.device.claimed ? 'lock' : 'hourglass_top'}>
           {viewPreview.device.claimed ? 'Sudah diklaim' : 'Belum diklaim'}

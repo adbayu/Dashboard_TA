@@ -2,7 +2,7 @@
 
 | Atribut | Isi |
 | --- | --- |
-| Status | Draft v0.1. Referensi final ada di `/docs` (OpenAPI), dokumen ini jadi acuan saat menulis schema route |
+| Status | Draft v0.1. Referensi OpenAPI aktif tampil di `/docs`; JSON tersedia publik di `/docs/openapi.json`. Dokumen ini menjelaskan kontrak dan perilaku firmware. |
 | Base URL lokal | `http://localhost:5173/api/v1` (lewat proxy Vite) atau `http://127.0.0.1:3001/api/v1` |
 | Format | JSON UTF-8, kecuali `/stream` (SSE) dan `/qr` (SVG/PNG) |
 
@@ -81,13 +81,13 @@ Response yang dikenai rate limit membawa header `x-ratelimit-limit`, `x-ratelimi
 ```json
 { "sensorTypes": [
   { "code": "ph", "name": "pH Air", "unit": "pH", "min": 0, "max": 14, "decimals": 2, "warnLow": 6.2, "warnHigh": 7.6 },
-  { "code": "tds", "name": "TDS", "unit": "ppm", "min": 0, "max": 5000, "decimals": 0, "warnLow": 400, "warnHigh": 900 }
+  { "code": "tds", "name": "TDS", "unit": "ppm", "min": 0, "max": 1000, "decimals": 0, "warnLow": 400, "warnHigh": 900 }
 ] }
 ```
 
-`POST /sensor-types` (scope `admin`) dengan body yang sama untuk satu item. `PATCH /sensor-types/:code` hanya untuk `name`, `decimals`, `warnLow`, `warnHigh`. `DELETE` ditolak 409 kalau sensor dipakai oleh tipe mana pun.
+`POST /sensor-types` (scope `admin`) membuat satu item dengan body yang sama dan mengembalikan `201 { "sensorType": ... }`. `PATCH /sensor-types/:code` hanya untuk `name`, `decimals`, `warnLow`, `warnHigh` dan mengembalikan `200 { "sensorType": ... }`. `DELETE` ditolak 409 kalau sensor dipakai oleh tipe mana pun; jika berhasil, response `204` tanpa body.
 
-Catatan: rentang `min` dan `max` untuk `tds` di atas adalah contoh format. Nilai finalnya mengikuti rentang ukur modul TDS yang dipakai (lihat [Firmware & Hardware](04-firmware-hardware.md)).
+Untuk `tds`, rentang API saat ini 0–1000 ppm dan merupakan hard maximum yang sama dengan firmware. Ambang peringatan tetap 400/900 ppm. Nilai awal migration 002 tidak diubah; migration 007 menyelaraskan row yang sudah ada.
 
 ### 6.2 Tipe IoT
 
@@ -102,7 +102,7 @@ Catatan: rentang `min` dan `max` untuk `tds` di atas adalah contoh format. Nilai
 ] }
 ```
 
-`POST /device-types` (scope `admin`)
+`POST /device-types` (scope `admin`) mengembalikan `201 { "deviceType": ... }`. `PATCH /device-types/:id` mengembalikan `200 { "deviceType": ... }`.
 
 ```json
 { "code": "AQ-WATER-01", "name": "Paket Kualitas Air", "kind": "paket", "description": "",
@@ -113,7 +113,7 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 
 ### 6.3 Device
 
-`GET /devices?type=AQ-PH&area=AR-01&cursor=` (scope `devices:read`)
+`GET /devices?type=AQ-PH&area=AR-01` (scope `devices:read`)
 
 ```json
 { "devices": [
@@ -124,13 +124,15 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 ], "nextCursor": null }
 ```
 
+Route mengembalikan maksimal 100 device dan saat ini selalu mengisi `nextCursor: null`. Query `cursor` masih diterima schema, tetapi belum digunakan untuk pagination.
+
 `status` bernilai `online`, `stale`, atau `offline`.
 
 `credentialProvisioned` adalah boolean non-secret yang selalu disertakan pada response daftar `GET /devices` dan detail `GET /devices/:id`. Untuk device live, nilainya `true` jika `credential_hash IS NOT NULL` dan `false` jika belum diprovisikan; untuk baris sandbox nilainya selalu `false`. Response tidak menyertakan hash atau credential. UI pengelola hanya menampilkan aksi rotasi untuk device live dengan `credentialProvisioned: true`; aksi tidak ditampilkan untuk sandbox atau device yang belum diprovisikan.
 
 `GET /devices/:id` mengembalikan satu device dengan bentuk yang sama, ditambah `sensors` beserta ambang efektifnya.
 
-`GET /devices?code=AQ-PH-001&c=<64 hex>` adalah pratinjau publik untuk halaman QR. Response hanya memuat `code`, `name`, `type`, `sensors`, `claimed`, dan `activationValid`. Endpoint ini tidak mengembalikan area, readings, ID pemilik, credential, atau kode aktivasi. `c` diperiksa terhadap hash aktivasi aktif dan tidak pernah dikembalikan. Kode alat tidak dikenal mendapat 404 `NOT_FOUND`. Pengecualian URL yang memuat kode aktivasi hanya berlaku untuk isi QR dan request pratinjau ini. Halaman `/d/:code` segera menghapus `c` dari entri riwayat aktif setelah membacanya ke state, memakai `Referrer-Policy: no-referrer`, dan menyediakan input manual bila halaman dimuat ulang tanpa `c`.
+`GET /devices?code=AQ-PH-001&c=<PLACEHOLDER_KODE_AKTIVASI_TIDAK_VALID>` adalah pratinjau publik untuk halaman QR. Response berbentuk `{ "device": ... }` dan hanya memuat `code`, `name`, `type`, `areaRef` yang sudah ada, `sensors`, `claimed`, dan `activationValid`. Endpoint ini tidak mengembalikan readings, identitas pemilik, credential, atau kode aktivasi. `c` diperiksa terhadap hash aktivasi aktif dan tidak pernah dikembalikan. Kode alat tidak dikenal mendapat 404 `NOT_FOUND`. Pengecualian URL yang memuat kode aktivasi hanya berlaku untuk isi QR dan request pratinjau ini. Halaman `/d/:code` segera menghapus `c` dari entri riwayat aktif setelah membacanya ke state, memakai `Referrer-Policy: no-referrer`, dan menyediakan input manual bila halaman dimuat ulang tanpa `c`.
 
 `GET /devices?legacyId=IOT-001` memerlukan scope `devices:read` dan mengikuti batas akses device actor.
 
@@ -140,20 +142,20 @@ Aturan: `satuan` tepat 1 sensor, `paket` minimal 2. `PATCH /device-types/:id` da
 // request
 { "typeCode": "AQ-WATER-01", "name": "Paket Kolam Nila B", "areaRef": "AR-02", "allocatedTo": null }
 // response 201
-{ "device": { "id": "c3f1...", "code": "AQ-PKT-001" },
-  "credential": "<64 hex, hanya ditampilkan sekali>",
-  "activationCode": "<64 hex, hanya ditampilkan sekali>" }
+{ "device": { "id": "<UUID_PLACEHOLDER>", "code": "AQ-PKT-001" },
+  "credential": "<PLACEHOLDER_CREDENTIAL_TIDAK_VALID>",
+  "activationCode": "<PLACEHOLDER_KODE_AKTIVASI_TIDAK_VALID>" }
 ```
 
-`POST /devices/:id/qr?format=svg|png` (scope `admin`) menerima body `{ "activationCode": "<64 hex>" }` dan mengembalikan gambar QR berisi `https://<APP_ORIGIN>/d/<code>?c=<activationCode>`. Server mencocokkan hash dan masa berlaku, lalu tidak menyimpan kode mentah. Kode salah, sudah diganti, sudah dipakai, atau kedaluwarsa mendapat 409 `CONFLICT`. Kode aktivasi baru dibuat lewat `POST /devices/:id/activation`, ditampilkan sekali, dan langsung membatalkan kode lama. Label dicetak saat alat siap dipasang ([ADR-0009](adr/0009-qr-dicetak-saat-pemasangan.md), [ADR-0011](adr/0011-qr-dibuat-dengan-kode-aktivasi-di-body.md)).
+`POST /devices/:id/qr?format=svg|png` (scope `admin`) menerima body `{ "activationCode": "<PLACEHOLDER_KODE_AKTIVASI_TIDAK_VALID>" }` dan mengembalikan gambar QR `image/svg+xml` (default) atau `image/png` berisi `https://<APP_ORIGIN>/d/<code>?c=<activationCode>`. Server mencocokkan hash dan masa berlaku, lalu tidak menyimpan kode mentah. Kode salah, sudah diganti, sudah dipakai, atau kedaluwarsa mendapat 409 `CONFLICT`. Kode aktivasi baru dibuat lewat `POST /devices/:id/activation`, ditampilkan sekali bersama `expiresAt`, dan langsung membatalkan kode lama. Label dicetak saat alat siap dipasang ([ADR-0009](adr/0009-qr-dicetak-saat-pemasangan.md), [ADR-0011](adr/0011-qr-dibuat-dengan-kode-aktivasi-di-body.md)).
 
 `POST /devices/claim` (scope `devices:write`)
 
 ```json
-{ "code": "AQ-PKT-001", "activationCode": "<64 hex>" }
+{ "code": "AQ-PKT-001", "activationCode": "<PLACEHOLDER_KODE_AKTIVASI_TIDAK_VALID>" }
 ```
 
-Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan untuk akun ini mendapat 400. Device yang sudah punya pemilik mendapat 409.
+Response `200 { "deviceId": "<UUID_PLACEHOLDER>" }`. Kode salah, kedaluwarsa, atau bukan untuk akun ini mendapat 400 `VALIDATION_FAILED`. Device yang sudah punya pemilik mendapat 409 `CONFLICT`.
 
 `PATCH /devices/:id` (scope `devices:write`) mengubah `name` dan `areaRef` device milik sendiri. Admin juga bisa mengubah `firmware` dan `calibratedAt`.
 
@@ -162,10 +164,10 @@ Response `200 { "deviceId": "c3f1..." }`. Kode salah, kedaluwarsa, atau bukan un
 `POST /devices/:id/credentials/rotate` (scope `admin`, sesi admin atau key live admin) merotasi credential device live yang sudah diprovisioning (`credentialProvisioned: true`). **Penyimpangan path:** prompt awal menyebut `/credential/rotate` (singular); kontrak memakai `/credentials/rotate` sebagai subresource rotasi credential, dengan `credentials` sebagai namespace operasi di bawah device. Adapter frontend harus memakai path kontrak ini secara persis. Response `200` menampilkan credential baru satu kali:
 
 ```json
-{ "credential": "<64 hex, hanya ditampilkan sekali>", "credentialSince": "2026-10-05T14:00:00.000Z" }
+{ "credential": "<PLACEHOLDER_CREDENTIAL_TIDAK_VALID>", "credentialSince": "2026-10-05T14:00:00.000Z" }
 ```
 
-Server mengubah `credential_hash` serta `credential_since` dalam satu transaksi sambil mengunci baris device yang sama dengan ingest. Setelah transaksi rotasi commit, credential lama langsung mendapat 401 `UNAUTHENTICATED` di `/api/ingest`. Credential tidak dikembalikan oleh daftar/detail device dan tidak ditulis ke log. Kiriman buffer dengan `measuredAt` sebelum `credentialSince` baru mendapat 400 `VALIDATION_FAILED`; ini disengaja. Device live yang ada tetapi belum diprovisioning (`credential_hash IS NULL`) mendapat 409 `CONFLICT`.
+Server mengubah `credential_hash` serta `credential_since` dalam satu transaksi sambil mengunci baris device yang sama dengan ingest. Setelah transaksi rotasi commit, credential lama langsung mendapat 401 `UNAUTHENTICATED` di `/api/ingest`. Credential tidak dikembalikan oleh daftar/detail device dan tidak ditulis ke log. Untuk payload v2, kiriman buffer dengan `measuredAt` sebelum `credentialSince` baru mendapat 400 `VALIDATION_FAILED`; ini penolakan permanen yang disengaja. Untuk payload legacy v1, pemeriksaan waktu tergabung dengan pencarian device dan credential, sehingga waktu sebelum `credential_since` mendapat 401 dengan kode legacy `REQUEST_REJECTED`. Device live yang ada tetapi belum diprovisikan (`credential_hash IS NULL`) mendapat 409 `CONFLICT`.
 
 Device sandbox tidak dapat dirotasi, dilepas, diklaim, diberi kode aktivasi, atau dibuatkan QR. Route tersebut mengembalikan 404 `NOT_FOUND`, termasuk pratinjau QR publik dengan kode sandbox.
 
@@ -218,10 +220,10 @@ Untuk menjaga arti field mode raw yang sudah ada, request dengan `sensor=ph` tet
 
 Raw log dan ekspor memakai scope `readings:read` serta pemeriksaan ownership/environment yang sama dengan riwayat. Actor tanpa scope `admin` hanya menerima riwayat ownership miliknya; pelepasan device tidak memindahkan pembacaan lama ke pemilik baru dan pemilik lama tetap dapat membaca riwayat dari masa ownership-nya. Actor dengan scope `admin` dapat melihat seluruh riwayat yang diizinkan oleh environment. Key `test` hanya melihat sandbox, key `live` hanya melihat device live. Resource yang bukan milik actor atau berada di environment lain mendapat 404 `NOT_FOUND`; request tanpa scope mendapat 403 `FORBIDDEN_SCOPE`.
 
-`GET /sensors/:code/overview` (scope `readings:read`) mengembalikan nilai terakhir satu jenis sensor di semua device milik actor:
+`GET /sensors/:code/overview` (scope `readings:read`) mengembalikan `sensor`, `name`, dan `unit` katalog di tingkat teratas beserta nilai terakhir satu jenis sensor di semua device milik actor:
 
 ```json
-{ "sensor": "ph", "items": [
+{ "sensor": "ph", "name": "pH Air", "unit": "pH", "items": [
   { "deviceId": "5e0a...", "deviceCode": "AQ-PH-001", "areaRef": "AR-01", "value": 6.8, "unit": "pH", "state": "normal", "threshold": { "low": 6.2, "high": 7.6, "source": "default" }, "measuredAt": "..." },
   { "deviceId": "c3f1...", "deviceCode": "AQ-PKT-001", "areaRef": "AR-02", "value": 6.1, "unit": "pH", "state": "low", "threshold": { "low": 6.5, "high": 7.5, "source": "area" }, "measuredAt": "..." }
 ] }
@@ -322,11 +324,29 @@ File tidak memuat PII, identitas pemilik, atau `messageId`. Nilai status dihitun
 
 ## 7. Ingest (untuk firmware)
 
-`POST /api/ingest`. Endpoint ini sengaja tidak dipindah ke `/api/v1`, supaya alat yang sudah terpasang tidak perlu diubah URL-nya.
+`POST /api/ingest`. Endpoint ini sengaja tidak dipindah ke `/api/v1`, supaya alat yang sudah terpasang tidak perlu diubah URL-nya. Route menerima payload pilot v1 dan ingest v2. v1 memakai `model` (`water-v1` atau `environment-v1`); v2 memakai `type` kode tipe device. Credential device Bearer hanya berlaku pada route ini, bukan API key.
+
+Contoh v1 pilot legacy:
 
 ```json
-{ "version": 2, "deviceId": "c3f1...", "type": "AQ-WATER-01",
-  "messageId": "0b7e...", "measuredAt": "2026-10-10T08:00:00.000Z",
+{ "version": 1, "deviceId": "00000000-0000-4000-8000-000000000001", "model": "water-v1",
+  "messageId": "00000000-0000-4000-8000-000000000002", "measuredAt": "2026-10-10T08:00:00.000Z",
+  "readings": { "water_temperature": 27.4, "ph": 7.02, "ec": 1.2 } }
+```
+
+Contoh v2 satuan (satu sensor):
+
+```json
+{ "version": 2, "deviceId": "00000000-0000-4000-8000-000000000001", "type": "AQ-PH",
+  "messageId": "00000000-0000-4000-8000-000000000002", "measuredAt": "2026-10-10T08:00:00.000Z",
+  "readings": { "ph": 7.02 }, "meta": { "rssi": -61, "fw": "0.3.0" } }
+```
+
+Contoh v2 paket (`AQ-WATER-01`, seluruh sensor tipe tersebut):
+
+```json
+{ "version": 2, "deviceId": "00000000-0000-4000-8000-000000000001", "type": "AQ-WATER-01",
+  "messageId": "00000000-0000-4000-8000-000000000002", "measuredAt": "2026-10-10T08:00:00.000Z",
   "readings": { "ph": 7.02, "tds": 612, "water_temperature": 27.4 },
   "meta": { "rssi": -61, "fw": "0.3.0" } }
 ```
@@ -336,11 +356,13 @@ File tidak memuat PII, identitas pemilik, atau `messageId`. Nilai status dihitun
 | `200 { accepted: true, duplicate: false }` | Diterima | Hapus pesan dari buffer |
 | `200 { accepted: true, duplicate: true }` | Sudah pernah diterima | Hapus pesan dari buffer |
 | `400` | Payload salah | Simpan pesan ke log error, jangan dikirim ulang terus-menerus |
-| `401` | Credential salah atau sudah dirotasi | Berhenti mengirim, minta provisioning ulang |
+| `401` | Credential salah atau sudah dirotasi; pada payload legacy v1, waktu ukur sebelum `credential_since` juga ditolak pada pemeriksaan ini | Berhenti mengirim, minta provisioning ulang |
 | `409` | Tidak ada pemilik pada waktu pengukuran, atau `messageId` bentrok | Simpan ke log error, lanjut ke pesan berikutnya |
 | `429`, `5xx`, timeout | Gangguan sementara | Coba lagi dengan backoff, pesan tetap di buffer |
 
-Retry dengan `deviceId` dan `messageId` yang sama menghasilkan `duplicate: true` hanya jika `version`, `model` atau `type`, `measuredAt`, `readings`, dan `meta` sama. Perubahan pada salah satu field payload dengan `messageId` yang sama menghasilkan 409 `CONFLICT`.
+Untuk payload v2, body error memakai kode Contract 4: `400 VALIDATION_FAILED`, `401 UNAUTHENTICATED`, `409 CONFLICT`, `429 RATE_LIMITED`, dan `5xx UNAVAILABLE` (saat ini backend mengembalikan 503). Payload v1 tetap kompatibel dengan route pilot lama dan memakai `REQUEST_REJECTED` untuk seluruh response 4xx; gangguan internal 503 memakai `UNAVAILABLE`. Firmware menentukan tindakan dari status HTTP pada tabel di atas, bukan hanya kode error.
+
+Retry dengan `deviceId` dan `messageId` yang sama menghasilkan `duplicate: true` hanya jika `version`, `model` atau `type`, `measuredAt`, `readings`, dan `meta` sama. `meta` v2 bersifat opsional; jika tidak dikirim, server membandingkannya sebagai object kosong. Perubahan pada salah satu field payload dengan `messageId` yang sama menghasilkan 409 (`CONFLICT` pada v2; `REQUEST_REJECTED` pada format pilot v1). UUID pada contoh ingest adalah placeholder, bukan identitas perangkat yang terdaftar.
 
 ## 8. Versi
 

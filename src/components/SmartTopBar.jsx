@@ -17,10 +17,10 @@ export default function SmartTopBar({ title, subtitle, onMenuClick }) {
         />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">
-            {role === 'pengelola' ? 'Mode Pengelola' : 'Mode Pengguna'}
+            {role === 'pengelola' ? 'Mode Pengelola' : role === 'mitra' ? 'Mode Mitra' : 'Mode Pengguna'}
           </p>
           <h1 className="text-lg sm:text-xl font-extrabold text-on-surface truncate leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-on-surface-variant truncate">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-on-surface-variant break-words">{subtitle}</p>}
         </div>
 
         <IconButton

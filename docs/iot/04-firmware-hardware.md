@@ -2,33 +2,33 @@
 
 | Atribut | Isi |
 | --- | --- |
-| Status | Draft v0.1. Model modul masih asumsi, lihat bagian 1 |
+| Status | Inventaris perangkat saat ini terkonfirmasi; formula TDS tetap perlu verifikasi bench |
 | Target | ESP32 yang mengirim pH, TDS, dan suhu air ke `POST /api/ingest` |
 | Kontrak | [API Contract bagian 7](03-api-contract.md#7-ingest-untuk-firmware) |
 
-## 1. Yang masih harus dikonfirmasi
+## 1. Inventaris perangkat saat ini
 
-Dokumen ini ditulis sebelum model alat yang sudah dirakit diketahui. Kolom `model` di `src/data/seed.js` (Atlas EZO-pH, DS18B20 Waterproof, Gravity TDS V1.0) adalah data contoh UI, jadi belum bisa dijadikan acuan. Sebelum minggu 1, isi tabel ini:
+Saat ini ada 3 perangkat satu-sensor (pH, suhu air, dan TDS) serta 1 perangkat paket yang memuat ketiga sensor. Jumlah perangkat dan modelnya dapat bertambah; perubahan inventaris tidak mengubah batas API tanpa keputusan baru.
 
-| Komponen | Asumsi di dokumen ini | Model sebenarnya |
-| --- | --- | --- |
-| Board | ESP32 klasik (DevKit, 4 MB flash) | |
-| Sensor pH | Modul pH analog (output tegangan) | |
-| Sensor TDS | Modul TDS analog (output tegangan) | |
-| Sensor suhu | DS18B20 waterproof (OneWire) | |
-| Catu daya | Adaptor USB 5 V | |
-| Jumlah unit | Belum diketahui berapa satuan dan berapa paket | |
+| Komponen | Model/perangkat saat ini |
+| --- | --- |
+| Board | ESP32 DevKit V1 |
+| Sensor pH | pH Meter Module PH-4502C with probe |
+| Sensor TDS | TDS Meter V1.0 |
+| Sensor suhu air | DS18B20 |
+| Jumlah | 3 unit satu-sensor dan 1 unit paket (4 perangkat saat ini) |
+| Catu daya | Adaptor yang dipakai dicatat saat uji bench/lapangan |
 
-Kalau ternyata modul pH memakai antarmuka I2C atau UART (misalnya keluarga Atlas EZO), bagian wiring dan pembacaan pH perlu ditulis ulang. Alur buffer, waktu, dan pengiriman tidak berubah.
+Nilai GPIO dan jalur pembacaan mengikuti konfigurasi firmware. Formula konversi TDS dan faktor kalibrasi harus diverifikasi dengan datasheet serta larutan standar sebelum uji akurasi.
 
 ## 2. Varian alat
 
 | Varian | Tipe IoT | Isi |
 | --- | --- | --- |
-| Satuan pH | `AQ-PH` | ESP32 + probe pH |
-| Satuan suhu | `AQ-TMP` | ESP32 + DS18B20 |
-| Satuan TDS | `AQ-TDS` | ESP32 + probe TDS |
-| Paket kualitas air | `AQ-WATER-01` | ESP32 + probe pH + probe TDS + DS18B20 |
+| Satuan pH | `AQ-PH` | ESP32 DevKit V1 + probe pH PH-4502C |
+| Satuan suhu | `AQ-TMP` | ESP32 DevKit V1 + DS18B20 |
+| Satuan TDS | `AQ-TDS` | ESP32 DevKit V1 + TDS Meter V1.0 |
+| Paket kualitas air | `AQ-WATER-01` | ESP32 DevKit V1 + probe pH PH-4502C + TDS Meter V1.0 + DS18B20 |
 
 Semua varian dibangun dari satu basis kode. Bedanya hanya di build flag PlatformIO.
 
@@ -118,13 +118,15 @@ Lokasi kode firmware diusulkan di folder `firmware/` di repo ini, supaya kontrak
 
 ### 5.1 pH
 
-Kalibrasi 2 titik menghasilkan tegangan di buffer 7,00 (`V7`) dan 4,00 (`V4`). Nilai pH dihitung secara linear:
+Kalibrasi 2 titik menghasilkan tegangan di buffer netral 6,86 (`V7`) dan asam 4,00 (`V4`). Nilai pH dihitung secara linear:
 
 ```
-pH = 7.00 + (V - V7) * (4.00 - 7.00) / (V4 - V7)
+pH = 6.86 + (V - V7) * (4.00 - 6.86) / (V4 - V7)
 ```
 
 ### 5.2 TDS
+
+Batas maksimum hard TDS adalah 1000 ppm pada firmware dan validasi database/API. Ambang peringatan tetap 400 ppm dan 900 ppm. Batas ini bukan pengganti kalibrasi dengan larutan standar.
 
 Kalau modulnya Gravity TDS (DFRobot SEN0244), rumus dari contoh kode pabrikannya:
 
@@ -177,7 +179,7 @@ DS18B20 dibaca dengan resolusi 12 bit. Nilai `-127` atau `85` saat pertama menya
 
 | Sensor | Prosedur | Frekuensi |
 | --- | --- | --- |
-| pH | Bilas probe dengan air suling, celup ke buffer 7,00, tunggu stabil, simpan `V7`. Bilas, ulangi dengan buffer 4,00 untuk `V4` | Tiap 2 sampai 4 minggu (sesuai teks panduan di `seed.js`) |
+| pH | Bilas probe dengan air suling, celup ke buffer 6,86, tunggu stabil, simpan `V7`. Bilas, ulangi dengan buffer 4,00 untuk `V4` | Tiap 2 sampai 4 minggu (sesuai teks panduan di `seed.js`) |
 | TDS | Celup ke larutan standar yang nilainya diketahui, hitung `k = nilai standar / nilai terbaca` | Saat pemasangan dan setiap kali probe dibersihkan |
 | Suhu | Tidak perlu kalibrasi rutin. Cukup dibandingkan dengan termometer acuan saat pemasangan | Saat pemasangan |
 

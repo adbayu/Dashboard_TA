@@ -36,6 +36,23 @@ test('login destination accepts only one internal QR code path', () => {
   assert.equal(loginDestination('pengguna', null), '/');
 });
 
+test('partner can open only Developer and profile routes', () => {
+  assert.equal(roleCanOpenPath('mitra', '/developer'), true);
+  assert.equal(roleCanOpenPath('mitra', '/profil'), true);
+  for (const path of ['/admin', '/admin/iot', '/', '/iot', '/area', '/monitoring', '/gamifikasi']) {
+    assert.equal(roleCanOpenPath('mitra', path), false, path);
+  }
+  assert.equal(roleAccess.loginDestination('mitra', null), '/developer');
+});
+
+test('partner sessions do not connect IoT monitoring while user and admin roles still do', () => {
+  const shouldConnect = roleAccess.shouldConnectIotMonitoring;
+  assert.equal(typeof shouldConnect, 'function');
+  assert.equal(shouldConnect('mitra'), false);
+  assert.equal(shouldConnect('pengguna'), true);
+  assert.equal(shouldConnect('pengelola'), true);
+});
+
 test('authenticated Shell and Login route through the same sanitized QR destination', async () => {
   const shellSource = await readFile(new URL('../SmartApp.jsx', import.meta.url), 'utf8');
   const loginSource = await readFile(new URL('../pages/Login.jsx', import.meta.url), 'utf8');

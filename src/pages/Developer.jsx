@@ -306,7 +306,7 @@ export default function Developer() {
               </label>
             ))}
           </fieldset>
-          {!isAdmin && <p className="text-xs text-on-surface-variant">Akun pengguna hanya dapat membuat key Test tanpa scope admin. Server tetap memeriksa izin.</p>}
+          {!isAdmin && <p className="text-xs text-on-surface-variant">{role === 'mitra' ? 'Akun mitra hanya dapat membuat key Test tanpa scope admin. Sandbox tetap terpisah untuk setiap akun.' : 'Akun pengguna hanya dapat membuat key Test tanpa scope admin.'} Server tetap memeriksa izin.</p>}
           {createError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{createError}</p>}
           <div className="flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={() => setCreateOpen(false)}>Batal</Button><Button type="submit" icon="key" disabled={creating || createForm.scopes.length === 0}>{creating ? 'Membuat...' : 'Buat key'}</Button></div>
         </form>

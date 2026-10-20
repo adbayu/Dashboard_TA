@@ -1,15 +1,13 @@
 #pragma once
 
-// Provisional, unconfirmed Q6 assumptions. Replace these only after the
-// assembled board and sensor module models have been verified.
-// Assumed board: classic ESP32 DevKit.
-// All module/formula/range values below are Q6/TDS provisional assumptions.
+// Current assembled inventory: ESP32 DevKit V1, PH-4502C, DS18B20, and TDS Meter V1.0.
+// The TDS conversion coefficients remain provisional pending calibration on the assembled module.
 namespace HardwareConfig {
 
-constexpr char kQ6ProvisionalPhModule[] = "Analog pH module (exact model unconfirmed)";
-constexpr char kQ6ProvisionalTdsModule[] = "Analog TDS module (exact model and range unconfirmed)";
+constexpr char kConfirmedPhModule[] = "pH Meter Module PH-4502C with probe";
+constexpr char kConfirmedTdsModule[] = "TDS Meter V1.0";
 constexpr char kQ6ProvisionalTdsFormula[] = "Gravity-style polynomial (unconfirmed)";
-constexpr char kQ6ProvisionalTemperatureSensor[] = "DS18B20 (exact probe/model unconfirmed)";
+constexpr char kConfirmedTemperatureSensor[] = "DS18B20 water-temperature sensor";
 
 constexpr int kPhPin = 34;
 constexpr int kTdsPin = 35;
@@ -23,8 +21,12 @@ constexpr float kQ6ProvisionalTdsLinearCoefficient = 857.39F;
 constexpr float kQ6ProvisionalTdsOutputScale = 0.5F;
 constexpr float kQ6ProvisionalTdsTempCompensationCoefficient = 0.02F;
 constexpr float kQ6ProvisionalTdsTempReferenceC = 25.0F;
-constexpr float kQ6ProvisionalTemporaryTdsMaxPpm = 5000.0F;
+constexpr float kTdsMaximumPpm = 1000.0F;
 constexpr float kDefaultTemperatureOffsetC = 0.0F;
+// Nilai pH buffer untuk kalibrasi dua titik. Kolom V7 di portal menyimpan tegangan pada titik
+// netral (6,86) dan kolom V4 pada titik asam (4,00). Nama V7 dipertahankan supaya NVS lama tetap terbaca.
+constexpr float kPhNeutralBufferPh = 6.86F;
+constexpr float kPhAcidBufferPh = 4.00F;
 constexpr float kQ6ProvisionalPhFallbackV7 = 2.5F;
 constexpr float kQ6ProvisionalPhFallbackV4 = 3.04F;
 

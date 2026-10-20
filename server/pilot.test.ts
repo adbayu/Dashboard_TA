@@ -33,7 +33,7 @@ test('Sprint 1: PostgreSQL-backed pilot isolation and persistence', async contex
   };
   const admin = await login('admin@example.test');
   const request = (method: 'GET' | 'POST', url: string, session: string, payload?: object) => app.inject({ method, url, headers: { origin, cookie: session }, payload });
-  let userA = ''; let userB = ''; let accountA = ''; let accountB = '';
+  let userA = ''; let userB = ''; let partner = ''; let accountA = ''; let accountB = ''; let partnerAccount = '';
   let water: any; let environment: any; let measuredAt = ''; let message: any;
 
   await context.test('Invitations verify email once; SMTP failures do not create active accounts', async () => {
@@ -44,6 +44,19 @@ test('Sprint 1: PostgreSQL-backed pilot isolation and persistence', async contex
       assert.equal(response.statusCode, 200, response.body);
       assert.equal((await app.inject({ method: 'POST', url: '/api/invitations/accept', headers: { origin }, payload: { token, password } })).statusCode, 400);
     }
+    assert.equal((await pool.query("SELECT role FROM users WHERE email='a@example.test'")).rows[0].role, 'user');
+    assert.equal((await request('POST', '/api/admin/invitations', admin, { email: 'partner@example.test', role: 'partner' })).statusCode, 200);
+    const partnerInvite = invitations.get('partner@example.test')!;
+    const acceptedPartner = await app.inject({ method: 'POST', url: '/api/invitations/accept', headers: { origin }, payload: { token: partnerInvite, password } });
+    assert.equal(acceptedPartner.statusCode, 200, acceptedPartner.body);
+    partner = await login('partner@example.test');
+    const partnerSession = await request('GET', '/api/session', partner);
+    assert.equal(partnerSession.json().user.role, 'partner');
+    partnerAccount = partnerSession.json().user.id;
+    assert.equal((await pool.query('SELECT role FROM users WHERE id=$1', [partnerAccount])).rows[0].role, 'partner');
+    assert.equal((await request('GET', '/api/admin/users', partner)).statusCode, 403);
+    assert.equal((await request('POST', '/api/admin/devices', partner, { userId: partnerAccount, name: 'Denied farm access', model: 'water-v1' })).statusCode, 403);
+    assert.equal((await request('POST', '/api/admin/invitations', admin, { email: 'invalid-role@example.test', role: 'admin' })).statusCode, 400);
     rejectMail = true;
     assert.equal((await request('POST', '/api/admin/invitations', admin, { email: 'failed@example.test' })).statusCode, 503);
     assert.equal((await pool.query("SELECT id FROM users WHERE email='failed@example.test'")).rowCount, 0);

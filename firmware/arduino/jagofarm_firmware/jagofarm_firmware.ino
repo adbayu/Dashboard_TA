@@ -57,7 +57,7 @@
 // jadi board baru yang belum pernah diisi LittleFS akan berhenti di state error tanpa ini.
 // Pada board yang sudah berisi antrean sampel, format menghapus sampel yang belum terkirim.
 // Set 0 untuk alat yang dipasang di lapangan.
-#define JF_DEV_FORMAT_FS_IF_MOUNT_FAILS 1
+#define JF_DEV_FORMAT_FS_IF_MOUNT_FAILS 0
 // =========================================================================
 
 #if JF_VARIANT == 1
@@ -89,16 +89,14 @@
 #endif
 
 // ---- hardware_config.h ----
-// Provisional, unconfirmed Q6 assumptions. Replace these only after the
-// assembled board and sensor module models have been verified.
-// Assumed board: classic ESP32 DevKit.
-// All module/formula/range values below are Q6/TDS provisional assumptions.
+// Current assembled inventory: ESP32 DevKit V1, PH-4502C, DS18B20, and TDS Meter V1.0.
+// The TDS conversion coefficients remain provisional pending calibration on the assembled module.
 namespace HardwareConfig {
 
-constexpr char kQ6ProvisionalPhModule[] = "Analog pH module (exact model unconfirmed)";
-constexpr char kQ6ProvisionalTdsModule[] = "Analog TDS module (exact model and range unconfirmed)";
+constexpr char kConfirmedPhModule[] = "pH Meter Module PH-4502C with probe";
+constexpr char kConfirmedTdsModule[] = "TDS Meter V1.0";
 constexpr char kQ6ProvisionalTdsFormula[] = "Gravity-style polynomial (unconfirmed)";
-constexpr char kQ6ProvisionalTemperatureSensor[] = "DS18B20 (exact probe/model unconfirmed)";
+constexpr char kConfirmedTemperatureSensor[] = "DS18B20 water-temperature sensor";
 
 constexpr int kPhPin = 34;
 constexpr int kTdsPin = 35;
@@ -112,8 +110,12 @@ constexpr float kQ6ProvisionalTdsLinearCoefficient = 857.39F;
 constexpr float kQ6ProvisionalTdsOutputScale = 0.5F;
 constexpr float kQ6ProvisionalTdsTempCompensationCoefficient = 0.02F;
 constexpr float kQ6ProvisionalTdsTempReferenceC = 25.0F;
-constexpr float kQ6ProvisionalTemporaryTdsMaxPpm = 5000.0F;
+constexpr float kTdsMaximumPpm = 1000.0F;
 constexpr float kDefaultTemperatureOffsetC = 0.0F;
+// Nilai pH buffer untuk kalibrasi dua titik. Kolom V7 di portal menyimpan tegangan pada titik
+// netral (6,86) dan kolom V4 pada titik asam (4,00). Nama V7 dipertahankan supaya NVS lama tetap terbaca.
+constexpr float kPhNeutralBufferPh = 6.86F;
+constexpr float kPhAcidBufferPh = 4.00F;
 constexpr float kQ6ProvisionalPhFallbackV7 = 2.5F;
 constexpr float kQ6ProvisionalPhFallbackV4 = 3.04F;
 
@@ -390,8 +392,8 @@ bool runProvisioning(DeviceConfig& value) {
   WiFiManagerParameter apiUrlParameter("api_url", "URL API", apiUrl.c_str(), 128);
   WiFiManagerParameter deviceIdParameter("device_id", "ID device", deviceId.c_str(), 37);
   WiFiManagerParameter credentialParameter("credential", "Credential device 64 hex", "", 65, "type='password'");
-  WiFiManagerParameter phV7Parameter("ph_v7", "Kalibrasi pH buffer 7,00 V7 volt", phV7.c_str(), 16);
-  WiFiManagerParameter phV4Parameter("ph_v4", "Kalibrasi pH buffer 4,00 V4 volt", phV4.c_str(), 16);
+  WiFiManagerParameter phV7Parameter("ph_v7", "Kalibrasi pH V7: volt di buffer netral 6,86", phV7.c_str(), 16);
+  WiFiManagerParameter phV4Parameter("ph_v4", "Kalibrasi pH V4: volt di buffer asam 4,00", phV4.c_str(), 16);
   WiFiManagerParameter tdsFactorParameter("tds_k", "Faktor kalibrasi TDS k", tdsFactor.c_str(), 16);
   WiFiManagerParameter temperatureOffsetParameter("temp_offset_c", "Offset suhu DS18B20 (C)", temperatureOffsetC.c_str(), 16);
   manager.addParameter(&apiUrlParameter);
@@ -505,7 +507,8 @@ bool readPh(float& value) {
     v4 = HardwareConfig::kQ6ProvisionalPhFallbackV4;
   }
   const float voltage = medianVoltage(kPhPin);
-  const float measured = 7.0F + (voltage - v7) * (4.0F - 7.0F) / (v4 - v7);
+  const float measured = HardwareConfig::kPhNeutralBufferPh +
+      (voltage - v7) * (HardwareConfig::kPhAcidBufferPh - HardwareConfig::kPhNeutralBufferPh) / (v4 - v7);
   if (!calibrated) {
     Serial.printf("pH belum dikalibrasi, memakai nilai bawaan sementara: %.3f V -> pH %.2f\n", voltage, measured);
   }
@@ -530,7 +533,7 @@ bool readTds(float temperature, float& value) {
       HardwareConfig::kQ6ProvisionalTdsQuadraticCoefficient * corrected * corrected +
       HardwareConfig::kQ6ProvisionalTdsLinearCoefficient * corrected) *
       HardwareConfig::kQ6ProvisionalTdsOutputScale * config.tdsFactor;
-  if (!std::isfinite(measured) || measured < 0.0F || measured > HardwareConfig::kQ6ProvisionalTemporaryTdsMaxPpm) return false;
+  if (!std::isfinite(measured) || measured < 0.0F || measured > HardwareConfig::kTdsMaximumPpm) return false;
   value = measured;
   return true;
 #else
@@ -865,12 +868,12 @@ void applyReadinessState(const FirmwareStatePolicy::Decision& decision) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("Q6 provisional: pH=%s; TDS=%s; formula=%s; temperature=%s; TDS max=%.0f ppm.\n",
-    HardwareConfig::kQ6ProvisionalPhModule,
-    HardwareConfig::kQ6ProvisionalTdsModule,
+  Serial.printf("Hardware profile: pH=%s; TDS=%s; formula=%s; temperature=%s; hard TDS max=%.0f ppm.\n",
+    HardwareConfig::kConfirmedPhModule,
+    HardwareConfig::kConfirmedTdsModule,
     HardwareConfig::kQ6ProvisionalTdsFormula,
-    HardwareConfig::kQ6ProvisionalTemperatureSensor,
-    HardwareConfig::kQ6ProvisionalTemporaryTdsMaxPpm);
+    HardwareConfig::kConfirmedTemperatureSensor,
+    HardwareConfig::kTdsMaximumPpm);
   pinMode(kLedPin, OUTPUT);
   pinMode(kProvisionPin, INPUT_PULLUP);
 #if JF_HAS_TDS_POWER_SWITCH

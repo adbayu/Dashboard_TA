@@ -228,8 +228,8 @@ bool runProvisioning(DeviceConfig& value) {
   WiFiManagerParameter apiUrlParameter("api_url", "URL API", apiUrl.c_str(), 128);
   WiFiManagerParameter deviceIdParameter("device_id", "ID device", deviceId.c_str(), 37);
   WiFiManagerParameter credentialParameter("credential", "Credential device 64 hex", "", 65, "type='password'");
-  WiFiManagerParameter phV7Parameter("ph_v7", "Kalibrasi pH buffer 7,00 V7 volt", phV7.c_str(), 16);
-  WiFiManagerParameter phV4Parameter("ph_v4", "Kalibrasi pH buffer 4,00 V4 volt", phV4.c_str(), 16);
+  WiFiManagerParameter phV7Parameter("ph_v7", "Kalibrasi pH V7: volt di buffer netral 6,86", phV7.c_str(), 16);
+  WiFiManagerParameter phV4Parameter("ph_v4", "Kalibrasi pH V4: volt di buffer asam 4,00", phV4.c_str(), 16);
   WiFiManagerParameter tdsFactorParameter("tds_k", "Faktor kalibrasi TDS k", tdsFactor.c_str(), 16);
   WiFiManagerParameter temperatureOffsetParameter("temp_offset_c", "Offset suhu DS18B20 (C)", temperatureOffsetC.c_str(), 16);
   manager.addParameter(&apiUrlParameter);
@@ -343,7 +343,8 @@ bool readPh(float& value) {
     v4 = HardwareConfig::kQ6ProvisionalPhFallbackV4;
   }
   const float voltage = medianVoltage(kPhPin);
-  const float measured = 7.0F + (voltage - v7) * (4.0F - 7.0F) / (v4 - v7);
+  const float measured = HardwareConfig::kPhNeutralBufferPh +
+      (voltage - v7) * (HardwareConfig::kPhAcidBufferPh - HardwareConfig::kPhNeutralBufferPh) / (v4 - v7);
   if (!calibrated) {
     Serial.printf("pH belum dikalibrasi, memakai nilai bawaan sementara: %.3f V -> pH %.2f\n", voltage, measured);
   }
@@ -368,7 +369,7 @@ bool readTds(float temperature, float& value) {
       HardwareConfig::kQ6ProvisionalTdsQuadraticCoefficient * corrected * corrected +
       HardwareConfig::kQ6ProvisionalTdsLinearCoefficient * corrected) *
       HardwareConfig::kQ6ProvisionalTdsOutputScale * config.tdsFactor;
-  if (!std::isfinite(measured) || measured < 0.0F || measured > HardwareConfig::kQ6ProvisionalTemporaryTdsMaxPpm) return false;
+  if (!std::isfinite(measured) || measured < 0.0F || measured > HardwareConfig::kTdsMaximumPpm) return false;
   value = measured;
   return true;
 #else
@@ -703,12 +704,12 @@ void applyReadinessState(const FirmwareStatePolicy::Decision& decision) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("Q6 provisional: pH=%s; TDS=%s; formula=%s; temperature=%s; TDS max=%.0f ppm.\n",
-    HardwareConfig::kQ6ProvisionalPhModule,
-    HardwareConfig::kQ6ProvisionalTdsModule,
+  Serial.printf("Hardware profile: pH=%s; TDS=%s; formula=%s; temperature=%s; hard TDS max=%.0f ppm.\n",
+    HardwareConfig::kConfirmedPhModule,
+    HardwareConfig::kConfirmedTdsModule,
     HardwareConfig::kQ6ProvisionalTdsFormula,
-    HardwareConfig::kQ6ProvisionalTemperatureSensor,
-    HardwareConfig::kQ6ProvisionalTemporaryTdsMaxPpm);
+    HardwareConfig::kConfirmedTemperatureSensor,
+    HardwareConfig::kTdsMaximumPpm);
   pinMode(kLedPin, OUTPUT);
   pinMode(kProvisionPin, INPUT_PULLUP);
 #if JF_HAS_TDS_POWER_SWITCH

@@ -28,3 +28,13 @@ test('sesi backend tanpa profil lama memakai email sebagai nama', () => {
     status: 'aktif',
   });
 });
+
+test('role partner tetap menjadi role mitra di SmartDashboard', () => {
+  assert.deepEqual(mapSessionUser({ id: 'partner-id', email: 'mitra@example.test', role: 'partner' }), {
+    id: 'partner-id',
+    email: 'mitra@example.test',
+    name: 'mitra@example.test',
+    role: 'mitra',
+    status: 'aktif',
+  });
+});
