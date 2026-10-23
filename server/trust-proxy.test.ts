@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type pg from 'pg';
-import { buildApp } from './app.js';
+import { buildApp } from './features/pilot/app.js';
 
 const origin = 'http://localhost:5173';
 const pool = { query: async () => ({ rows: [] }) } as unknown as pg.Pool;

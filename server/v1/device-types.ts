@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
-import { transaction } from '../db.js';
+import { transaction } from '../database/db.js';
 import { failV1, requireAdmin, requireActor, sensorCodeSchema, shortTextSchema, v1Object, validateSensors } from './common.js';
 
 type SensorLink = { code: string; label: string };

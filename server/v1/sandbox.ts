@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
-import { transaction } from '../db.js';
+import { transaction } from '../database/db.js';
 import { ensureSandboxDevice } from '../sandbox/provision.js';
 import { failV1, requireActor, shortTextSchema, uuidSchema, v1Object } from './common.js';
 

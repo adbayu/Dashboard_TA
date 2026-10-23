@@ -54,9 +54,9 @@ test('partner sessions do not connect IoT monitoring while user and admin roles 
 });
 
 test('authenticated Shell and Login route through the same sanitized QR destination', async () => {
-  const shellSource = await readFile(new URL('../SmartApp.jsx', import.meta.url), 'utf8');
-  const loginSource = await readFile(new URL('../pages/Login.jsx', import.meta.url), 'utf8');
-  const listIotSource = await readFile(new URL('../pages/ListIot.jsx', import.meta.url), 'utf8');
+  const shellSource = await readFile(new URL('../app/SmartApp.jsx', import.meta.url), 'utf8');
+  const loginSource = await readFile(new URL('../masuk/pages/Login.jsx', import.meta.url), 'utf8');
+  const listIotSource = await readFile(new URL('../list-iot/pages/ListIot.jsx', import.meta.url), 'utf8');
 
   assert.match(shellSource, /isLoggedIn\s*&&\s*location\.pathname\s*===\s*'\/masuk'[\s\S]*?loginDestination\(role,\s*location\.state\?\.from\)/);
   const capturedReturnTo = loginSource.indexOf('const returnTo = location.state?.from;');

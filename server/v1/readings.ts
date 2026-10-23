@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
-import { transaction } from '../db.js';
-import { connectionStatus } from '../domain.js';
+import { transaction } from '../database/db.js';
+import { connectionStatus } from '../shared/domain.js';
 import { failV1, requireAdmin, requireActor, sandboxScope, sensorCodeSchema, shortTextSchema, uuidSchema, v1Object } from './common.js';
 import { historyDevice, visibleDevice } from './access.js';
 import { deviceSensors, sensorState, type EffectiveThreshold, type ThresholdSource } from './monitoring-state.js';

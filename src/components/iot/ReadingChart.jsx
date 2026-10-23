@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { Chart as ChartJS, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { Empty } from '../ui.jsx';
+import { Empty } from '../../shared/components/ui.jsx';
 import { formatSensorNumber, summarizeHistory } from '../../utils/iotPresentation.js';
 
 ChartJS.register(CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);

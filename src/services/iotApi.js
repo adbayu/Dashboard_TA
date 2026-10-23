@@ -1,4 +1,4 @@
-import { pilotApi } from './pilotApi.js';
+import { pilotApi } from '../pilot/services/pilotApi.js';
 import { iotRequestGovernor } from './iotRequestGovernor.js';
 import { parseContentDispositionFilename } from '../utils/deviceLog.js';
 

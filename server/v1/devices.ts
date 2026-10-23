@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import QRCode from 'qrcode';
-import { transaction } from '../db.js';
-import { connectionStatus, hash, secret } from '../domain.js';
+import { transaction } from '../database/db.js';
+import { connectionStatus, hash, secret } from '../shared/domain.js';
 import { activationCodeSchema, codeSchema, failV1, requireAdmin, requireActor, sandboxScope, shortTextSchema, uuidSchema, v1Object } from './common.js';
 
 type DeviceQuery = {

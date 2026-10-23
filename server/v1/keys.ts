@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
-import { hash, secret } from '../domain.js';
-import { transaction } from '../db.js';
+import { hash, secret } from '../shared/domain.js';
+import { transaction } from '../database/db.js';
 import { ensureSandboxDevice } from '../sandbox/provision.js';
 import type { Actor } from '../auth/session.js';
 import type { ApiKeyEnvironment, ApiScope } from '../auth/types.js';

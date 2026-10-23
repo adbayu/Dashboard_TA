@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSmart } from '../../store/SmartStore';
-import { Badge, Button, Card, Empty, Field, SectionTitle, Select } from '../ui';
+import { useSmart } from '../../shared/store/SmartStore';
+import { Badge, Button, Card, Empty, Field, SectionTitle, Select } from '../../shared/components/ui';
 import { IOT_SOURCE, iotApi } from '../../services/iotApi.js';
 import { iotStreamClient } from '../../services/iotStream.js';
 import { formatEventMessage, formatMeasuredAt, formatSensorNumber, mergeLatestReading } from '../../utils/iotPresentation.js';

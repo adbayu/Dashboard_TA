@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import pg from 'pg';
 import ExcelJS from 'exceljs';
-import { migrate } from './db.js';
-import { buildApp } from './app.js';
-import { hash, passwordHash, secret } from './domain.js';
+import { migrate } from './database/db.js';
+import { buildApp } from './features/pilot/app.js';
+import { hash, passwordHash, secret } from './shared/domain.js';
 import { authenticateApiKey, parseApiKey } from './auth/api-key.js';
 import { authenticateSession } from './auth/session.js';
 import { HEARTBEAT_INTERVAL_MS, StreamHub, type StreamClock } from './v1/stream.js';
@@ -180,7 +180,7 @@ test('serializer request hanya mencatat method, bukan URL, body, atau header', a
     body: { credential: 'one-time-credential' },
     headers: { authorization: 'Bearer one-time-credential' },
   };
-  const { serializeRequestForLog } = await import('./app.js');
+  const { serializeRequestForLog } = await import('./features/pilot/app.js');
   const serialized = serializeRequestForLog(request);
   assert.deepEqual(serialized, { method: 'POST' });
   assert.equal(Object.hasOwn(serialized, 'url'), false);

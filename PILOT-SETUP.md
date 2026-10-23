@@ -11,7 +11,7 @@ penghapusan akun, dan akses dataset tim belum diimplementasikan.
 
 | Bagian | Sumber | Perlakuan |
 | --- | --- | --- |
-| / dan /perangkat/:id | src/services/pilotApi.js → Fastify → PostgreSQL | API saja; tidak ada fallback fixture |
+| / dan /perangkat/:id | src/pilot/services/pilotApi.js → Fastify → PostgreSQL | API saja; tidak ada fallback fixture |
 | /admin | Sesi backend, users/devices PostgreSQL | Admin mengundang dan provisioning; tidak bebas membaca telemetri |
 | /demo/* | App.jsx, useFarmStore.js, iotSimulator.js | UI lama dipisah dan diberi label Data contoh / Demo |
 | Role, sensor, log, ambang UI lama | localStorage dalam useFarmStore.js | Tidak menjadi otorisasi atau data pilot |
@@ -191,11 +191,9 @@ Tidak ada email sensor yang dipicu oleh ingestion Sprint 1.
 
 ### Skema dan migrasi
 
-`server/migrations/001_pilot.sql` mempertahankan skema pilot lama. Migrasi
-`002_iot_platform.sql` menambahkan katalog sensor dan tipe perangkat beserta
-metadata IoT. `migrate()` menjalankan versi yang belum tercatat secara berurutan,
-satu transaksi per file dengan advisory lock `90260909`. Model v1 tetap ada untuk
-menjaga ingest pilot yang sudah berjalan.
+Migrasi bernomor 001–007 di server/database/migrations/ berjalan berurutan, satu
+transaksi per file dengan advisory lock `90260909`. Model/sensor didefinisikan
+sekali di server/shared/domain.ts dan disajikan melalui /models.
 
 Admin tidak dapat memindahkan unit aktif. Pemilik melepas, admin mengalokasikan ulang
 unit yang sama, kredensial dirotasi, pengguna baru melakukan pairing. Riwayat lama tetap

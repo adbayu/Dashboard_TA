@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" preserveAspectRatio="none" role="img">
-<!-- Air hangat beruap, dipakai saat suhu di atas ambang. -->
-<defs><linearGradient id="air" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9d6"/><stop offset="1" stop-color="#e0955f"/></linearGradient></defs>
-<rect width="480" height="260" fill="url(#air)"/>
-<path d="M120 96q-10-14 2-24t2-22q-8-12 2-22" stroke="#fff" stroke-width="4" fill="none" opacity=".65" stroke-linecap="round"/>
-<path d="M300 104q-10-14 2-24t2-22q-8-12 2-22" stroke="#fff" stroke-width="4" fill="none" opacity=".6" stroke-linecap="round"/>
-</svg>

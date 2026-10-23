@@ -1,4 +1,4 @@
-import { Badge } from '../ui.jsx';
+import { Badge } from '../../shared/components/ui.jsx';
 
 const SENSOR_STATES = {
   normal: { label: 'Normal', tone: 'ok', icon: 'check_circle' },

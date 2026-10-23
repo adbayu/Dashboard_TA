@@ -1,9 +1,14 @@
 .git
 node_modules
 dist
+dist-ssr
+coverage
 .env
 .env.*
+*.local
+*.log
 !.env.example
+.pilot-buffer.json
 firmware
 docs
 anti-slop
@@ -11,5 +16,8 @@ Claude outputs
 scripts
 *.md
 compose*.yaml
+docker-compose*.yml
+docker.env.example
+docker.env.lan.example
 **/*.test.js
 **/*.test.ts

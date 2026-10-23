@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import type { ApiScope } from './types.js';
-import { hash } from '../domain.js';
+import { hash } from '../shared/domain.js';
 
 export type Actor = {
   kind: 'session' | 'key';

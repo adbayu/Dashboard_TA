@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" preserveAspectRatio="none" role="img">
-<!-- Air jernih, dipakai saat semua parameter sensor dalam ambang. -->
-<defs><linearGradient id="air" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f7fb"/><stop offset="1" stop-color="#8fd0e8"/></linearGradient></defs>
-<rect width="480" height="260" fill="url(#air)"/>
-<path d="M0 206q60-12 120 0t120 0 120 0 120 0v54H0Z" fill="#d9c9a3"/>
-<path d="M0 222q70-10 140 2t140 0 140-2 60 4v34H0Z" fill="#cbb68c"/>
-</svg>

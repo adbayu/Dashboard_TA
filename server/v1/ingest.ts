@@ -1,6 +1,6 @@
 import type pg from 'pg';
-import { transaction } from '../db.js';
-import { hash } from '../domain.js';
+import { transaction } from '../database/db.js';
+import { hash } from '../shared/domain.js';
 import { failV1 } from './common.js';
 import { recordReadingEvents } from './monitoring-state.js';
 import type { DeviceEvent } from './events.js';

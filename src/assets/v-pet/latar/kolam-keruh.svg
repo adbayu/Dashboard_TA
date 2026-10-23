@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" preserveAspectRatio="none" role="img">
-<!-- Air keruh, dipakai saat parameter jauh dari ambang. -->
-<defs><linearGradient id="air" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8e0cc"/><stop offset="1" stop-color="#a89a72"/></linearGradient></defs>
-<rect width="480" height="260" fill="url(#air)"/>
-<circle cx="110" cy="90" r="30" fill="#8a7f5c" opacity=".45"/><circle cx="330" cy="70" r="26" fill="#8a7f5c" opacity=".4"/>
-<circle cx="240" cy="120" r="22" fill="#8a7f5c" opacity=".35"/>
-</svg>

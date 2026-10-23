@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8');
-const ui = readFileSync(new URL('./components/ui.jsx', import.meta.url), 'utf8');
-const listIot = readFileSync(new URL('./pages/ListIot.jsx', import.meta.url), 'utf8');
-const adminIot = readFileSync(new URL('./pages/admin/AdminIotPage.jsx', import.meta.url), 'utf8');
+const css = readFileSync(new URL('./app/styles/index.css', import.meta.url), 'utf8');
+const ui = readFileSync(new URL('./shared/components/ui.jsx', import.meta.url), 'utf8');
+const listIot = readFileSync(new URL('./list-iot/pages/ListIot.jsx', import.meta.url), 'utf8');
+const adminIot = readFileSync(new URL('./kelola-area/pages/admin/AdminIotPage.jsx', import.meta.url), 'utf8');
 
 function rule(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -1,4 +1,4 @@
-import { pilotApi } from './pilotApi.js';
+import { pilotApi } from '../pilot/services/pilotApi.js';
 
 export function createDeveloperApi({ request = pilotApi } = {}) {
   return {

@@ -3,10 +3,10 @@ services:
     image: postgres:17
     environment:
       POSTGRES_USER: pilot
-      POSTGRES_PASSWORD: pilot-local-only
+      POSTGRES_PASSWORD: ${JAGOFARM_DB_PASSWORD:-pilot-local-only}
       POSTGRES_DB: jagofarm
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${JAGOFARM_DB_PORT:-5432}:5432"
     volumes:
       - pilot_database:/var/lib/postgresql/data
     healthcheck:
@@ -15,9 +15,81 @@ services:
       timeout: 5s
       retries: 10
   mailbox:
-    image: axllent/mailpit:v1.27
+    image: axllent/mailpit:v1.31.1
     ports:
-      - "127.0.0.1:1025:1025"
-      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:${JAGOFARM_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${JAGOFARM_MAIL_UI_PORT:-8025}:8025"
+    restart: unless-stopped
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      DATABASE_URL: postgresql://pilot:${JAGOFARM_DB_PASSWORD:-pilot-local-only}@database:5432/jagofarm
+    command: ["node", "--env-file-if-exists=.env", "--import", "tsx", "server/index.ts", "migrate"]
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    environment:
+      NODE_ENV: ${JAGOFARM_NODE_ENV:-development}
+      DATABASE_URL: postgresql://pilot:${JAGOFARM_DB_PASSWORD:-pilot-local-only}@database:5432/jagofarm
+      APP_ORIGIN: ${JAGOFARM_APP_ORIGIN:-http://127.0.0.1:8080}
+      ALLOW_LAN_HTTP_ORIGIN: ${JAGOFARM_ALLOW_LAN_HTTP_ORIGIN:-false}
+      HOST: 0.0.0.0
+      PORT: "3001"
+      SMTP_HOST: mailbox
+      SMTP_PORT: "1025"
+      SMTP_FROM: ${JAGOFARM_SMTP_FROM:-no-reply@jagofarm.local}
+      SMTP_SECURE: "false"
+    expose:
+      - "3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailbox:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    ports:
+      - "${JAGOFARM_WEB_BIND:-127.0.0.1}:${JAGOFARM_WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+  admin-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    profiles:
+      - admin-init
+    environment:
+      DATABASE_URL: postgresql://pilot:${JAGOFARM_DB_PASSWORD:-pilot-local-only}@database:5432/jagofarm
+      ADMIN_EMAIL: ${JAGOFARM_ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${JAGOFARM_ADMIN_PASSWORD:-}
+    command: ["node", "--env-file-if-exists=.env", "--import", "tsx", "server/index.ts", "admin"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 volumes:
   pilot_database:

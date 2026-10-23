@@ -1,6 +1,6 @@
 import type pg from 'pg';
-import { transaction } from '../db.js';
-import { DEVICE_OFFLINE_AFTER_MS } from '../domain.js';
+import { transaction } from '../database/db.js';
+import { DEVICE_OFFLINE_AFTER_MS } from '../shared/domain.js';
 import type { DeviceEvent } from './events.js';
 
 export const OFFLINE_SCAN_INTERVAL_MS = 60_000;

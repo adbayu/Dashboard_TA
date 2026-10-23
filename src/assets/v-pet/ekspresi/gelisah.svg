@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" role="img">
-<!-- Ada parameter di luar ambang tapi belum parah. Raut waspada. -->
-<circle cx="16" cy="26" r="9" fill="#fff"/><circle cx="44" cy="26" r="9" fill="#fff"/><circle cx="16" cy="26" r="6" fill="#22303a"/><circle cx="44" cy="26" r="6" fill="#22303a"/><circle cx="13.5" cy="23" r="2" fill="#fff"/><ellipse cx="30" cy="44" rx="5" ry="4" fill="#22303a"/><path d="M2 20l7 3M58 20l-7 3" stroke="#c9a227" stroke-width="2.4" stroke-linecap="round"/>
-</svg>

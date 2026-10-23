@@ -1,4 +1,4 @@
-import { Badge, Empty } from '../ui.jsx';
+import { Badge, Empty } from '../../shared/components/ui.jsx';
 import { formatEventMessage } from '../../utils/iotPresentation.js';
 
 const EVENT_STYLE = {

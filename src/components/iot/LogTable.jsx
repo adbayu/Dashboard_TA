@@ -1,4 +1,4 @@
-import { Badge } from '../ui.jsx';
+import { Badge } from '../../shared/components/ui.jsx';
 import { formatSensorNumber } from '../../utils/iotPresentation.js';
 
 const READING_STATES = {

@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import type pg from 'pg';
-import { hash } from '../domain.js';
+import { hash } from '../shared/domain.js';
 import { failV1 } from '../v1/common.js';
 import type { Actor } from './session.js';
 import type { ApiKeyEnvironment, ApiScope } from './types.js';

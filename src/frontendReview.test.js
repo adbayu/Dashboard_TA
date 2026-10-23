@@ -21,8 +21,8 @@ test('SmartTopBar subtitle wraps instead of truncating', async t => {
   t.after(() => vite.close());
 
   const [{ default: SmartTopBar }, { SmartProvider }] = await Promise.all([
-    vite.ssrLoadModule('/src/components/SmartTopBar.jsx'),
-    vite.ssrLoadModule('/src/store/SmartStore.jsx'),
+    vite.ssrLoadModule('/src/app/layout/SmartTopBar.jsx'),
+    vite.ssrLoadModule('/src/shared/store/SmartStore.jsx'),
   ]);
   const markup = renderToStaticMarkup(React.createElement(
     MemoryRouter,
@@ -51,14 +51,14 @@ test('partner sidebar exposes Developer without farm or monitoring menus', async
   });
   t.after(() => vite.close());
 
-  const { MENUS } = await vite.ssrLoadModule('/src/components/SmartSidebar.jsx');
+  const { MENUS } = await vite.ssrLoadModule('/src/app/layout/SmartSidebar.jsx');
   assert.deepEqual(MENUS.mitra.flatMap(section => section.items.map(item => item.to)), ['/developer']);
 });
 
 test('public QR surfaces render the allowed areaRef with an Indonesian area label', async t => {
   const [claimSource, detailSource] = await Promise.all([
-    readFile(new URL('./pages/DeviceClaim.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('./pages/DetailInformation.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./kelola-area/pages/DeviceClaim.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./detail-information/pages/DetailInformation.jsx', import.meta.url), 'utf8'),
   ]);
   assert.match(claimSource, /PublicAreaLabel/);
   assert.match(detailSource, /PublicAreaLabel/);
@@ -80,13 +80,13 @@ test('public QR surfaces render the allowed areaRef with an Indonesian area labe
 });
 
 test('pilot invitation form offers admin-assigned user and partner roles', async () => {
-  const source = await readFile(new URL('./PilotApp.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./pilot/PilotApp.jsx', import.meta.url), 'utf8');
   assert.match(source, /id="pilot-invitation-role"\s+name="role"/);
   assert.match(source, /defaultValue="user"[\s\S]*?<option value="partner">Mitra<\/option>/);
 });
 
 test('partner sessions are redirected out of Pilot device routes', async () => {
-  const source = await readFile(new URL('./PilotApp.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./pilot/PilotApp.jsx', import.meta.url), 'utf8');
   assert.match(source, /user\.role === 'partner' \? <PartnerRedirect \/> : <>/);
   assert.match(source, /function PartnerRedirect\(\)[\s\S]*?window\.location\.replace\('\/developer'\)/);
   assert.match(source, /user\.role !== 'partner' && <NavLink to="\/" end>Perangkat<\/NavLink>/);
@@ -94,7 +94,7 @@ test('partner sessions are redirected out of Pilot device routes', async () => {
 
 test('pilot invitation email opens the route that reads its invite token', async () => {
   const [pilotSource, serverSource] = await Promise.all([
-    readFile(new URL('./PilotApp.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./pilot/PilotApp.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../server/index.ts', import.meta.url), 'utf8'),
   ]);
   assert.match(pilotSource, /new URLSearchParams\(window\.location\.hash\.slice\(1\)\)\.get\('invite'\)/);
@@ -106,7 +106,7 @@ function exposeShellForRouteTests() {
   return {
     name: 'expose-smart-app-shell-for-route-tests',
     transform(source, id) {
-      if (id.replaceAll('\\', '/').endsWith('/src/SmartApp.jsx')) {
+      if (id.replaceAll('\\', '/').endsWith('/src/app/SmartApp.jsx')) {
         return `${source}\nexport { Shell, TITLES };`;
       }
       return null;
@@ -118,7 +118,7 @@ function exposeMonitoringForTests() {
   return {
     name: 'expose-monitoring-presentation-for-tests',
     transform(source, id) {
-      if (id.replaceAll('\\', '/').endsWith('/src/pages/Monitoring.jsx')) {
+      if (id.replaceAll('\\', '/').endsWith('/src/kelola-area/pages/Monitoring.jsx')) {
         return `${source}\nexport { TABS, nextTabId, Sparkline, ComparisonChart, EventLogPanel, ErrorPanel };`;
       }
       return null;
@@ -130,7 +130,7 @@ function exposeStreamStatusForTests() {
   return {
     name: 'expose-list-iot-stream-status-for-tests',
     transform(source, id) {
-      if (id.replaceAll('\\', '/').endsWith('/src/pages/ListIot.jsx')) {
+      if (id.replaceAll('\\', '/').endsWith('/src/list-iot/pages/ListIot.jsx')) {
         return `${source}\nexport { StreamStatus };`;
       }
       return null;
@@ -149,7 +149,7 @@ test('Field connects the visible label to a control nested in a wrapper', async 
   });
   t.after(() => vite.close());
 
-  const { Field, Input } = await vite.ssrLoadModule('/src/components/ui.jsx');
+  const { Field, Input } = await vite.ssrLoadModule('/src/shared/components/ui.jsx');
   const markup = renderToStaticMarkup(React.createElement(
     Field,
     { label: 'Password' },
@@ -174,7 +174,7 @@ test('List IoT stream status is announced politely as a status region', async t 
   });
   t.after(() => vite.close());
 
-  const { StreamStatus } = await vite.ssrLoadModule('/src/pages/ListIot.jsx');
+  const { StreamStatus } = await vite.ssrLoadModule('/src/list-iot/pages/ListIot.jsx');
   const markup = renderToStaticMarkup(React.createElement(StreamStatus, { status: 'polling' }));
 
   assert.match(markup, /role="status"/);
@@ -193,7 +193,7 @@ test('Field links the label to the input in a two-control wrapper without a key 
   });
   t.after(() => vite.close());
 
-  const { Field, Input } = await vite.ssrLoadModule('/src/components/ui.jsx');
+  const { Field, Input } = await vite.ssrLoadModule('/src/shared/components/ui.jsx');
   const warnings = [];
   const originalError = console.error;
   let markup;
@@ -295,8 +295,8 @@ test('Developer links to OpenAPI JSON in a new tab and Vite proxies docs to the 
   t.after(() => vite.close());
 
   const [{ default: Developer }, { SmartProvider }] = await Promise.all([
-    vite.ssrLoadModule('/src/pages/Developer.jsx'),
-    vite.ssrLoadModule('/src/store/SmartStore.jsx'),
+    vite.ssrLoadModule('/src/kelola-area/pages/Developer.jsx'),
+    vite.ssrLoadModule('/src/shared/store/SmartStore.jsx'),
   ]);
   const markup = renderToStaticMarkup(React.createElement(
     MemoryRouter,
@@ -339,8 +339,8 @@ test('API shell preserves protected and public routes while session hydration is
   t.after(() => vite.close());
 
   const [{ Shell }, { SmartProvider }] = await Promise.all([
-    vite.ssrLoadModule('/src/SmartApp.jsx'),
-    vite.ssrLoadModule('/src/store/SmartStore.jsx'),
+    vite.ssrLoadModule('/src/app/SmartApp.jsx'),
+    vite.ssrLoadModule('/src/shared/store/SmartStore.jsx'),
   ]);
   function CurrentPath() {
     return React.createElement('output', null, useLocation().pathname);
@@ -388,9 +388,9 @@ test('Monitoring menus share the route and has exactly three category tabs', asy
   t.after(() => vite.close());
 
   const [{ TITLES }, { MENUS }, { TABS, nextTabId }] = await Promise.all([
-    vite.ssrLoadModule('/src/SmartApp.jsx'),
-    vite.ssrLoadModule('/src/components/SmartSidebar.jsx'),
-    vite.ssrLoadModule('/src/pages/Monitoring.jsx'),
+    vite.ssrLoadModule('/src/app/SmartApp.jsx'),
+    vite.ssrLoadModule('/src/app/layout/SmartSidebar.jsx'),
+    vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx'),
   ]);
   assert.deepEqual(TABS.map(tab => tab.label), ['Per paket', 'Per sensor', 'Per area']);
   assert.equal(nextTabId('package', 'ArrowLeft'), 'area');
@@ -418,8 +418,8 @@ test('Monitoring renders its initial API loading state inside SmartProvider', as
   t.after(() => vite.close());
 
   const [{ default: Monitoring }, { SmartProvider }] = await Promise.all([
-    vite.ssrLoadModule('/src/pages/Monitoring.jsx'),
-    vite.ssrLoadModule('/src/store/SmartStore.jsx'),
+    vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx'),
+    vite.ssrLoadModule('/src/shared/store/SmartStore.jsx'),
   ]);
   const markup = renderToStaticMarkup(React.createElement(
     MemoryRouter,
@@ -441,7 +441,7 @@ test('Monitoring retains a filterable, paginated event panel with four request s
     logLevel: 'silent',
   });
   t.after(() => vite.close());
-  const { EventLogPanel } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { EventLogPanel } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const defaults = {
     events: [],
     eventCursor: null,
@@ -487,8 +487,8 @@ test('Monitoring retains a filterable, paginated event panel with four request s
 });
 
 test('Sandbox is visibly labeled in Monitoring package/sensor/events and device detail', async () => {
-  const monitoringSource = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
-  const detailSource = await readFile(new URL('./pages/ListIot.jsx', import.meta.url), 'utf8');
+  const monitoringSource = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const detailSource = await readFile(new URL('./list-iot/pages/ListIot.jsx', import.meta.url), 'utf8');
   const packageStart = monitoringSource.indexOf('function PackageDeviceCard(');
   const sensorStart = monitoringSource.indexOf('function renderSensorTab()');
   const areaStart = monitoringSource.indexOf('function renderAreaTab()');
@@ -505,7 +505,7 @@ test('Sandbox is visibly labeled in Monitoring package/sensor/events and device 
 });
 
 test('Monitoring keeps authorized sandbox snapshots visible but excludes them from area data', async () => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
 
   assert.ok(source.includes('const devices = hasSessionSnapshot ? monitoringSnapshot.devices : EMPTY_DEVICES'));
   assert.ok(source.includes('const displayDevices = devices;'));
@@ -514,8 +514,8 @@ test('Monitoring keeps authorized sandbox snapshots visible but excludes them fr
 });
 
 test('Monitoring and SmartSidebar share one overview-backed monitoring snapshot', async () => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
-  const sidebar = await readFile(new URL('./components/SmartSidebar.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const sidebar = await readFile(new URL('./app/layout/SmartSidebar.jsx', import.meta.url), 'utf8');
   const store = await readFile(new URL('./services/iotMonitoringStore.js', import.meta.url), 'utf8');
 
   assert.match(source, /useSyncExternalStore\(iotMonitoringStore\.subscribe/);
@@ -531,7 +531,7 @@ test('Monitoring and SmartSidebar share one overview-backed monitoring snapshot'
 });
 
 test('Monitoring subtree remounts when the session owner changes', async () => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
 
   assert.match(source, /<MonitoringView key=\{String\(currentUser\?\.id \?\? 'anonymous'\)\} currentUser=\{currentUser\} \/>/);
   assert.match(source, /function MonitoringView\(\{ currentUser \}\)/);
@@ -548,7 +548,7 @@ test('Monitoring error panel exposes and invokes its retry action', async t => {
     logLevel: 'silent',
   });
   t.after(() => vite.close());
-  const { ErrorPanel } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { ErrorPanel } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   let attempts = 0;
   const panel = ErrorPanel({ message: 'API gagal', onRetry: () => { attempts += 1; } });
   const children = React.Children.toArray(panel.props.children);
@@ -571,7 +571,7 @@ test('Per sensor partial overview error shows one alert and invokes one retry ac
     logLevel: 'silent',
   });
   t.after(() => vite.close());
-  const { SensorLatestError } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { SensorLatestError } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   let attempts = 0;
   const errorPanelElement = SensorLatestError({ message: 'Overview gagal', onRetry: () => { attempts += 1; } });
   const presentation = errorPanelElement.type(errorPanelElement.props);
@@ -587,12 +587,12 @@ test('Per sensor partial overview error shows one alert and invokes one retry ac
 
 test('IoT control surfaces scope 44px hit areas without changing shared defaults', async () => {
   const [css, ui, developer, monitoring, adminIot, deviceLog] = await Promise.all([
-    readFile(new URL('./index.css', import.meta.url), 'utf8'),
-    readFile(new URL('./components/ui.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('./pages/Developer.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('./pages/admin/AdminIotPage.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('./pages/DeviceLog.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./app/styles/index.css', import.meta.url), 'utf8'),
+    readFile(new URL('./shared/components/ui.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./kelola-area/pages/Developer.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./kelola-area/pages/admin/AdminIotPage.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./kelola-area/pages/DeviceLog.jsx', import.meta.url), 'utf8'),
   ]);
 
   assert.match(css, /\.iot-touch-targets\s+:where\([^}]+\)\s*\{[^}]*min-height:\s*44px;/s);
@@ -607,7 +607,7 @@ test('IoT control surfaces scope 44px hit areas without changing shared defaults
 });
 
 test('DeviceClaim clears valid manual input and relies on activation memory for claim state', async () => {
-  const source = await readFile(new URL('./pages/DeviceClaim.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/DeviceClaim.jsx', import.meta.url), 'utf8');
   const submit = source.match(/function submitActivationCode\(event\) \{([\s\S]*?)\n  \}/)?.[1] || '';
 
   assert.match(submit, /setManualActivationCode\(''\)/);
@@ -621,7 +621,7 @@ test('DeviceClaim clears valid manual input and relies on activation memory for 
 });
 
 test('Monitoring recovery views wire bounded retries for latest, comparison, and area failures', async () => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
 
   assert.ok(source.includes('comparisonRunner.current.isRunning()'));
   assert.ok(source.includes('onClick={retryComparison}>Coba lagi</Button>'));
@@ -632,7 +632,7 @@ test('Monitoring recovery views wire bounded retries for latest, comparison, and
 });
 
 test('Per area exposes manual refresh without a separate rate budget', async () => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
 
   assert.match(source, /Muat ulang/);
   assert.match(source, /onClick=\{\(\) => areaRefreshActionRef\.current\?\.\(\)\}/);
@@ -648,7 +648,7 @@ test('Per area exposes manual refresh without a separate rate budget', async () 
 });
 
 test('package history waits for card visibility and cancels requests when it leaves', async () => {
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
   const requestEffect = source.match(/useEffect\(\(\) => \{\n    const sensorCodes = JSON\.parse\(sensorKey\);\n    if \(!visible \|\| !sensorCodes\.length \|\| completed\.current\) return undefined;[\s\S]*?\n  \}, \[([^\]]+)\]\);/);
 
   assert.match(source, /function PackageDeviceCard\(/);
@@ -676,7 +676,7 @@ test('comparison chart uses statically discoverable token classes for all three 
     logLevel: 'silent',
   });
   t.after(() => vite.close());
-  const { ComparisonChart } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { ComparisonChart } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const series = ['one', 'two', 'three'].map(id => ({
     device: { id, name: id },
     history: { points: [{ avg: 1, min: 0.5, max: 1.5 }, { avg: 2, min: 1.5, max: 2.5 }] },
@@ -727,7 +727,7 @@ test('Per paket empty state shows the live-device guidance when no package devic
   });
   t.after(() => vite.close());
 
-  const { PackageTabEmpty } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { PackageTabEmpty } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const markup = renderToStaticMarkup(React.createElement(PackageTabEmpty, { hasPackageDevices: false }));
 
   assert.match(markup, /Belum ada perangkat paket live/);
@@ -746,9 +746,9 @@ test('Per paket latest-value loading is announced inside the active package tab'
   });
   t.after(() => vite.close());
 
-  const { PackageTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { PackageTabLoading } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const markup = renderToStaticMarkup(React.createElement(PackageTabLoading));
-  const source = await readFile(new URL('./pages/Monitoring.jsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
   const packageTab = source.match(/function renderPackageTab\(\)\s*\{([\s\S]*?)\n  \}/)?.[1] || '';
 
   assert.match(markup, /role="status"/);
@@ -767,7 +767,7 @@ test('Per sensor loading state is announced as a status region', async t => {
   });
   t.after(() => vite.close());
 
-  const { SensorTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { SensorTabLoading } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const markup = renderToStaticMarkup(React.createElement(SensorTabLoading));
 
   assert.match(markup, /role="status"/);
@@ -785,7 +785,7 @@ test('Per sensor empty state guides users to select another sensor or check inst
   });
   t.after(() => vite.close());
 
-  const { SensorDeviceEmpty } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { SensorDeviceEmpty } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const markup = renderToStaticMarkup(React.createElement(SensorDeviceEmpty));
 
   assert.match(markup, /Belum ada perangkat dengan sensor ini/);
@@ -803,7 +803,7 @@ test('Per area loading state is announced as a status region', async t => {
   });
   t.after(() => vite.close());
 
-  const { AreaTabLoading } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { AreaTabLoading } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const markup = renderToStaticMarkup(React.createElement(AreaTabLoading));
 
   assert.match(markup, /role="status"/);
@@ -821,7 +821,7 @@ test('Per area empty state distinguishes missing areas from missing readings', a
   });
   t.after(() => vite.close());
 
-  const { AreaEmptyState } = await vite.ssrLoadModule('/src/pages/Monitoring.jsx');
+  const { AreaEmptyState } = await vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx');
   const noAreaMarkup = renderToStaticMarkup(React.createElement(AreaEmptyState, { hasArea: false }));
   const noReadingsMarkup = renderToStaticMarkup(React.createElement(AreaEmptyState, { hasArea: true }));
 

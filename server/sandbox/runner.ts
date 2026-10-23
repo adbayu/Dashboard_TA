@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
-import { transaction } from '../db.js';
+import { transaction } from '../database/db.js';
 import { deviceSensors } from '../v1/monitoring-state.js';
 import { ingestSandboxV2, type IngestPublisher } from '../v1/ingest.js';
 

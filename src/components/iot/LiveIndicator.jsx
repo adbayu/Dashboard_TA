@@ -1,4 +1,4 @@
-import { Badge } from '../ui.jsx';
+import { Badge } from '../../shared/components/ui.jsx';
 
 const INDICATORS = {
   connecting: { label: 'Menghubungkan...', tone: 'muted', icon: 'sensors' },
