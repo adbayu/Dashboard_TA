@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { createTransport } from 'nodemailer';
-import { database, migrate, transaction } from './db.js';
-import { passwordHash } from './domain.js';
-import { buildApp } from './app.js';
+import { database, migrate, transaction } from './database/db.js';
+import { passwordHash } from './shared/domain.js';
+import { buildApp } from './features/pilot/app.js';
 
 function required(name: string) {
   const value = process.env[name];

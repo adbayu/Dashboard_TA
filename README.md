@@ -7,6 +7,8 @@ siklus air) yang terintegrasi dengan perangkat **IoT**. Aplikasi memiliki **2 ro
 Stack: **Vite 8 + React 19 + Tailwind CSS 3 + react-router-dom 7**, tema visual "Lumina Aqua".
 Repo: https://github.com/adbayu/Dashboard_TA.git — branch kerja: **`dev/antigravity`**.
 
+Mulai membaca kode dari [Panduan struktur proyek](docs/struktur-proyek.md) dan [daftar fitur](src/README.md).
+
 > Dokumen pilot backend (Fastify + PostgreSQL, Sprint 1) tetap ada di
 > [PILOT-SETUP.md](PILOT-SETUP.md) dan [PERSIAPAN-PILOT.md](PERSIAPAN-PILOT.md).
 > Dokumen ini fokus pada SmartDashboard Aquaponik.
@@ -101,8 +103,8 @@ environment):
 
 | Path | Aplikasi | Keterangan |
 | --- | --- | --- |
-| `/pilot` dan `/pilot/*` | `src/PilotApp.jsx` | UI pilot backend (Fastify + PostgreSQL), Sprint 1 |
-| Semua path lain | `src/SmartApp.jsx` | **SmartDashboard Aquaponik** — bagian utama |
+| `/pilot` dan `/pilot/*` | `src/pilot/PilotApp.jsx` | UI pilot backend (Fastify + PostgreSQL), Sprint 1 |
+| Semua path lain | `src/app/SmartApp.jsx` | **SmartDashboard Aquaponik** — bagian utama |
 
 UI demo lama (`/demo/*`, `src/App.jsx`) **sudah dihapus seluruhnya**.
 
@@ -210,7 +212,7 @@ tidak ada geser horizontal di semua kombinasi.
 | `/detail-informasi` | Detail Information (QR) | **Pindai QR alat** pakai kamera → penjelasan lengkap alat: jenis, fungsi, parameter + ambang ideal, pembacaan saat ini, arti tiap status, dan catatan perawatan. Bisa juga lewat input manual kode alat |
 | `/area` | Kelola Area | Daftar area produksi (kolam/growbed/tandon) + HPP tercatat |
 | `/area/:id` | Detail Area | **Input item HPP** (perhitungan total & per unit otomatis), **statistik harian sensor**, **catat ikan mati harian** (kolam saja, populasi ikut disesuaikan), **pemantauan kolam** (pH, suhu, TDS, catatan), **catat panen** + margin untung/rugi, daftar device di area |
-| `/v-pet` | V-Pet | Kartu pet terpisah; detail perawatan, sensor, jumlah ikan tersisa, dan ikan mati hari ini dari kolam yang ditautkan (hanya lihat). Karakter kiriman pengguna dipilih menurut spesies dan level; gambar level khusus mengungguli gambar dasar, spesies tanpa aset tetap placeholder. EXP bertambah 1 tiap 2 poin peningkatan bersih pada Kenyang, Kebersihan, atau Kesehatan (dibulatkan ke atas); Ajak main hanya menaikkan Kebahagiaan |
+| `/v-pet` | V-Pet | Kartu pet terpisah; detail perawatan ikan, sensor, jumlah ikan tersisa, dan ikan mati hari ini dari kolam yang ditautkan (hanya lihat). Nila dan Gurame memakai EXP dari kegiatan/quest ikan; Kangkung terpasang di Kolam Nila A dan mendapat +10 EXP maksimal sekali per tanggal lokal bila pembacaan pH, suhu, dan TDS tersedia serta semuanya berada dalam ambang aktif area. Kangkung tidak menerima EXP quest ikan. Karakter mengikuti spesies, level, dan kondisi dari GIF yang tersedia; aset yang tidak tersedia memakai placeholder. |
 | `/gamifikasi` | Gamifikasi | Misi harian, koleksi badge, papan peringkat, riwayat perolehan poin |
 | `/chatbot` | Chatbot Aquaponik | Tanya-jawab seputar aquaponik (ikan & sayur) berbasis basis pengetahuan lokal, menyertakan pembacaan sensor area terpilih |
 
@@ -232,35 +234,44 @@ nama alat, kategori, deskripsi, daftar fungsi, lokasi, dan status unit.
 
 ---
 
-## 4. Struktur berkas yang ditambahkan/diubah
+## 4. Struktur folder berdasarkan fitur
 
-### 4.1 Berkas baru (22 berkas, ~4.400 baris)
+### 4.1 Peta folder
 
+Panduan lengkap dan contoh mengubah v-pet tersedia di [Panduan struktur proyek](docs/struktur-proyek.md). Daftar halaman tiap fitur tersedia di [README fitur](src/README.md).
+
+```text
+src/
+  main.jsx           Pemilih aplikasi utama atau pilot
+  app/               Router, layout sidebar/topbar, gaya global
+  dashboard/  Dashboard
+  dashboard-pengelola/  Dashboard Pengelola
+  list-iot/  List IoT
+  detail-information/  Detail Information
+  kelola-iot/  Kelola IoT
+  kategori-device/  Kategori Device
+  kelola-area/  Kelola Area
+  v-pet/  V-Pet
+  kelola-virtual-pet/  Kelola Virtual Pet
+  gamifikasi/  Gamifikasi
+  sistem-point/  Sistem Point
+  chatbot-aquaponik/  Chatbot Aquaponik
+  masuk/  Masuk
+  daftar/  Daftar
+  profil-saya/  Profil Saya
+  pilot/  Pilot PostgreSQL
+  shared/            Komponen umum, gabungan data awal, state lintas fitur
+  assets/            Aset umum
+server/
+  index.ts           Entry API dan perintah migrasi/admin
+  database/          Koneksi, transaksi, schema, migrations/
+  features/          Helper akun, model/simulator IoT, API pilot
+  shared/            Kontrak domain lintas fitur backend
+tests/               Tes v-pet, area, dan backend
+scripts/             Skrip v-pet, pilot, dan Docker
 ```
-src/SmartApp.jsx                   150  Shell aplikasi: router, judul halaman, toast
-src/store/SmartStore.jsx           940  Sumber data tunggal (state global + aksi)
-src/data/seed.js                   319  Seluruh data awal + basis pengetahuan chatbot
-src/components/ui.jsx              294  Komponen dasar + sistem ukuran (UKURAN: sm/md/lg) & IconButton
-src/components/SmartSidebar.jsx    155  Sidebar + definisi menu per role
-src/components/SmartTopBar.jsx      72  Top bar: status device, tema, reset demo (IconButton)
-src/components/QrCode.jsx           46  QR asli (paket qrcode) berisi kode alat
-src/components/QrScanner.jsx       180  Pemindai QR kamera (BarcodeDetector bawaan browser), dipakai pengguna & pengelola
-src/components/PanelInfoAlat.jsx   312  Panel penjelasan alat — dipakai BERSAMA pengguna & pengelola
-src/components/AksiQr.jsx           210  Tombol Unduh PNG / Salin isi QR / Cetak label (satu sumber, keempat pintu QR)
-src/services/aquaBot.js            139  Mesin pencarian jawaban chatbot
-src/services/iotInfo.js             62  Resolver isi QR alat (3 format: kode ringkas/URL/kode alat)
 
-src/pages/Login.jsx                174  Masuk + tautan ke pendaftaran
-src/pages/Daftar.jsx               274  Daftar akun sendiri (operator langsung aktif, pengelola perlu persetujuan)
-src/pages/Dashboard.jsx            342  Role pengguna
-src/pages/ListIot.jsx              362  (termasuk komponen DeviceDetail; modal QR pakai panel bersama)
-src/pages/DetailInformation.jsx    183  Pindai QR alat -> penjelasan lengkap perangkat (panel bersama)
-src/pages/KelolaArea.jsx           169
-src/pages/AreaDetail.jsx           433
-src/pages/VPet.jsx                 169
-src/pages/Gamifikasi.jsx           198
-src/pages/Chatbot.jsx              185
-src/pages/Profil.jsx               237  Termasuk tombol Keluar
+Folder fitur mengikuti nama menu. Nama menu yang berbeda memiliki folder tersendiri; halaman pengguna dan pengelola dengan nama menu yang sama tetap dikelompokkan bersama. Data awal yang sebelumnya terkumpul dalam satu file sudah dipisahkan ke folder `data/` masing-masing fitur; `src/shared/data/seed.js` hanya menggabungkan export untuk state global.
 
 ### Detail Information — memindai QR alat
 
@@ -273,7 +284,7 @@ menerima tiga bentuk isi QR, karena label lama mungkin sudah dicetak/ditempel di
 | URL halaman | `http://.../iot/IOT-001` | ambil ID perangkat dari URL |
 | Kode alat saja | `AQ-PH-001` | cari perangkat lewat kode alat |
 
-Resolver-nya `cariPerangkat(devices, teks)` di `src/services/iotInfo.js`, dan isi QR-nya
+Resolver-nya `cariPerangkat(devices, teks)` di `src/detail-information/services/iotInfo.js`, dan isi QR-nya
 dihasilkan oleh **satu** fungsi `ambilKodeAlat(device)` di store — dipakai halaman List IoT
 dan Kelola IoT. Jadi label yang dicetak pengelola pasti terbaca oleh pengguna.
 
@@ -281,12 +292,13 @@ Hasil pemindaian menjelaskan: jenis & lokasi alat, fungsi alat dalam sistem, tia
 beserta ambang idealnya, pembacaan saat ini dibanding ambang, arti tiap status, dan catatan
 perawatan yang menyesuaikan jenis alat.
 
-Pemindai kamera memakai `BarcodeDetector` bawaan Chrome/Edge — tanpa library tambahan.
-Browser yang belum mendukungnya mendapat pesan jujur, dan kolom kode tetap tersedia di
-kartu yang sama. Hak akses dijaga: pengguna hanya bisa membuka alat di area yang diampu.
+Kamera dibuka melalui `getUserMedia` setelah pengguna menekan **Pindai QR alat**. QR dibaca dengan `BarcodeDetector` bila tersedia, atau decoder software `jsqr` bila browser tidak menyediakan API native. Kamera memerlukan HTTPS atau `localhost` serta izin kamera; bila perangkat/browser tidak punya kamera, kode alat tetap bisa dimasukkan manual. Pada ponsel yang melaporkan kamera depan dan belakang, tombol `Depan` atau `Belakang` tersedia untuk berganti arah.
+Jika kamera tidak tersedia, izinnya ditolak, atau perangkat tidak menemukannya, pemindai
+menjelaskan penyebabnya dan kolom kode tetap tersedia. Hak akses dijaga: pengguna hanya bisa
+membuka alat di area yang diampu.
 
 **Penjelasan alat itu satu sumber, dipakai EMPAT tempat.** Isi penjelasannya tinggal di
-`src/components/PanelInfoAlat.jsx` dan dipakai oleh:
+`src/shared/iot/components/PanelInfoAlat.jsx` dan dipakai oleh:
 
 | Tempat | Role | Cara membuka |
 | --- | --- | --- |
@@ -306,7 +318,7 @@ perangkat, pengelola melihat tombol menuju halaman pengelola.
 ### Mengatur QR: yang bisa & belum bisa dilakukan pengelola
 
 **Tombol aksi pada kartu QR** (untuk KEDUA role, karena semuanya berasal dari satu
-komponen `src/components/AksiQr.jsx`):
+komponen `src/shared/qr/components/AksiQr.jsx`):
 
 | Tombol | Yang terjadi |
 | --- | --- |
@@ -346,27 +358,17 @@ dengan skala Windows 150%) sampai 1440px: dua tombol aksi rata dalam satu baris,
 menyisakan ruang kosong besar (43px → 21px), QR sejajar dengan teks penjelasnya, dan baris
 judul alat rata kiri konsisten.
 
-src/pages/admin/AdminDashboard.jsx 160  Role pengelola
-src/pages/admin/AdminUsers.jsx     296  Termasuk pembuatan akun + persetujuan pendaftar
-src/pages/admin/AdminIot.jsx       242
-src/pages/admin/AdminDetailInformation.jsx 232  Detail Information versi pengelola (panel bersama + pemindai kamera)
-src/pages/admin/AdminCategories.jsx 215
-src/pages/admin/AdminAreas.jsx     312
-src/pages/admin/AdminVPet.jsx      159
-src/pages/admin/AdminPoints.jsx    238
-```
-
-### 4.2 Berkas yang diubah (9)
+### 4.2 Catatan perubahan tampilan
 
 | Berkas | Perubahan |
 | --- | --- |
 | `src/main.jsx` | Pemilih aplikasi: `/pilot` → `PilotApp.jsx`, lainnya → `SmartApp.jsx` (sebelumnya `/demo` → `App.jsx`) |
-| `src/PilotApp.jsx` | Tautan "Lihat UI lama" diganti menjadi "Kembali ke SmartDashboard Aquaponik" |
-| `src/components/SmartSidebar.jsx` | Sidebar tampil otomatis dari 640px (sebelumnya 1024px); lebar menyesuaikan lebar layar |
-| `src/components/SmartTopBar.jsx` | Tombol menu hanya muncul di bawah 640px |
-| `src/components/ui.jsx` | `min-w-0` pada Card/StatCard/input agar tabel dan input tidak memaksa halaman melebar |
-| `src/SmartApp.jsx` | Jarak kiri konten mengikuti lebar sidebar (`sm:pl-56 md:pl-64 xl:pl-72`) |
-| `src/index.css` | `overflow-x: hidden` juga di `html`, bukan hanya `body` |
+| `src/pilot/PilotApp.jsx` | Tautan "Lihat UI lama" diganti menjadi "Kembali ke SmartDashboard Aquaponik" |
+| `src/app/layout/SmartSidebar.jsx` | Sidebar tampil otomatis dari 640px (sebelumnya 1024px); lebar menyesuaikan lebar layar |
+| `src/app/layout/SmartTopBar.jsx` | Tombol menu hanya muncul di bawah 640px |
+| `src/shared/components/ui.jsx` | `min-w-0` pada Card/StatCard/input agar tabel dan input tidak memaksa halaman melebar |
+| `src/app/SmartApp.jsx` | Jarak kiri konten mengikuti lebar sidebar (`sm:pl-56 md:pl-64 xl:pl-72`) |
+| `src/app/styles/index.css` | `overflow-x: hidden` juga di `html`, bukan hanya `body` |
 | `package.json` | Tambah dependency `qrcode` untuk QR alat |
 | `package-lock.json` | Ikut menyesuaikan dependency |
 
@@ -394,7 +396,7 @@ UI demo lama beserta state/simulator/RAG-nya:
 
 ## 5. Arsitektur data
 
-Seluruh state aplikasi terpusat di **`src/store/SmartStore.jsx`** melalui satu provider
+Seluruh state aplikasi terpusat di **`src/shared/store/SmartStore.jsx`** melalui satu provider
 (`SmartProvider` / hook `useSmart`). Tidak ada komponen yang menyimpan data penting
 sendiri-sendiri.
 
@@ -464,7 +466,7 @@ juga menampilkan seluruh aturan yang dikonfigurasi.
 | Yang tampak hidup | Sebenarnya |
 | --- | --- |
 | Nilai sensor berubah tiap 5 detik | `setInterval` di `SmartStore.jsx` menambah angka acak kecil (simulasi) |
-| 3 perangkat IoT (IOT-001 … IOT-003: pH, suhu, TDS) | Data tulisan tangan di `src/data/seed.js` |
+| 3 perangkat IoT (IOT-001 … IOT-003: pH, suhu, TDS) | Data awal di `src/kelola-iot/data/devices.js` |
 | Riwayat harian (titik tiap 30 menit) | Dibuat sekali saat app dimuat dari pola acak, bukan hasil pembacaan alat |
 | Status Terhubung/Perlu perhatian/Offline | Teks statis di data, bukan hasil ping ke alat |
 | QR alat | QR asli & valid, tetapi isinya URL halaman web — bukan data dari alat |
@@ -628,7 +630,7 @@ sehingga penangkapan penuh waktu habis).
 
 ## 9. Portal tampilan: satu sistem ukuran
 
-Seluruh halaman memakai **satu skala ukuran** dari `src/components/ui.jsx` (`UKURAN`).
+Seluruh halaman memakai **satu skala ukuran** dari `src/shared/components/ui.jsx` (`UKURAN`).
 Sebelumnya tiap halaman menulis padding tombolnya sendiri sehingga tinggi tombol berbeda-beda
 (20/24/30/33/36/38/60/66 px) dan baris tombol tampak melenceng. Aturan yang berlaku:
 

@@ -10,9 +10,9 @@ Catatan berlaku per batch/cohort, bukan identitas ikan individual. Tanpa penanda
 
 ## Konteks yang diverifikasi
 
-- `src/pages/admin/AdminAreas.jsx` membuat/mengubah kolam dengan komoditas, populasi, status, dan HPP; belum ada entitas batch.
-- `src/pages/AreaDetail.jsx` menerima mortalitas harian per area, item HPP area, dan panen dengan jumlah/satuan/nilai jual manual.
-- `src/store/SmartStore.jsx` menerapkan perubahan mortalitas ke populasi memakai delta agar koreksi catatan harian tidak mengurangi populasi dua kali.
+- `src/kelola-area/pages/AdminAreas.jsx` membuat/mengubah kolam dengan komoditas, populasi, status, dan HPP; belum ada entitas batch.
+- `src/kelola-area/pages/AreaDetail.jsx` menerima mortalitas harian per area, item HPP area, dan panen dengan jumlah/satuan/nilai jual manual.
+- `src/shared/store/SmartStore.jsx` menerapkan perubahan mortalitas ke populasi memakai delta agar koreksi catatan harian tidak mengurangi populasi dua kali.
 - Seed area saat ini memiliki item HPP bibit, misalnya “Benih nila gesit” dan “Benih lele sangkuriang”. Biaya bibit tidak boleh dihitung lagi sebagai HPP setelah dibuat sebagai biaya batch.
 - Domain SmartDashboard masih lokal; migrasi PostgreSQL 003 belum diterapkan ke database aktif. Migrasi aktif terakhir yang diverifikasi adalah versi 1.
 

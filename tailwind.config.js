@@ -9,6 +9,7 @@ export default {
     extend: {
       colors: {
         primary: "#0f5238",
+        "primary-action": "rgb(var(--c-primary-action) / <alpha-value>)",
         "primary-container": "#2d6a4f",
         "on-primary": "#ffffff",
         "on-primary-container": "#a8e7c5",
@@ -39,7 +40,7 @@ export default {
         // ── Token semantik (dipakai ~300x di seluruh halaman) ─────────────────
         // Nilainya adalah CSS variable dalam bentuk triplet RGB agar modifier
         // opacity Tailwind (mis. border-outline-variant/40) tetap bekerja.
-        // Variable diisi di src/index.css: nilai terang di :root, nilai gelap di
+        // Variable diisi di src/app/styles/index.css: nilai terang di :root, nilai gelap di
         // .dark. JANGAN kembalikan ke hex statis — hex statis membuat dark mode
         // memakai warna tema terang (teks #191c1d di atas latar gelap, kontras
         // 1.01:1 sehingga tidak terbaca).

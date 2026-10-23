@@ -7,7 +7,12 @@
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["*.ts"]
+  "include": [
+    "**/*.ts",
+    "../tests/server/**/*.ts"
+  ]
 }

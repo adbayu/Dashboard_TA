@@ -13,9 +13,9 @@ Tech Stack: PostgreSQL 17, Fastify 5, `pg`, Node.js built-in test runner, React 
 ## Verified constraints and contracts
 
 - Current branch: `dev/antigravity`; do not switch branches, merge `origin/feat/iot-system`, or push.
-- Current worktree has unrelated local changes in Docker, `server/app.ts`, `server/index.ts`, `server/pilot.test.ts`, V-Pet and documentation. Never stage them accidentally. Commit only exact plan/spec/code hunks for this work.
+- Current worktree has unrelated local changes in Docker, `server/features/pilot/app.ts`, `server/index.ts`, `tests/server/pilot/pilot.test.ts`, V-Pet and documentation. Never stage them accidentally. Commit only exact plan/spec/code hunks for this work.
 - The active PostgreSQL schema is version 1. It contains 4 users (1 Pilot admin, 3 Pilot users), 4 devices, 4 ownerships, and 2,086 readings. Preserve all records and identifiers.
-- Existing schema is `server/schema.sql`; `server/db.ts` currently runs it as one transaction. `server/app.ts` uses the `pilot_session` cookie, scrypt password hashes, Origin checks, and Pilot-specific 10-account/20-device limits.
+- Existing schema is `server/database/schema.sql`; `server/database/db.ts` currently runs it as one transaction. `server/features/pilot/app.ts` uses the `pilot_session` cookie, scrypt password hashes, Origin checks, and Pilot-specific 10-account/20-device limits.
 - `origin/feat/iot-system` has numbered migrations 001/002, `sensor_types`, `device_types`, `device_type_sensors`, `area_thresholds`, `device_events`, API key/usage tables, and reading ingestion metadata. Migration 002's warning defaults match the current SmartDashboard seed. Its TDS 0-5000 ppm envelope is explicitly provisional upstream, so preserve it as catalog metadata but do not present or enforce it as a verified hardware maximum until the sensor specification is confirmed. Omit its three sample device inserts during schema upgrade.
 - Existing dashboard identifiers are strings such as `AR-01`, `IOT-001`, `U-001`, `MON-1`, `H-1`, `HV-1`, and `PET-*`; Pilot IDs are UUIDs. Preserve dashboard IDs in `legacy_id` fields or a deterministic import map. `temp` in SmartDashboard maps to canonical IoT sensor code `water_temperature`.
 - Preserve Pilot role meanings (`admin/user`) and Pilot quota semantics. Add separate dashboard role/status and a Pilot-scope marker so Dashboard-only users/devices do not consume Pilot caps. Do not trust role, status, area assignment, points, or IDs sent by the browser.
@@ -40,8 +40,8 @@ Tech Stack: PostgreSQL 17, Fastify 5, `pg`, Node.js built-in test runner, React 
 Objective: Make migration and Dashboard API tests run in a disposable PostgreSQL schema, never the public schema.
 
 Files:
-- Create `server/testDb.ts` for random-schema pool setup/cleanup, or extract the existing setup from `server/pilot.test.ts` without changing its behavior.
-- Create `server/db.test.ts` for migration ordering/atomicity cases.
+- Create `tests/server/support/testDb.ts` for random-schema pool setup/cleanup, or extract the existing setup from `tests/server/pilot/pilot.test.ts` without changing its behavior.
+- Create `tests/server/database/db.test.ts` for migration ordering/atomicity cases.
 - Modify `package.json` to expose a combined API test command if separate test files are added.
 
 Steps:
@@ -55,10 +55,10 @@ Steps:
 Objective: Replace the monolithic runner with ordered, transactional numbered migrations while recognizing the already-applied version 1.
 
 Files:
-- Create `server/migrations/001_pilot.sql` from the verified current Pilot baseline in `server/schema.sql`.
-- Modify `server/db.ts` to discover `NNN_name.sql`, acquire advisory lock `90260909`, run each pending migration in its own transaction, and record each version after successful SQL.
+- Create `server/database/migrations/001_pilot.sql` from the verified current Pilot baseline in `server/database/schema.sql`.
+- Modify `server/database/db.ts` to discover `NNN_name.sql`, acquire advisory lock `90260909`, run each pending migration in its own transaction, and record each version after successful SQL.
 - Modify `server/index.ts` to report versions newly applied in this invocation separately from the current schema version, including no-op reruns.
-- Remove `server/schema.sql` only after the new baseline and tests prove equivalent; otherwise leave it documented as a frozen legacy reference and ensure runtime no longer executes it.
+- Remove `server/database/schema.sql` only after the new baseline and tests prove equivalent; otherwise leave it documented as a frozen legacy reference and ensure runtime no longer executes it.
 
 Steps:
 1. Add tests for numeric ordering, malformed filename rejection, skip of applied versions, rollback on SQL error, and repeat-run idempotence.
@@ -71,8 +71,8 @@ Steps:
 Objective: Add the colleague branch's IoT catalog/ingestion contract without adding fake device rows or changing existing Pilot readings.
 
 Files:
-- Create `server/migrations/002_iot_platform.sql`, based on `origin/feat/iot-system:server/migrations/002_iot_platform.sql` after review.
-- Modify `server/pilot.test.ts` only for compatibility assertions; preserve existing tests and current local changes.
+- Create `server/database/migrations/002_iot_platform.sql`, based on `origin/feat/iot-system:server/database/migrations/002_iot_platform.sql` after review.
+- Modify `tests/server/pilot/pilot.test.ts` only for compatibility assertions; preserve existing tests and current local changes.
 
 Steps:
 1. Add migration tests for the catalog tables, device/readings columns, legacy model-to-type mapping, and 4 existing Pilot devices/readings retained.
@@ -85,8 +85,8 @@ Steps:
 Objective: Create normalized tables and constraints for every role feature that needs persistent data.
 
 Files:
-- Create `server/migrations/003_dashboard_domain.sql`.
-- Add migration tests in `server/db.test.ts` or `server/dashboard.test.ts`.
+- Create `server/database/migrations/003_dashboard_domain.sql`.
+- Add migration tests in `tests/server/database/db.test.ts` or `server/dashboard.test.ts`.
 
 Steps:
 1. Test required table/constraint behavior first: dashboard profile/roles, areas, categories, user-area assignments, monitoring, mortality, HPP, harvests, pets/care, point rules, missions/progress, badges/claims, ledger and import batches.
@@ -101,7 +101,7 @@ Steps:
 Objective: Verify old Pilot rows survive the numbered migration sequence before touching the active volume.
 
 Files:
-- Modify `server/db.test.ts` and `server/pilot.test.ts`.
+- Modify `tests/server/database/db.test.ts` and `tests/server/pilot/pilot.test.ts`.
 
 Steps:
 1. In a random test schema, create the exact v1 baseline and insert fixture rows for users/devices/ownerships/readings, then mark version 1 applied.
@@ -115,7 +115,7 @@ Objective: Derive Dashboard access from the server session and enforce least pri
 
 Files:
 - Create `server/dashboardAuth.ts` for profile loading and authorization helpers.
-- Modify `server/app.ts` to register the dashboard routes/hooks without changing existing Origin/Cookie/CSRF behavior.
+- Modify `server/features/pilot/app.ts` to register the dashboard routes/hooks without changing existing Origin/Cookie/CSRF behavior.
 - Add tests in `server/dashboard.test.ts`.
 
 Steps:
@@ -129,8 +129,8 @@ Steps:
 Objective: Replace client-only login/profile/password storage with the existing server identity/session system.
 
 Files:
-- Modify `server/app.ts` or create `server/dashboardRoutes.ts` and register it from `server/app.ts`.
-- Modify `server/domain.ts` only if password validation/hash helpers need shared tests.
+- Modify `server/features/pilot/app.ts` or create `server/dashboardRoutes.ts` and register it from `server/features/pilot/app.ts`.
+- Modify `server/shared/domain.ts` only if password validation/hash helpers need shared tests.
 - Add auth/profile cases in `server/dashboard.test.ts`.
 
 Steps:
@@ -189,7 +189,7 @@ Steps:
 Objective: Make pet care, EXP, missions, badge claims, and points server-authoritative.
 
 Files:
-- Modify `server/dashboardRoutes.ts` and existing pure logic in `src/data/petProgress.js` only if shared rules need server tests or a mirrored server helper.
+- Modify `server/dashboardRoutes.ts` and existing pure logic in `src/v-pet/model/petProgress.js` only if shared rules need server tests or a mirrored server helper.
 - Add tests to `server/dashboard.test.ts` and targeted `.mjs` tests for shared pure calculations.
 
 Steps:
@@ -219,7 +219,7 @@ Objective: Centralize API calls and structured loading/error handling.
 
 Files:
 - Create `src/services/dashboardApi.js`.
-- Reuse or factor `src/services/pilotApi.js` for same-origin credentials, timeouts, and structured errors.
+- Reuse or factor `src/pilot/services/pilotApi.js` for same-origin credentials, timeouts, and structured errors.
 - Add focused Node tests only if the project test harness can import the service without Vite transforms; otherwise verify through browser tests.
 
 Steps:
@@ -232,8 +232,8 @@ Steps:
 Objective: Keep the existing `useSmart` API for page components while making PostgreSQL the domain source of truth.
 
 Files:
-- Modify `src/store/SmartStore.jsx`.
-- Modify `src/SmartApp.jsx` for initial loading, API error and empty states.
+- Modify `src/shared/store/SmartStore.jsx`.
+- Modify `src/app/SmartApp.jsx` for initial loading, API error and empty states.
 - Add store/domain tests in available existing test scripts.
 
 Steps:
@@ -248,8 +248,8 @@ Steps:
 Objective: Keep current user workflows while saving all domain changes through the API.
 
 Files:
-- Modify `src/store/SmartStore.jsx` action implementations.
-- Update `src/pages/AreaDetail.jsx`, `src/pages/ListIot.jsx`, `src/pages/VPet.jsx`, `src/pages/Gamifikasi.jsx`, and `src/pages/Profil.jsx` only where async results/loading/errors need handling.
+- Modify `src/shared/store/SmartStore.jsx` action implementations.
+- Update `src/kelola-area/pages/AreaDetail.jsx`, `src/list-iot/pages/ListIot.jsx`, `src/v-pet/pages/VPet.jsx`, `src/gamifikasi/pages/Gamifikasi.jsx`, and `src/profil-saya/pages/Profil.jsx` only where async results/loading/errors need handling.
 
 Steps:
 1. Replace local mutations for profile, device details, monitoring, mortality, HPP, harvest, pet care, mission completion and badge claims with server calls.
@@ -262,8 +262,8 @@ Steps:
 Objective: Make manager edits change the same records read by users.
 
 Files:
-- Modify `src/store/SmartStore.jsx` manager action implementations.
-- Update `src/pages/admin/AdminUsers.jsx`, `AdminIot.jsx`, `AdminCategories.jsx`, `AdminAreas.jsx`, `AdminVPet.jsx`, and `AdminPoints.jsx` for async feedback/errors.
+- Modify `src/shared/store/SmartStore.jsx` manager action implementations.
+- Update `src/kelola-user/pages/AdminUsers.jsx`, `AdminIot.jsx`, `AdminCategories.jsx`, `AdminAreas.jsx`, `AdminVPet.jsx`, and `AdminPoints.jsx` for async feedback/errors.
 
 Steps:
 1. Connect account approval/area assignment, category/device/area configuration, pet configuration and point rules to API endpoints.
@@ -276,7 +276,7 @@ Steps:
 Objective: Remove plaintext demo credentials and let users deliberately import their legacy snapshot.
 
 Files:
-- Modify `src/pages/Login.jsx`, `Daftar.jsx`, `Profil.jsx`, `src/data/seed.js`, `src/SmartApp.jsx`, and add an import dialog/page component.
+- Modify `src/masuk/pages/Login.jsx`, `Daftar.jsx`, `Profil.jsx`, `src/shared/data/seed.js`, `src/app/SmartApp.jsx`, and add an import dialog/page component.
 
 Steps:
 1. Remove the publicly displayed demo password and client-side password reset path. Use same-origin server login and password rules aligned with backend.
@@ -310,8 +310,8 @@ Amandemen ini tidak menambah fase bernomor baru. Jalankan tiap kelompok di dalam
 **Objective:** Persistensikan spesies/harga, batch tebar, bobot, mortalitas, panen, dan biaya tertaut tanpa menghitung bibit dua kali.
 
 **Files:**
-- Modify `server/migrations/003_dashboard_domain.sql`.
-- Modify `server/db.test.ts`.
+- Modify `server/database/migrations/003_dashboard_domain.sql`.
+- Modify `tests/server/database/db.test.ts`.
 
 **Steps:**
 1. Tambahkan failing isolated migration tests untuk tabel/constraint: `fish_species`, `fish_species_prices`, `fish_stocking_batches`, `fish_growth_samples`, `fish_mortality_events`, `fish_batch_harvests`, dan `fish_batch_adjustments`; selaraskan nama final dengan domain tables Task 4. Uji jumlah awal/sampel positif, harga nonnegatif, unique sampel per batch/tanggal, mortalitas per batch/tanggal, histori legacy per area/tanggal, FK, dan indeks.
@@ -368,13 +368,13 @@ Amandemen ini tidak menambah fase bernomor baru. Jalankan tiap kelompok di dalam
 **Objective:** Pengguna melihat dan mencatat data batch hanya pada area tugasnya, dengan label estimasi/aktual yang jelas.
 
 **Files:**
-- Modify `src/services/dashboardApi.js`, `src/store/SmartStore.jsx`, `src/pages/AreaDetail.jsx`, dan kontrak terkait di `server/dashboard.test.ts`.
+- Modify `src/services/dashboardApi.js`, `src/shared/store/SmartStore.jsx`, `src/kelola-area/pages/AreaDetail.jsx`, dan kontrak terkait di `server/dashboard.test.ts`.
 
 **Steps:**
 1. Tambahkan failing API/bootstrap tests di `server/dashboard.test.ts` untuk batch, spesies, harga terbaru, bobot, mortalitas, panen, dan HPP tertaut; sertakan API error/empty responses.
 2. Jalankan `npm run test:pilot`; pastikan kontrak baru gagal sebelum client/store terhubung.
 3. Implementasikan service/store actions async; state diubah dari respons server dan mutasi memakai idempotency key. API failure tidak fallback ke seed/localStorage sebagai kebenaran.
-4. Ubah `src/pages/AreaDetail.jsx` untuk menampilkan umur, jumlah hidup, sampel terbaru/tanggal, laju pertumbuhan bila ada dua sampel, nilai stok berlabel estimasi, kerugian bibit langsung, dan panen aktual. Tambahkan form sampel, mortalitas, serta panen (ekor, kg, harga aktual diawali harga acuan); bila ada beberapa batch, pengguna wajib memilih batch.
+4. Ubah `src/kelola-area/pages/AreaDetail.jsx` untuk menampilkan umur, jumlah hidup, sampel terbaru/tanggal, laju pertumbuhan bila ada dua sampel, nilai stok berlabel estimasi, kerugian bibit langsung, dan panen aktual. Tambahkan form sampel, mortalitas, serta panen (ekor, kg, harga aktual diawali harga acuan); bila ada beberapa batch, pengguna wajib memilih batch.
 5. Uji empty/loading/error state, akses direct-ID, dan mutasi pada browser lokal; pastikan pengguna area lain tidak melihat data.
 6. Jalankan `npm run test:pilot`, `npm run test:vpet`, `npm run typecheck`, dan `node node_modules/vite/bin/vite.js build`.
 
@@ -383,13 +383,13 @@ Amandemen ini tidak menambah fase bernomor baru. Jalankan tiap kelompok di dalam
 **Objective:** Pengelola membuat batch tebar awal untuk kolam aktif dan mengatur harga per spesies tanpa mengubah histori transaksi.
 
 **Files:**
-- Modify `src/pages/admin/AdminAreas.jsx`, `src/pages/AreaDetail.jsx`, `src/store/SmartStore.jsx`, `src/services/dashboardApi.js`, dan `server/dashboard.test.ts`.
+- Modify `src/kelola-area/pages/AdminAreas.jsx`, `src/kelola-area/pages/AreaDetail.jsx`, `src/shared/store/SmartStore.jsx`, `src/services/dashboardApi.js`, dan `server/dashboard.test.ts`.
 
 **Steps:**
 1. Pastikan API tests Task 9 mencakup role dan validasi kolam; tambahkan regression test HPP tertaut/umum di `server/dashboard.test.ts`.
 2. Jalankan `npm run test:pilot` dan pastikan regression test gagal sebelum HPP batch linking selesai.
-3. Implementasikan form kolam aktif di `src/pages/admin/AdminAreas.jsx` dengan spesies, tanggal tebar, jumlah bibit, harga/ekor, total otomatis, dan populasi turunan; status istirahat boleh kosong.
-4. Tampilkan spesies dipelihara dan form harga/kg bertanggal berlaku; perubahan harga tersimpan sebagai histori. Tambahkan pilihan batch opsional di form HPP pada `src/pages/AreaDetail.jsx`; bibit awal hanya dihitung melalui batch.
+3. Implementasikan form kolam aktif di `src/kelola-area/pages/AdminAreas.jsx` dengan spesies, tanggal tebar, jumlah bibit, harga/ekor, total otomatis, dan populasi turunan; status istirahat boleh kosong.
+4. Tampilkan spesies dipelihara dan form harga/kg bertanggal berlaku; perubahan harga tersimpan sebagai histori. Tambahkan pilihan batch opsional di form HPP pada `src/kelola-area/pages/AreaDetail.jsx`; bibit awal hanya dihitung melalui batch.
 5. Jalankan `npm run test:pilot`, `npm run typecheck`, `npm run lint`, dan `node node_modules/vite/bin/vite.js build`; uji alur pengelola serta visibilitas update lintas role di browser lokal.
 
 ### Task 18 amendment — verifikasi ekonomi dan audit UI AFTER
@@ -397,8 +397,8 @@ Amandemen ini tidak menambah fase bernomor baru. Jalankan tiap kelompok di dalam
 **Objective:** Buktikan perhitungan batch dan akses kedua role konsisten tanpa menyentuh database aktif sebelum preflight migration utama lulus.
 
 **Files:**
-- Tests: `server/db.test.ts`, `server/dashboard.test.ts`, `server/fishEconomics.test.ts`.
-- UI: `src/pages/admin/AdminAreas.jsx`, `src/pages/AreaDetail.jsx`.
+- Tests: `tests/server/database/db.test.ts`, `server/dashboard.test.ts`, `server/fishEconomics.test.ts`.
+- UI: `src/kelola-area/pages/AdminAreas.jsx`, `src/kelola-area/pages/AreaDetail.jsx`.
 
 **Steps:**
 1. Jalankan schema/API suite pada schema uji: `docker compose --env-file docker.env.example --env-file .env.docker.lan exec -T api sh -lc 'TEST_DATABASE_URL="$DATABASE_URL" npm run test:pilot'`.

@@ -4,7 +4,7 @@
 
 **Goal:** Redraw five original arcade-inspired virtual pets in editable per-species folders and show clear continuous swimming animation without crop or detached facial overlays.
 
-**Architecture:** Add independent SVG layers under `src/assets/v-pet/karakter-arcade/<species>/`. Extend the existing V-Pet layer loader to render those layers, keep expressions/accessories aligned against a documented shared canvas, and separate swimming path transforms from pose transforms. Keep the old asset tree available until the new art is browser-verified.
+**Architecture:** Add independent SVG layers under `src/v-pet/assets/karakter-arcade/<species>/`. Extend the existing V-Pet layer loader to render those layers, keep expressions/accessories aligned against a documented shared canvas, and separate swimming path transforms from pose transforms. Keep the old asset tree available until the new art is browser-verified.
 
 **Tech Stack:** React 19, Vite 8, SVG, CSS; no new package dependencies.
 
@@ -15,8 +15,8 @@
 **Objective:** Draw distinct, polished, complete silhouettes for nila, mas, lele, gurame, and udang as editable SVG parts.
 
 **Files:**
-- Create: `src/assets/v-pet/karakter-arcade/{nila,mas,lele,gurame,udang}/{tail,fins,body,details}.svg`
-- Test: `scripts/cek-aset.py`
+- Create: `src/v-pet/assets/karakter-arcade/{nila,mas,lele,gurame,udang}/{tail,fins,body,details}.svg`
+- Test: `scripts/v-pet/cek-aset.py`
 - Reference: approved `docs/superpowers/specs/2026-10-04-virtual-pet-arcade-redesign.md` and supplied user screenshot
 
 **Steps:**
@@ -28,7 +28,7 @@
 
 **Objective:** Switch species render to the new folder while preserving existing data keys and behaviors.
 
-**Files:** `src/components/PetKarakter.jsx`, `scripts/cek-aset.py`
+**Files:** `src/v-pet/components/PetKarakter.jsx`, `scripts/v-pet/cek-aset.py`
 
 **Steps:**
 1. Add nested glob mapping for `karakter-arcade/<species>/<part>.svg`; do not merge these with the old `karakter/` fallback map.
@@ -40,7 +40,7 @@
 
 **Objective:** Make motion unmistakable under normal settings while preserving accessible reduced-motion behavior.
 
-**Files:** `src/components/PetKarakter.jsx`, `src/pet.css`
+**Files:** `src/v-pet/components/PetKarakter.jsx`, `src/v-pet/styles/pet.css`
 
 **Steps:**
 1. Add separate wrapper elements/classes for path movement, pose movement, and independently animated tail/fins; do not stack conflicting transform animations on the same node.
@@ -52,7 +52,7 @@
 
 **Objective:** Ensure the files are easy to edit in Antigravity and the actual V-Pet page matches acceptance criteria.
 
-**Files:** `src/assets/v-pet/README.md`, `scripts/cek-aset.py`, affected component/styles
+**Files:** `src/v-pet/assets/README.md`, `scripts/v-pet/cek-aset.py`, affected component/styles
 
 **Steps:**
 1. Document the distinct `karakter-arcade` folder, layer names, canvas dimensions, face anchors, and animation controls.

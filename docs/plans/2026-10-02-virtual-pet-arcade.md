@@ -12,7 +12,7 @@
 
 ### Task 1: Define and validate modular character assets
 
-**Files:** `src/assets/v-pet/karakter/<species>/*.svg`, `scripts/cek-aset.py`
+**Files:** `src/v-pet/assets/karakter/<species>/*.svg`, `scripts/v-pet/cek-aset.py`
 
 - Inspect the asset validator's assumptions, then extend only as needed to permit per-species SVG folders and validate required layers for all five species.
 - Create independent SVG parts per animal: body, tail, fins/limbs, eyes/face details as applicable. Keep an original arcade-cartoon style, 240x160 composition coordinates, clean outlines and accessible forms.
@@ -20,7 +20,7 @@
 
 ### Task 2: Compose species-specific layers in the existing pet stage
 
-**Files:** `src/components/PetKarakter.jsx`, optional `src/components/pet/` helpers
+**Files:** `src/v-pet/components/PetKarakter.jsx`, optional `src/components/pet/` helpers
 
 - Adapt glob discovery to nested folders without changing existing expression/accessory/latar lookup.
 - Compose all five known species with species-to-layer metadata; keep `kunciKarakter` output stable.
@@ -29,7 +29,7 @@
 
 ### Task 3: Add swimming and reaction motion
 
-**Files:** `src/pet.css`, relevant SVG parts
+**Files:** `src/v-pet/styles/pet.css`, relevant SVG parts
 
 - Animate tail and fin layers with small species-appropriate motion plus gentle body drift.
 - Retain existing sikap classes; coordinate their animation with the new layer motion to avoid transform conflicts.
@@ -37,7 +37,7 @@
 
 ### Task 4: Document assets and verify integration
 
-**Files:** `src/assets/v-pet/README.md`
+**Files:** `src/v-pet/assets/README.md`
 
 - Document the per-species folder and layer naming conventions so individual SVG parts can be edited in Antigravity.
 - Run `npm run cek:aset`, Vite build via `node node_modules/vite/bin/vite.js build`, and targeted `npx --no-install oxlint src`.

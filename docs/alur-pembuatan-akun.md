@@ -165,13 +165,13 @@ Saat mengubah akun, kolom password dikosongkan agar password lama tetap dipakai.
 
 | Berkas | Peran dalam alur |
 | --- | --- |
-| `src/pages/Daftar.jsx` | Halaman pendaftaran + layar hasil pengajuan pengelola |
-| `src/pages/Login.jsx` | Tautan "Daftar di sini", info pendaftar menunggu, kartu akun demo |
-| `src/pages/admin/AdminUsers.jsx` | Pembuatan akun, panel persetujuan, ubah status, area |
-| `src/pages/Profil.jsx` | Pemilik akun mengganti password sendiri + Keluar |
-| `src/store/SmartStore.jsx` | `register()`, `setUserStatus()`, `saveUser()`, `login()` |
-| `src/data/seed.js` | `STATUS_AKUN`, `AVATAR_PILIHAN`, `DEMO_PASSWORD` |
-| `src/SmartApp.jsx` | Rute `/daftar` di luar gerbang login |
+| `src/daftar/pages/Daftar.jsx` | Halaman pendaftaran + layar hasil pengajuan pengelola |
+| `src/masuk/pages/Login.jsx` | Tautan "Daftar di sini", info pendaftar menunggu, kartu akun demo |
+| `src/kelola-user/pages/AdminUsers.jsx` | Pembuatan akun, panel persetujuan, ubah status, area |
+| `src/profil-saya/pages/Profil.jsx` | Pemilik akun mengganti password sendiri + Keluar |
+| `src/shared/store/SmartStore.jsx` | `register()`, `setUserStatus()`, `saveUser()`, `login()` |
+| `src/kelola-user/data/seed.js` | `STATUS_AKUN`, `AVATAR_PILIHAN`, `DEMO_PASSWORD` |
+| `src/app/SmartApp.jsx` | Rute `/daftar` di luar gerbang login |
 
 ---
 

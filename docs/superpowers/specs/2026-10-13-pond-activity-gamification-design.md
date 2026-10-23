@@ -55,30 +55,38 @@ Kolam harus bertipe `kolam`; pengguna harus memiliki akses ke area tersebut. Pet
 - Aksi ulang pada quest yang sudah selesai tetap boleh memperbarui kondisi pet atau membuat catatan yang sah, tetapi tidak memberi EXP quest kedua pada tanggal yang sama. Untuk catatan kematian, koreksi pada baris kolam/tanggal yang sama tidak dihitung sebagai event baru.
 - Batas poin Sistem Point tidak membatasi EXP quest. Aksi yang valid dapat memberi EXP quest walaupun batas poin akun sudah tercapai atau aturan poinnya nonaktif.
 - Aksi “Ajak main” tetap hanya menaikkan kebahagiaan dan tidak menyelesaikan quest EXP.
-- Quest menggunakan tanggal lokal yang sama dengan `hariKey()`. Saat tanggal berganti, daftar quest harian kembali belum selesai; riwayat penyelesaian lama tetap tersimpan.
+- Quest menggunakan tanggal lokal yang sama dengan `hariKey()`. Tepat setelah tengah malam lokal, status quest harian diperbarui walau halaman V-Pet tetap terbuka; completion kemarin tetap tersimpan sebagai riwayat, sedangkan EXP dan level tidak direset.
 - Pertahankan XP, level, tahap, dan ambang progres yang sudah tersimpan. Jalankan EXP quest melalui fungsi kenaikan level yang sama agar sisa EXP dan tahap tetap konsisten. Perubahan kondisi dari pakan/bersih/rawat tidak boleh menambah EXP lagi di luar quest.
 - Saldo poin, badge, level, dan EXP lama tidak dikurangi atau dihitung ulang. Tidak ada reward atau penyelesaian quest retroaktif dari data lama.
 
+### Quest bulanan pembersihan kolam
+
+- V-Pet memiliki quest bulanan “Pembersihan area kolam ikan”. Reset mengikuti pergantian bulan kalender lokal (`YYYY-MM`), terpisah dari reset quest harian.
+- Quest hanya selesai saat pengguna menyimpan catatan pembersihan fisik kolam melalui Kelola Area. Tombol “Bersihkan” pada V-Pet hanya mengubah kondisi pet dan tidak dihitung sebagai pembersihan kolam.
+- Quest memberi +10 EXP kepada semua V-Pet yang ditempatkan di kolam, paling banyak sekali per `questId + areaId + monthKey`. Quest bulanan ini tidak menambah poin akun.
+- Event pembersihan disimpan di `pondActivityEvents` dengan tanggal, bulan lokal, sumber event, dan catatan opsional. Penyelesaian disimpan di `petQuestCompletions` dengan penanda `period: 'monthly'`, `monthKey`, dan daftar pet penerima.
+- Event bertanggal lampau, area non-kolam, atau pengguna tanpa akses tidak menyelesaikan quest. Tidak ada perubahan IoT atau ambang sensor.
+
 ### Pencatatan idempoten
 
-Simpan state aktivitas `pondActivityEvents` dan penyelesaian `petQuestCompletions` secara persisten. Event aktivitas berisi ID pengguna, tanggal lokal, kode aktivitas, area/kolam, ID sumber stabil, waktu pencatatan, aturan poin, dan poin yang diberikan. Penyelesaian quest berisi `questId`, `areaId`, tanggal lokal, ID event sumber, ID pet penerima, dan +10 EXP per pet.
+Simpan state aktivitas `pondActivityEvents` dan penyelesaian `petQuestCompletions` secara persisten. Event aktivitas berisi ID pengguna, tanggal lokal, kode aktivitas, area/kolam, ID sumber stabil, waktu pencatatan, aturan poin, dan poin yang diberikan. Penyelesaian quest berisi `questId`, `areaId`, tanggal lokal, ID event sumber, ID pet penerima, dan +10 EXP per pet; penyelesaian bulanan juga memiliki `period: 'monthly'` dan `monthKey`.
 
-Kunci unik penyelesaian adalah `questId + areaId + tanggal lokal`. Catatan aktivitas valid tetap disimpan walau batas poin tercapai atau tidak ada pet di kolam; misi poin tetap dapat membaca event, tetapi quest EXP hanya memberi hadiah bila ada pet yang ditugaskan. Periksa ID sumber sebelum mencatat reward. Koreksi catatan kematian menggunakan event sumber yang sama untuk `areaId + tanggal`; tidak membuat penyelesaian quest kedua. Batas poin dihitung dari event/reward per aturan, bukan ledger tampilan yang dipangkas. Aktivitas bertanggal lampau atau gagal validasi tidak menerima poin atau EXP quest. Jangan memberi reward atau penyelesaian quest retroaktif.
+Kunci unik quest harian adalah `questId + areaId + tanggal lokal`; quest bulanan memakai `questId + areaId + monthKey`. Catatan aktivitas valid tetap disimpan walau batas poin tercapai atau tidak ada pet di kolam; misi poin tetap dapat membaca event, tetapi quest EXP hanya memberi hadiah bila ada pet yang ditugaskan. Periksa ID sumber sebelum mencatat reward. Koreksi catatan kematian menggunakan event sumber yang sama untuk `areaId + tanggal`; tidak membuat penyelesaian quest kedua. Batas poin dihitung dari event/reward per aturan, bukan ledger tampilan yang dipangkas. Aktivitas bertanggal lampau atau gagal validasi tidak menerima poin atau EXP quest. Jangan memberi reward atau penyelesaian quest retroaktif.
 
 ### Misi Gamifikasi dan quest V-Pet di UI
 
 - Halaman `/gamifikasi` menampilkan status misi poin berdasarkan `pondActivityEvents`, bukan centang manual. Misi status tidak memberi bonus poin kedua; poin akun hanya berasal dari aturan aktivitas.
-- Halaman `/v-pet` menampilkan quest harian sebagai checklist pada detail pet/kolam. Quest yang belum selesai terlihat belum dicentang; setelah aktivitas manual terkait tercatat, checklist otomatis tercentang dan menampilkan hadiah `+10 EXP`. Checkbox hanya indikator status, bukan kontrol klaim.
-- Saat quest pertama kali selesai, UI langsung menandai checklist, memperbarui EXP/bar level dan jurnal pet, lalu menampilkan pesan yang jelas, misalnya “Quest Bersihkan selesai (+10 EXP)”. Pesan poin akun ditampilkan terpisah agar tidak membingungkan.
-- Jika tombol aksi ditekan lagi setelah quest yang sama selesai hari itu, checklist tetap tercentang, EXP tidak bertambah lagi, dan UI memberi tahu bahwa reward harian sudah diterima. Perubahan kondisi pet yang sah tetap boleh terlihat.
-- Quest V-Pet: “Beri pakan”, “Bersihkan”, “Rawat”, dan “Cek kualitas air” (minimal dua parameter manual). Quest kematian/panen bersifat peristiwa, hanya muncul/selesai saat catatan nyata tersedia dan bukan target rutin harian.
+- Halaman `/v-pet` menampilkan quest harian dan bulanan sebagai checklist terpisah pada detail pet/kolam. Klik checkbox yang belum selesai langsung mengklaim quest, menandainya tercentang, dan memberi `+10 EXP` per pet. Aktivitas yang tercatat juga tetap dapat menyelesaikan quest otomatis. Klaim manual disimpan sebagai `sourceType: 'manual-checkbox'`, tanpa membuat `pondActivityEvents` atau poin akun.
+- Saat quest pertama kali selesai melalui checkbox atau aktivitas yang valid, UI memperbarui checklist, EXP/bar level dan jurnal pet, lalu menampilkan pesan yang jelas. Pesan EXP dan poin akun tetap terpisah.
+- Checkbox yang selesai dinonaktifkan. Klaim atau aktivitas ulang untuk quest yang sama pada kolam/periode itu tidak menambah EXP lagi; aktivitas nyata tetap boleh tercatat.
+- Quest V-Pet: “Beri pakan”, “Bersihkan”, “Rawat”, “Cek kualitas air”, dan “Pembersihan area kolam ikan”. Checkbox quest dapat diklaim langsung; catatan kematian/panen tetap merupakan quest peristiwa yang hanya muncul saat catatan nyata tersedia.
 - Kartu saldo, badge, dan papan peringkat tetap memakai saldo poin akun. EXP quest memperbarui progres level serta riwayat V-Pet, terpisah dari poin akun.
 - Screenshot aksi V-Pet menjadi acuan alur: “Beri pakan”, “Bersihkan”, dan “Rawat” dapat menyelesaikan quest masing-masing; “Ajak main” hanya menambah kebahagiaan.
-- Perubahan UI dibatasi pada halaman Gamifikasi dan V-Pet yang diperlukan untuk status misi/quest. Tampilan statistik sensor tidak diubah.
+- Perubahan UI dibatasi pada halaman Gamifikasi dan V-Pet untuk checklist serta AreaDetail untuk mencatat pembersihan fisik kolam. Tampilan statistik sensor tidak diubah.
 
 ## Alur data
 
-Form atau aksi manual di halaman area/V-Pet memanggil satu aksi domain di `SmartStore`. Aksi tersebut memvalidasi pengguna, kolam, tanggal, dan ID sumber; menyimpan `pondActivityEvents`; memberi poin akun jika aturan dan kuota mengizinkan; lalu memeriksa quest harian yang relevan. Quest yang belum selesai dicatat di `petQuestCompletions` dan memberi +10 EXP kepada pet di kolam. Misi poin dan quest V-Pet membaca event yang sama tetapi memakai ledger serta aturan reward terpisah. Pembaruan telemetri sensor tidak melewati jalur quest maupun reward.
+Aktivitas manual di halaman area/V-Pet memanggil aksi domain di `SmartStore`, menyimpan `pondActivityEvents`, lalu memberi poin atau menyelesaikan quest sesuai aturan. Checkbox yang belum selesai memanggil klaim terpisah dan mencatat `petQuestCompletions` dengan `sourceType: 'manual-checkbox'`; klaim ini memberi EXP saja, tanpa event aktivitas atau poin akun. Kedua jalur memakai kunci quest/kolam/periode yang sama sehingga tidak bisa memberi EXP ganda. Misi poin dan quest V-Pet memakai pencatatan terpisah. Pembaruan telemetri sensor tidak melewati jalur quest maupun reward.
 
 ## Batasan teknis dan non-tujuan
 
@@ -94,7 +102,7 @@ Ikuti peta folder fitur yang sudah ditetapkan di `docs/struktur-proyek.md` dan `
 
 Jangan menaruh source baru di root `src/`, jangan membuat folder fitur duplikat atau mengganti nama folder yang sudah dirapihkan, dan jangan memindahkan file yang tidak perlu. Tambahkan subfolder hanya mengikuti konvensi proyek yang sudah ada.
 
-- Kerjakan hanya alur gamifikasi, V-Pet, dan integrasi state minimum untuk mengaitkan reward ke kolam.
+- Kerjakan alur gamifikasi, V-Pet, integrasi state, serta form Kelola Area yang diperlukan untuk mencatat pembersihan fisik kolam.
 - Jangan mengubah logika sensor, nilai pH/suhu/TDS, ambang, simulator/telemetri, atau reaksi karakter terhadap sensor.
 - Jangan menjalankan migrasi database, mengubah layanan backend, menghapus data lokal, atau mengubah aset karakter.
 - Tidak menambahkan sinkronisasi lintas perangkat; state tetap mengikuti batas penyimpanan browser yang ada.
@@ -105,11 +113,12 @@ Jangan menaruh source baru di root `src/`, jangan membuat folder fitur duplikat 
 1. Aktivitas manual yang valid memberi poin akun mengikuti aturan aktif dan batas harian per pengguna/aturan.
 2. Pakan, bersihkan, rawat, dan pemantauan manual minimal dua parameter menyelesaikan quest terkait untuk kolam yang sama.
 3. Quest yang selesai memberi tepat +10 EXP kepada semua V-Pet yang ditugaskan di kolam itu; quest yang sama hanya membayar sekali per kolam/tanggal lokal.
-4. Setelah klik pertama yang memenuhi syarat, checklist otomatis tercentang, EXP/bar level dan jurnal pet langsung berubah tanpa menutup detail pet; pesan membedakan EXP dari poin akun.
-5. Checkbox quest bukan tombol klaim. Klik ulang pada quest yang sudah selesai tetap menampilkan centang dan memberi keterangan reward harian sudah diterima, tanpa EXP tambahan.
+4. Klik checkbox quest yang belum selesai langsung menambah +10 EXP kepada semua pet di kolam dan mengubah status checklist tanpa menutup detail pet; pesan membedakan EXP dari poin akun.
+5. Checkbox yang sudah selesai terkunci; klaim ulang atau aktivitas nyata yang sama pada periode itu tidak memberi EXP tambahan.
 6. Quest di kolam berbeda memiliki status/penyelesaian terpisah; tanggal lokal baru mereset status quest rutin tanpa menghapus riwayat lama.
 7. Catatan kematian yang diperbarui pada kolam/tanggal sama tidak menyelesaikan quest dua kali; quest kematian/panen hanya tersedia saat catatan nyata dibuat.
-8. Ajak main, HPP, chatbot, centang manual, telemetri otomatis, growbed/tandon, pet tanpa kolam, serta aktivitas tanpa hak akses tidak memberi EXP quest.
+8. Klaim checkbox memberi EXP quest tetapi tidak menambah poin akun atau mencatat aktivitas palsu. Ajak main, HPP, chatbot, telemetri otomatis, growbed/tandon, pet tanpa kolam, serta area tanpa hak akses tidak dapat diklaim.
 9. Batas poin harian atau aturan poin nonaktif tidak menggagalkan EXP dari quest yang valid; poin dan EXP memiliki pencatatan terpisah.
 10. Perubahan kondisi pet tidak memberi EXP langsung di luar reward quest; kenaikan level menjaga sisa XP, ambang berikutnya, dan tahap yang benar.
-11. Data lama, saldo poin, level, dan EXP tetap utuh setelah state dimuat ulang; tes unit/integrasi dan browser mencakup reward, visual completion, batas harian, duplikasi/koreksi, akses, reset tanggal, migrasi state, serta jalur sensor yang tidak berubah.
+11. Data lama, saldo poin, level, dan EXP tetap utuh setelah state dimuat ulang; tes unit/integrasi dan browser mencakup reward, visual completion, batas harian, duplikasi/koreksi, akses, reset tanggal/bulan, migrasi state, serta jalur sensor yang tidak berubah.
+12. Catatan pembersihan fisik atau klik checkbox menyelesaikan quest bulanan sekali per kolam/bulan lokal, memberi +10 EXP ke semua pet di kolam tanpa menambah poin akun; tombol Bersihkan harian pada V-Pet tidak menyelesaikan quest bulanan.

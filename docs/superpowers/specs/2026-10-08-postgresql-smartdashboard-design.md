@@ -8,7 +8,7 @@ Menjadikan PostgreSQL satu sumber data bersama untuk fitur SmartDashboard penggu
 
 ## Kondisi yang telah diverifikasi
 
-- SmartDashboard berada di `src/SmartApp.jsx` dan memakai `src/store/SmartStore.jsx` sebagai sumber state. Seluruh state utamanya disimpan sebagai satu objek localStorage dengan key `aquasmart_smart_v1`.
+- SmartDashboard berada di `src/app/SmartApp.jsx` dan memakai `src/shared/store/SmartStore.jsx` sebagai sumber state. Seluruh state utamanya disimpan sebagai satu objek localStorage dengan key `aquasmart_smart_v1`.
 - Halaman SmartDashboard belum menggunakan autentikasi/API Pilot untuk operasi domain. Role dan batas area saat ini terutama diterapkan di sisi klien.
 - Backend aktif pada branch `dev/antigravity` memiliki skema Pilot versi 1: `users`, `sessions`, `devices`, `ownerships`, `readings`, dan `schema_migrations`.
 - Database lokal yang diperiksa mencatat versi migrasi 1 serta 4 user, 4 device, 4 ownership, dan 2.086 reading. Angka dan baris yang ada harus tetap ada setelah migrasi.
@@ -82,7 +82,7 @@ Untuk koreksi mortalitas di hari yang sama, tetapkan satu catatan unik per area/
 
 ### Migrasi schema
 
-Pindah dari `server/schema.sql` monolitik ke runner migrasi bernomor yang kompatibel dengan konvensi branch rekan. Sebelum perubahan apa pun:
+Pindah dari `server/database/schema.sql` monolitik ke runner migrasi bernomor yang kompatibel dengan konvensi branch rekan. Sebelum perubahan apa pun:
 
 1. Ambil backup logis dan catat versi/schema aktual.
 2. Bandingkan database versi 1 yang sudah ada dengan baseline migrasi 001. Jangan menjalankan ulang 001 terhadap schema yang sudah tercatat.

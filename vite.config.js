@@ -14,10 +14,10 @@ export default defineConfig({
     // browser (dibuktikan: new Image().onerror terpanggil). Kalau dibiarkan,
     // karakter pet tidak pernah tampil walau `background-image` sudah terisi.
     //
-    // Dengan aturan ini, tiap berkas di src/assets/v-pet/ disalin apa adanya ke
-    // dist/assets/v-pet/ dan dipanggil lewat URL biasa, sehingga:
+    // Dengan aturan ini, tiap berkas di src/v-pet/assets/ disalin apa adanya ke
+    // dist/assets/ dengan nama hash dan dipanggil lewat URL biasa, sehingga:
     //   - tidak ada masalah kutip/encoding data URI,
-    //   - berkasnya bisa dibuka langsung (mis. /assets/v-pet/karakter/nila-xxxx.svg),
+    //   - berkasnya bisa dibuka langsung lewat URL aset hasil build,
     //   - folder aset tetap terpisah seperti yang diminta untuk pengaturan manual.
     assetsInlineLimit: (filePath) => (filePath.includes('v-pet') ? false : undefined),
   },

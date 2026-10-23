@@ -11,7 +11,7 @@ penghapusan akun, dan akses dataset tim belum diimplementasikan.
 
 | Bagian | Sumber | Perlakuan |
 | --- | --- | --- |
-| / dan /perangkat/:id | src/services/pilotApi.js → Fastify → PostgreSQL | API saja; tidak ada fallback fixture |
+| / dan /perangkat/:id | src/pilot/services/pilotApi.js → Fastify → PostgreSQL | API saja; tidak ada fallback fixture |
 | /admin | Sesi backend, users/devices PostgreSQL | Admin mengundang dan provisioning; tidak bebas membaca telemetri |
 | /demo/* | App.jsx, useFarmStore.js, iotSimulator.js | UI lama dipisah dan diberi label Data contoh / Demo |
 | Role, sensor, log, ambang UI lama | localStorage dalam useFarmStore.js | Tidak menjadi otorisasi atau data pilot |
@@ -191,10 +191,10 @@ Tidak ada email sensor yang dipicu oleh ingestion Sprint 1.
 
 ### Skema dan migrasi
 
-server/schema.sql memuat migrasi awal transaksional/idempotent, dikunci advisory lock:
+server/database/schema.sql memuat migrasi awal transaksional/idempotent, dikunci advisory lock:
 users → sessions; users/devices → ownerships; ownerships/devices → readings.
 Index unik membatasi satu pemilik aktif per unit dan satu kiriman per ID/unit.
-Model/sensor didefinisikan sekali di server/domain.ts dan disajikan melalui /models;
+Model/sensor didefinisikan sekali di server/shared/domain.ts dan disajikan melalui /models;
 tidak membuat tabel katalog tambahan untuk dua model tetap.
 
 Admin tidak dapat memindahkan unit aktif. Pemilik melepas, admin mengalokasikan ulang

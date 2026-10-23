@@ -24,7 +24,7 @@ API, dev server, pratinjau). Di PowerShell:
 
 ```powershell
 cd C:\JagoFarm_TA\Dashboard_TA
-powershell -ExecutionPolicy Bypass -File scripts\start-pilot.ps1
+powershell -ExecutionPolicy Bypass -File scripts\pilot\start-pilot.ps1
 ```
 
 Skrip ini aman diulang: komponen yang sudah hidup akan dilewati, dan di akhir ia
@@ -34,13 +34,13 @@ pemakaian pertama (Docker Desktop harus naik lebih dulu).
 Setelah itu, nyalakan simulator supaya data bergerak:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\start-simulator.ps1
+powershell -ExecutionPolicy Bypass -File scripts\pilot\start-simulator.ps1
 ```
 
 Simulator mengirim satu pengukuran setiap 30 detik. Hentikan semuanya dengan:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\stop-pilot.ps1
+powershell -ExecutionPolicy Bypass -File scripts\pilot\stop-pilot.ps1
 ```
 
 Catatan: `scripts\*.ps1` hanya alat bantu; semua perintah mentahnya tetap ada di
@@ -315,13 +315,13 @@ Docker Desktop juga boleh ditutup dari ikonnya di system tray.
 
 | Gejala | Sebab yang paling sering | Tindakan |
 | --- | --- | --- |
-| `/pilot` menampilkan "Balasan /api tidak berupa JSON" | UI dibuka lewat port selain 5173, atau API belum jalan | Jalankan `scripts\start-pilot.ps1`, buka http://localhost:5173/pilot |
+| `/pilot` menampilkan "Balasan /api tidak berupa JSON" | UI dibuka lewat port selain 5173, atau API belum jalan | Jalankan `scripts\pilot\start-pilot.ps1`, buka http://localhost:5173/pilot |
 | "Origin tidak diizinkan." saat klik-klik | Port bukan 5173 | Pakai 5173, atau ubah `APP_ORIGIN` di `.env` + nyalakan ulang API |
-| `npm run db:migrate` gagal | Kontainer database belum siap/belum jalan | `scripts\start-pilot.ps1` sudah menunggu sehat; kalau masih gagal, ulangi perintahnya |
+| `npm run db:migrate` gagal | Kontainer database belum siap/belum jalan | `scripts\pilot\start-pilot.ps1` sudah menunggu sehat; kalau masih gagal, ulangi perintahnya |
 | Login dijawab 401 padahal password benar | Batas 10 percobaan per 5 menit | Tunggu 5 menit atau nyalakan ulang API |
 | Pratinjau 4173 menampilkan tampilan lama | Pratinjau menyajikan hasil build | `node node_modules/vite/bin/vite.js build`, lalu muat ulang dengan Ctrl+Shift+R |
 | Undangan tidak muncul di Mailpit | Alamat berbeda, atau Mailpit baru dinyalakan | Lihat http://127.0.0.1:8025 dan tekan Refresh |
-| Simulator berhenti dengan "Invalid buffer" | Berkas buffer rusak dari run sebelumnya | `scripts\start-simulator.ps1` sudah membuangnya otomatis; kalau perlu hapus `.pilot-buffer.json` |
+| Simulator berhenti dengan "Invalid buffer" | Berkas buffer rusak dari run sebelumnya | `scripts\pilot\start-simulator.ps1` sudah membuangnya otomatis; kalau perlu hapus `.pilot-buffer.json` |
 | Simulator berulang "Ingestion rejected: HTTP 409" dan `buffered` naik terus | Kiriman lama di buffer berasal dari masa unit belum/tidak lagi terpasang | Hentikan simulator, hapus `.pilot-buffer.json`, jalankan lagi. Kalau tetap 409, alokasikan ulang unit dari `/pilot/admin` (kepemilikan bisa sudah dilepas) |
 | Unit tampil "Tidak terhubung" padahal simulator jalan | Kredensial di `%TEMP%\audit-device.json` bukan milik unit yang sedang tampil | Alokasikan ulang unit dari `/pilot/admin`, pasangkan kode aktivasi dari akun pilot, lalu jalankan simulator lagi |
 | Halaman pilot tampak "tidak selesai memuat" | Tab browser tidak aktif, jadi polling memang dihentikan | Klik jendela browser (perilaku ini disengaja untuk hemat beban) |
@@ -331,8 +331,8 @@ Docker Desktop juga boleh ditutup dari ikonnya di system tray.
 ## Bagian 8. Kalau data pilot ingin dimulai dari nol
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\stop-pilot.ps1 -HapusData
-powershell -ExecutionPolicy Bypass -File scripts\start-pilot.ps1
+powershell -ExecutionPolicy Bypass -File scripts\pilot\stop-pilot.ps1 -HapusData
+powershell -ExecutionPolicy Bypass -File scripts\pilot\start-pilot.ps1
 cd C:\JagoFarm_TA\Dashboard_TA
 npm run db:migrate
 $env:ADMIN_EMAIL = 'admin@jagofarm.test'
@@ -340,7 +340,7 @@ $secure = Read-Host 'Password admin (minimal 12 karakter)' -AsSecureString
 $env:ADMIN_PASSWORD = [System.Net.NetworkCredential]::new('', $secure).Password
 npm run db:admin
 Remove-Item Env:ADMIN_PASSWORD
-powershell -ExecutionPolicy Bypass -File scripts\start-simulator.ps1
+powershell -ExecutionPolicy Bypass -File scripts\pilot\start-simulator.ps1
 ```
 
 Peringatan: `-HapusData` menghapus seluruh isi database pilot, termasuk akun,
