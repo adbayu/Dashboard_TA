@@ -121,3 +121,10 @@ WHERE d.type_id IS NULL AND t.code = CASE d.model
   WHEN 'water-v1' THEN 'PILOT-WATER-V1'
   WHEN 'environment-v1' THEN 'PILOT-ENV-V1'
 END;
+
+INSERT INTO devices (id, name, model, code, type_id, area_ref, legacy_id, credential_hash, allocated_to)
+VALUES
+  ('20000000-0000-4000-8000-000000000001', 'Sensor pH Kolam Nila A', NULL, 'AQ-PH-001', '10000000-0000-4000-8000-000000000001', 'AR-01', 'IOT-001', NULL, NULL),
+  ('20000000-0000-4000-8000-000000000002', 'Sensor Suhu Air Kolam Nila A', NULL, 'AQ-TMP-002', '10000000-0000-4000-8000-000000000002', 'AR-01', 'IOT-002', NULL, NULL),
+  ('20000000-0000-4000-8000-000000000003', 'Sensor TDS Kolam Nila A', NULL, 'AQ-TDS-003', '10000000-0000-4000-8000-000000000003', 'AR-01', 'IOT-003', NULL, NULL)
+ON CONFLICT (legacy_id) DO NOTHING;

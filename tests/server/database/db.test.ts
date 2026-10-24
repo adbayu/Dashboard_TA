@@ -4,15 +4,15 @@ import assert from 'node:assert/strict';
 import { isolatedDatabase } from '../support/testDb.js';
 import { migrate, migrationVersion, migrations, orderedMigrationFiles } from '../../../server/database/db.js';
 
-test('numbered migrations apply once in order and omit sample devices', async context => {
+test('numbered migrations apply once in order and apply seed pilot devices once', async context => {
   const db = await isolatedDatabase();
   context.after(db.cleanup);
   const firstRun = await migrate(db.pool);
   const rerun = await migrate(db.pool);
-  assert.deepEqual(firstRun, { applied: [1, 2], current: [1, 2] });
-  assert.deepEqual(rerun, { applied: [], current: [1, 2] });
+  assert.deepEqual(firstRun, { applied: [1, 2, 3, 4, 5, 6, 7], current: [1, 2, 3, 4, 5, 6, 7] });
+  assert.deepEqual(rerun, { applied: [], current: [1, 2, 3, 4, 5, 6, 7] });
   const versions = await db.pool.query('SELECT version FROM schema_migrations ORDER BY version');
-  assert.deepEqual(versions.rows.map(row => row.version), [1, 2]);
+  assert.deepEqual(versions.rows.map(row => row.version), [1, 2, 3, 4, 5, 6, 7]);
   const catalog = await db.pool.query("SELECT to_regclass('sensor_types') AS sensor_types");
   assert.equal(catalog.rows[0].sensor_types, 'sensor_types');
   const user = await db.pool.query("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='users' AND column_name='password_hash'");
@@ -21,8 +21,9 @@ test('numbered migrations apply once in order and omit sample devices', async co
   assert.equal(sensors.rows[0].count, 6);
   const mappings = await db.pool.query("SELECT code FROM device_types WHERE code LIKE 'PILOT-%' ORDER BY code");
   assert.deepEqual(mappings.rows.map(row => row.code), ['PILOT-ENV-V1', 'PILOT-WATER-V1']);
-  const sampleDevices = await db.pool.query('SELECT count(*)::int AS count FROM devices');
-  assert.equal(sampleDevices.rows[0].count, 0);
+  const seedDevices = await db.pool.query('SELECT legacy_id FROM devices ORDER BY legacy_id');
+  assert.equal(seedDevices.rowCount, 3);
+  assert.deepEqual(seedDevices.rows.map(row => row.legacy_id), ['IOT-001', 'IOT-002', 'IOT-003']);
 });
 
 test('migration file ordering rejects duplicates, gaps and malformed names', () => {
@@ -56,12 +57,12 @@ test('migration runner rejects inconsistent and newer recorded histories before 
   assert.equal((await gap.pool.query("SELECT to_regclass('sensor_types') AS sensor_type_table")).rows[0].sensor_type_table, null);
 
   await future.pool.query('CREATE TABLE schema_migrations(version integer PRIMARY KEY)');
-  await future.pool.query('INSERT INTO schema_migrations(version) VALUES(1),(2),(3)');
+  await future.pool.query('INSERT INTO schema_migrations(version) VALUES(1),(2),(3),(4),(5),(6),(7),(8)');
   await assert.rejects(migrate(future.pool), /newer than available migrations/i);
-  assert.deepEqual((await future.pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version), [1, 2, 3]);
+  assert.deepEqual((await future.pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version), [1, 2, 3, 4, 5, 6, 7, 8]);
 });
 
-test('upgrade from recorded Pilot v1 preserves four users, four devices and 2,086 readings after rerun', async context => {
+test('upgrade from recorded Pilot v1 preserves four users, four legacy devices plus three seed devices and 2,086 readings after rerun', async context => {
   const db = await isolatedDatabase();
   context.after(db.cleanup);
   const baseline = (await migrations()).find(file => file.version === 1);
@@ -96,7 +97,7 @@ test('upgrade from recorded Pilot v1 preserves four users, four devices and 2,08
   await db.pool.query('INSERT INTO schema_migrations(version) VALUES(1)');
 
   const upgrade = await migrate(db.pool);
-  assert.deepEqual(upgrade, { applied: [2], current: [1, 2] });
+  assert.deepEqual(upgrade, { applied: [2, 3, 4, 5, 6, 7], current: [1, 2, 3, 4, 5, 6, 7] });
 
   const preservedUsers = await db.pool.query('SELECT id,email,password_hash,role FROM users ORDER BY email');
   assert.equal(preservedUsers.rowCount, 4);
@@ -133,7 +134,7 @@ test('upgrade from recorded Pilot v1 preserves four users, four devices and 2,08
   assert.equal(representative.rows[0].ingest_type, 'water-v1');
   assert.equal(representative.rows[0].ingest_version, 1);
   assert.equal(Number((await db.pool.query('SELECT count(*) FROM ownerships')).rows[0].count), 4);
-  assert.deepEqual((await db.pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version), [1, 2]);
+  assert.deepEqual((await db.pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version), [1, 2, 3, 4, 5, 6, 7]);
   const readingFingerprint = async () => (await db.pool.query(`SELECT md5(COALESCE(string_agg(concat_ws('|', device_id::text, message_id::text, ownership_id::text, measured_at::text, readings::text, ingest_type, ingest_version::text), chr(10) ORDER BY device_id, message_id), '')) AS digest FROM readings`)).rows[0].digest;
   const stateFingerprint = async () => JSON.stringify({
     users: (await db.pool.query('SELECT id,email,password_hash,role FROM users ORDER BY id')).rows,
@@ -149,9 +150,9 @@ test('upgrade from recorded Pilot v1 preserves four users, four devices and 2,08
     (SELECT count(*)::int FROM devices) AS devices,
     (SELECT count(*)::int FROM ownerships) AS ownerships,
     (SELECT count(*)::int FROM readings) AS readings`);
-  assert.deepEqual(rerunCounts.rows[0], { users: 4, devices: 4, ownerships: 4, readings: 2086 });
+  assert.deepEqual(rerunCounts.rows[0], { users: 4, devices: 7, ownerships: 4, readings: 2086 });
   assert.equal(await stateFingerprint(), beforeRerunFingerprint);
-  assert.deepEqual((await db.pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version), [1, 2]);
+  assert.deepEqual((await db.pool.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(row => row.version), [1, 2, 3, 4, 5, 6, 7]);
 });
 
 test('migration 002 is atomic when its SQL fails', async context => {

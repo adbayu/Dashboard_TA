@@ -37,7 +37,7 @@ test('Sprint 1: PostgreSQL-backed pilot isolation and persistence', async contex
   await context.test('configured LAN origin is allowed while unrelated origins remain blocked', async () => {
     const allowed = await app.inject({ method: 'POST', url: '/api/session/login', headers: { origin: lanOrigin }, payload: { email: 'admin@example.test', password } });
     assert.equal(allowed.statusCode, 200, allowed.body);
-    const rejected = await app.inject({ method: 'POST', url: '/api/session/logout', headers: { origin: 'https://evil.test' } });
+    const rejected = await app.inject({ method: 'POST', url: '/api/session/logout', headers: { origin: 'https://evil.test', cookie: admin } });
     assert.equal(rejected.statusCode, 403);
   });
   let userA = ''; let userB = ''; let partner = ''; let accountA = ''; let accountB = ''; let partnerAccount = '';

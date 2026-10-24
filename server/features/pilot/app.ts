@@ -200,7 +200,7 @@ export async function buildApp(options: Options) {
         failV1(429, 'RATE_LIMITED', 'Terlalu banyak kegagalan autentikasi API key. Coba lagi setelah jendela berakhir.');
       }
     }
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && request.url !== '/api/ingest') {
+    if (hasSessionCookie && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       if (!allowedOrigins.has(request.headers.origin ?? '')) {
         if (isV1Request) failV1(403, 'ORIGIN_REJECTED', 'Origin tidak diizinkan.');
         fail(403, 'Origin tidak diizinkan.');
