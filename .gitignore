@@ -29,3 +29,7 @@ dist-ssr
 *.sw?
 
 /Claude outputs/
+
+# Bukti QA lokal berisi cookie sesi, API key, dan credential device.
+# Jangan pernah di-commit; simpan hanya placeholder di Test-case.
+Test-case/

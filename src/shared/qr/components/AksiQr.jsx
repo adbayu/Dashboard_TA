@@ -171,13 +171,21 @@ export default function AksiQr({ value, kode, nama, size = 'sm', className = '' 
       kabari('Jendela cetak diblokir browser. Pakai "Unduh PNG" lalu cetak gambarnya.', 'gagal');
       return;
     }
-    jendela.document.write(
-      `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Label QR ${kode || 'alat'}</title>` +
-        '<style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;' +
-        'background:#fff;font-family:system-ui,sans-serif}img{width:76mm;height:auto}</style></head>' +
-        `<body><img src="${url}" alt="Label QR ${kode || 'alat'}"></body></html>`,
-    );
-    jendela.document.close();
+    // Bangun DOM lewat API, tanpa document.write: nilai apa pun yang nanti masuk
+    // ke `url`/`kode` tidak bisa berubah menjadi markup.
+    const dok = jendela.document;
+    dok.title = `Label QR ${kode || 'alat'}`;
+    const meta = dok.createElement('meta');
+    meta.setAttribute('charset', 'utf-8');
+    dok.head.appendChild(meta);
+    const style = dok.createElement('style');
+    style.textContent = 'body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;'
+      + 'background:#fff;font-family:system-ui,sans-serif}img{width:76mm;height:auto}';
+    dok.head.appendChild(style);
+    const gambar = dok.createElement('img');
+    gambar.src = url;
+    gambar.alt = `Label QR ${kode || 'alat'}`;
+    dok.body.appendChild(gambar);
     jendela.focus();
     // Beri waktu gambar dimuat; tanpa jeda, halaman bisa tercetak kosong.
     setTimeout(() => jendela.print(), 350);

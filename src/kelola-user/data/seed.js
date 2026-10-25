@@ -3,7 +3,15 @@
 // CATATAN PENTING: password di bawah ini HANYA untuk demo di browser.
 // Belum ada backend, jadi akun & password tersimpan apa adanya di localStorage —
 // jangan dipakai untuk data sungguhan sebelum server autentikasi dibuat.
-export const DEMO_PASSWORD = 'jagofarm123';
+//
+// Data demo ini hanya ikut ke bundle kalau build dijalankan dengan
+// VITE_IOT_SOURCE=local (lihat `define` di vite.config.js). Build produksi
+// memakai mode api, sehingga Rollup membuang cabang mati di bawah dan password
+// demo tidak pernah terkirim ke browser. Di Node (unit test) flag tidak
+// didefinisikan, jadi perilakunya tetap seperti sebelumnya.
+const DEMO_MODE = typeof __DEMO_MODE__ === 'undefined' ? true : __DEMO_MODE__;
+
+export const DEMO_PASSWORD = DEMO_MODE ? 'jagofarm123' : '';
 
 // Pilihan foto profil dipakai di dua tempat: halaman Daftar (akun baru) dan
 // halaman Profil. Ditaruh di seed supaya daftarnya tidak ditulis dua kali dan
@@ -50,7 +58,7 @@ export const STATUS_AKUN = {
   nonaktif: 'Nonaktif',
 };
 
-export const SEED_USERS = [
+export const SEED_USERS = DEMO_MODE ? [
   {
     id: 'U-001', name: 'Budi Santoso', email: 'budi@jagofarm.id', password: DEMO_PASSWORD,
     role: 'pengguna', areaIds: ['AR-01', 'AR-03'], status: 'aktif', joinedAt: '2026-01-12', points: 1240,
@@ -75,4 +83,4 @@ export const SEED_USERS = [
     phone: '0811-1122-3344', jabatan: 'Pengelola Farm', bio: 'Mengelola perangkat IoT dan data seluruh area.',
     avatar: { id: 'U-004', warna: '#1e40af', warnaTeks: '#eafff4' },
   },
-];
+] : [];

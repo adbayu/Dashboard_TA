@@ -12,6 +12,12 @@ export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [react()],
+    // Demo seed (password contoh + akun contoh) hanya dibundel kalau build
+    // diminta mode lokal. Vite mengganti __DEMO_MODE__ dengan literal boolean,
+    // jadi Rollup membuang cabang mati dan kredensial demo tidak ikut ke dist.
+    define: {
+      __DEMO_MODE__: JSON.stringify((process.env.VITE_IOT_SOURCE ?? env.VITE_IOT_SOURCE ?? 'api') === 'local'),
+    },
     server: {
       ...developmentHostOptions(command, env.DEV_ALLOWED_HOSTS),
       headers: { 'Referrer-Policy': 'no-referrer' },

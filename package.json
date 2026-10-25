@@ -16,6 +16,7 @@
     "typecheck": "tsc -p server/tsconfig.json",
     "test:pilot": "node --env-file-if-exists=.env --import tsx --test tests/server/pilot/pilot.test.ts tests/server/database/db.test.ts",
     "test:v1": "node --env-file-if-exists=.env --import tsx --test server/v1.test.ts",
+    "test:security": "node --import tsx --test server/auth/security-limits.test.ts",
     "test:vpet": "node --test tests/v-pet/pet-model.test.mjs tests/v-pet/pet-condition.test.mjs tests/v-pet/pet-progression.test.mjs tests/kelola-area/fish-population.test.mjs tests/v-pet/pet-character-levels.test.mjs tests/v-pet/kangkung-sensor-exp.test.mjs tests/v-pet/pet-quests.test.mjs tests/gamifikasi/mission-navigation.test.mjs tests/gamifikasi/pond-activity-rewards.test.mjs tests/gamifikasi/pond-activity-state.test.mjs",
     "test:qr": "node --test tests/detail-information/qr-scanner.test.mjs",
     "cek:aset": "python scripts/v-pet/cek-aset.py"
@@ -24,7 +25,7 @@
     "@fastify/cookie": "^11.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/swagger": "^9.9.1",
-    "@scalar/fastify-api-reference": "1.75.0",
+    "@scalar/fastify-api-reference": "^1.76.0",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",

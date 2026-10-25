@@ -203,6 +203,16 @@ String setupApName() {
   return "JagoFarm-Setup-" + mac.substring(mac.length() > 4 ? mac.length() - 4 : 0);
 }
 
+// Portal provisioning bisa mengubah URL API dan menerima credential device, jadi
+// AP-nya tidak boleh terbuka. Password diturunkan dari MAC (8 hex terakhir) supaya
+// unik per unit dan bisa dibaca dari label/serial tanpa disimpan di firmware.
+String setupApPassword() {
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  mac.toUpperCase();
+  return mac.length() >= 8 ? mac.substring(mac.length() - 8) : mac;
+}
+
 // startConfigPortal() memblokir sampai portal ditutup, jadi LED dikedipkan dari task terpisah.
 void provisioningLedTask(void*) {
   for (;;) {
@@ -240,10 +250,11 @@ bool runProvisioning(DeviceConfig& value) {
   manager.addParameter(&tdsFactorParameter);
   manager.addParameter(&temperatureOffsetParameter);
   const String apName = setupApName();
-  Serial.printf("Provisioning starts. Setup AP: %s\n", apName.c_str());
+  const String apPassword = setupApPassword();
+  Serial.printf("Provisioning starts. Setup AP: %s password: %s (5 menit)\n", apName.c_str(), apPassword.c_str());
   TaskHandle_t ledTask = nullptr;
   xTaskCreate(provisioningLedTask, "jf_prov_led", 2048, nullptr, 1, &ledTask);
-  const bool portalDone = manager.startConfigPortal(apName.c_str());
+  const bool portalDone = manager.startConfigPortal(apName.c_str(), apPassword.c_str());
   if (ledTask) vTaskDelete(ledTask);
   digitalWrite(kLedPin, LOW);
   if (!portalDone) return false;

@@ -9,6 +9,8 @@ import { transaction } from '../../database/db.js';
 import { models, hash, secret, passwordHash, passwordMatches, connectionStatus, type Model } from '../../shared/domain.js';
 import { authenticateApiKey, parseApiKey } from '../../auth/api-key.js';
 import { ApiKeyFailureLimit } from '../../auth/api-key-failure-limit.js';
+import { AnonymousPreviewLimit } from '../../auth/preview-limit.js';
+import { LoginFailureLimit } from '../../auth/login-failure-limit.js';
 import { authenticateSession, sessionUser, type Actor } from '../../auth/session.js';
 import { failV1 } from '../../v1/common.js';
 import { ingestV2, type V2IngestBody } from '../../v1/ingest.js';
@@ -94,7 +96,13 @@ export async function buildApp(options: Options) {
   });
   await app.register(cookie);
   const apiKeyFailureLimit = new ApiKeyFailureLimit();
-  const cleanupTimer = setInterval(() => apiKeyFailureLimit.cleanupExpired(), 10_000);
+  const previewLimit = new AnonymousPreviewLimit();
+  const loginFailureLimit = new LoginFailureLimit();
+  const cleanupTimer = setInterval(() => {
+    apiKeyFailureLimit.cleanupExpired();
+    previewLimit.cleanupExpired();
+    loginFailureLimit.cleanupExpired();
+  }, 10_000);
   cleanupTimer.unref();
   app.addHook('onClose', async () => clearInterval(cleanupTimer));
   if (options.enableOfflineDetection) {
@@ -180,6 +188,11 @@ export async function buildApp(options: Options) {
   });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
+    // Dokumentasi Scalar memuat seluruh permukaan API. Di produksi endpoint ini
+    // ditutup supaya peta API tidak terbuka tanpa login.
+    if (options.production && (request.url === '/docs' || request.url.startsWith('/docs/'))) {
+      return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Dokumentasi API tidak tersedia di produksi.' } });
+    }
     reply.header('X-Content-Type-Options', 'nosniff');
     if (options.production) reply.header('Strict-Transport-Security', 'max-age=31536000');
     const isV1Request = request.url.startsWith('/api/v1/');
@@ -218,9 +231,25 @@ export async function buildApp(options: Options) {
     '/api/v1/keys/:id',
     '/api/v1/keys/:id/usage',
   ]);
-  app.addHook('preHandler', async request => {
+  app.addHook('preHandler', async (request, reply) => {
     if (publicRoutes.has(request.routeOptions.url ?? '')) return;
-    if (request.routeOptions.url === '/api/v1/devices' && request.method === 'GET' && typeof (request.query as { code?: unknown }).code === 'string') return;
+    // Pratinjau QR publik (dipakai halaman /d/:code sebelum login). Kode device
+    // berurutan, jadi permintaan tanpa kredensial dibatasi per IP; permintaan yang
+    // membawa sesi/API key tetap lewat jalur autentikasi normal di bawah.
+    if (request.routeOptions.url === '/api/v1/devices' && request.method === 'GET' && typeof (request.query as { code?: unknown }).code === 'string') {
+      const anonymous = !request.cookies.pilot_session && !parseApiKey(request.headers.authorization ?? '');
+      if (anonymous) {
+        const quota = previewLimit.consume(request.ip);
+        if (!quota.allowed) {
+          reply.header('x-ratelimit-limit', 20);
+          reply.header('x-ratelimit-remaining', 0);
+          reply.header('x-ratelimit-reset', Math.ceil(quota.resetAt / 1000));
+          reply.header('retry-after', Math.max(1, Math.ceil((quota.resetAt - Date.now()) / 1000)));
+          failV1(429, 'RATE_LIMITED', 'Batas pratinjau QR publik tercapai. Masuk untuk melihat daftar device.');
+        }
+        return;
+      }
+    }
     const isV1 = request.url.startsWith('/api/v1/');
     const parsed = isV1 ? parseApiKey(request.headers.authorization) : null;
     request.actor = parsed
@@ -274,10 +303,23 @@ export async function buildApp(options: Options) {
   app.post<{ Body: { email: string; password: string } }>('/api/session/login', {
     schema: { body: object({ email, password }) }, config: { rateLimit: { max: 10, timeWindow: '5 minutes' } },
   }, async (request, reply) => {
-    const result = await pool.query('SELECT id,email,role,password_hash FROM users WHERE email=$1', [request.body.email.toLowerCase()]);
+    const email = request.body.email.toLowerCase();
+    const lockout = loginFailureLimit.lockoutFor(email);
+    if (lockout) {
+      reply.header('x-ratelimit-limit', 8);
+      reply.header('x-ratelimit-remaining', 0);
+      reply.header('x-ratelimit-reset', Math.ceil(lockout.resetAt / 1000));
+      reply.header('retry-after', lockout.retryAfter);
+      fail(429, 'Terlalu banyak percobaan masuk untuk akun ini. Coba lagi nanti.');
+    }
+    const result = await pool.query('SELECT id,email,role,password_hash FROM users WHERE email=$1', [email]);
     const user = result.rows[0];
     const matches = await passwordMatches(request.body.password, user?.password_hash ?? dummyPassword);
-    if (!matches || !user?.password_hash) fail(401, 'Email atau password salah.');
+    if (!matches || !user?.password_hash) {
+      loginFailureLimit.recordFailure(email);
+      fail(401, 'Email atau password salah.');
+    }
+    loginFailureLimit.clear(email);
     const session = secret();
     await transaction(pool, async client => {
       await client.query('DELETE FROM sessions WHERE expires_at<=now() OR token_hash=$1', [hash(request.cookies.pilot_session ?? '')]);
