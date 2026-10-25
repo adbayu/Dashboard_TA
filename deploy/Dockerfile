@@ -10,7 +10,7 @@ FROM node:22-slim AS api
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=api-deps /app/node_modules ./node_modules
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY server ./server
 USER node
 EXPOSE 3001
