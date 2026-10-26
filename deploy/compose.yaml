@@ -22,7 +22,7 @@ services:
   # Penampung email undangan kalau belum ada SMTP asli. UI hanya di loopback VPS.
   # Akses lewat SSH tunnel: ssh -L 8025:127.0.0.1:8025 <user>@<ip-vps>
   mailbox:
-    image: axllent/mailpit:v1.27
+    image: axllent/mailpit:v1.32.0
     restart: unless-stopped
     mem_limit: 128m
     ports:
