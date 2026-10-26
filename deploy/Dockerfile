@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 # Build dari root repo: docker build -f deploy/Dockerfile --target api|web .
 
-FROM node:22-slim AS api-deps
+FROM node:22-trixie-slim AS api-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:22-slim AS api
+FROM node:22-trixie-slim AS api
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=api-deps /app/node_modules ./node_modules
@@ -16,7 +16,7 @@ USER node
 EXPOSE 3001
 CMD ["node", "--import", "tsx", "server/index.ts"]
 
-FROM node:22-slim AS web-build
+FROM node:22-trixie-slim AS web-build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
