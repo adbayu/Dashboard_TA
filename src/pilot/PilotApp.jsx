@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
-import { Line } from 'react-chartjs-2';
 import { pilotApi } from './services/pilotApi';
+import TelemetryLineChart from '../shared/components/TelemetryLineChart.jsx';
 import './styles/pilot.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 const date = value => value ? new Date(value).toLocaleString('id-ID') : 'Belum ada data';
 const statusNames = { online: 'Terhubung', stale: 'Data terlambat', offline: 'Tidak terhubung' };
+const PILOT_CHART_PALETTE = {
+  muted: '#56695d',
+  grid: '#dce5dc',
+  tooltipBackground: '#193e30',
+  tooltipText: '#ffffff',
+};
 
 function usePolling(path) {
   const [snapshot, setSnapshot] = useState(null);
@@ -190,7 +194,17 @@ function DeviceDetail() {
       {rows.length > 0 && <>
         <p>Grafik berdasarkan waktu pengukuran asli. Tabel menyediakan nilai yang sama.</p>
         <div className="pilot-sensors">{device.sensors.map(sensor => <section className="pilot-panel pilot-chart-panel" key={sensor.code}><h3>{sensor.name} ({sensor.unit})</h3>
-          <div className="pilot-chart"><Line aria-label={'Grafik ' + sensor.name} role="img" data={{ labels: plot.map(row => date(row.measured_at)), datasets: [{ label: sensor.unit, data: plot.map(row => row.readings[sensor.code]), borderColor: '#165b3f', backgroundColor: '#165b3f', pointRadius: 1, borderWidth: 2 }] }} options={{ responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 4 } } } }} /></div>
+          <div className="pilot-chart">
+            <TelemetryLineChart
+              ariaLabel={'Grafik ' + sensor.name}
+              labels={plot.map(row => new Date(row.measured_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }))}
+              datasets={[{ label: sensor.unit, data: plot.map(row => row.readings[sensor.code]), borderColor: '#1b6045', backgroundColor: '#1b6045', pointRadius: 1, borderWidth: 2 }]}
+              palette={PILOT_CHART_PALETTE}
+              height={220}
+              yAxisLabel={sensor.unit}
+              tooltipTitle={(items) => date(plot[items[0]?.dataIndex]?.measured_at)}
+            />
+          </div>
         </section>)}</div>
         <div className="pilot-table" tabIndex={0} role="region" aria-label="Tabel riwayat, dapat digulir"><table><caption>Riwayat unit ini, periode kepemilikan akun Anda</caption><thead><tr><th scope="col">Waktu pengukuran</th>{device.sensors.map(sensor => <th scope="col" key={sensor.code}>{sensor.name} ({sensor.unit})</th>)}<th scope="col">Diterima server</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.message_id}><td>{date(row.measured_at)}</td>{device.sensors.map(sensor => <td key={sensor.code}>{row.readings[sensor.code]?.toLocaleString('id-ID', { maximumFractionDigits: 3 }) ?? '·'}</td>)}<td>{date(row.received_at)}</td></tr>)}</tbody></table></div>

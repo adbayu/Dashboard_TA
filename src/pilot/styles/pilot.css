@@ -95,9 +95,9 @@
 .pilot-refresh { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin: 1rem 0; font-size: .75rem; color: var(--pilot-muted); }
 .pilot-refresh > span { min-width: 0; }
 .pilot-refresh .pilot-button { flex-shrink: 0; font-size: .8125rem; }
-.pilot-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; background: var(--pilot-brand); color: white; border: 1px solid var(--pilot-brand); border-radius: var(--pilot-radius-kontrol); padding: .65rem 1rem; min-height: 44px; font-size: .875rem; font-weight: 600; text-align: center; transition: background-color 150ms, box-shadow 150ms; }
+.pilot-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; background: var(--pilot-brand); color: white; border: 1px solid var(--pilot-brand); border-radius: var(--pilot-radius-kontrol); padding: .65rem 1rem; min-height: 44px; font-size: .875rem; font-weight: 600; text-align: center; transition: background-color 150ms, border-color 150ms; }
 .pilot-button > span[aria-hidden] { font-size: 1.2rem; line-height: 1; }
-.pilot-button:hover:not(:disabled) { background: #134b35; box-shadow: 0 3px 10px #1b604522; }
+.pilot-button:hover:not(:disabled) { background: #134b35; }
 .pilot-button.secondary { background: white; color: var(--pilot-brand); border-color: #8aab94; }
 .pilot-button.secondary:hover:not(:disabled) { background: var(--pilot-soft); }
 .pilot-shell button:disabled { opacity: .55; cursor: wait; }
@@ -166,7 +166,7 @@
 .pilot-connection dd { font-size: .875rem; font-weight: 600; }
 .pilot-connection > p { flex-basis: 100%; max-width: none; padding-top: 1rem; border-top: 1px solid var(--pilot-border); margin: 0; font-size: .75rem; }
 .pilot-shell .pilot-section-title { margin-top: 2rem; }
-.pilot-chart { height: 220px; margin-top: 1rem; }
+.pilot-chart { min-width: 0; height: 220px; margin-top: 1rem; }
 .pilot-table { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--pilot-border); border-radius: var(--pilot-radius-pesan); background: var(--pilot-surface); }
 .pilot-table table { border-collapse: collapse; width: 100%; font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .pilot-table th, .pilot-table td { text-align: left; padding: 1rem; border-bottom: 1px solid var(--pilot-border); white-space: nowrap; }

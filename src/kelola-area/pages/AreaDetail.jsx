@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { formatRupiah, METRIC_META, useSmart } from '../../shared/store/SmartStore';
 import { localDateKey, localMonthKey } from '../../shared/model/localDate.js';
 import { monthlyQuestChecklist } from '../../v-pet/model/petQuests.js';
+import { getAreaFeatures } from '../model/areaFeatures.js';
 import { IconButton,
   Badge, Button, Card, Empty, Field, Input, NumberInput, SectionTitle, StatCard, STATUS_LABEL,
   STATUS_TONE, Select, Table, TextArea,
@@ -31,16 +32,27 @@ export default function AreaDetail() {
   const [matiForm, setMatiForm] = useState(emptyMati);
   const [harvest, setHarvest] = useState({ qty: '', unit: 'kg', revenue: '', note: '', date: localDateKey() });
   const [cleaningNote, setCleaningNote] = useState('');
+  const [featureSelection, setFeatureSelection] = useState(() => ({
+    areaId: id,
+    pathname: location.pathname,
+    hash: location.hash,
+    feature: location.hash === '#form-pemantauan' ? 'pemantauan' : 'sensor',
+  }));
 
   const area = areasSaya.find((a) => a.id === id);
+  const activeFeature = featureSelection.areaId === id
+    && featureSelection.pathname === location.pathname
+    && featureSelection.hash === location.hash
+    ? featureSelection.feature
+    : location.hash === '#form-pemantauan' ? 'pemantauan' : 'sensor';
 
   useEffect(() => {
-    if (location.hash !== '#form-pemantauan') return undefined;
+    if (location.hash !== '#form-pemantauan' || activeFeature !== 'pemantauan') return undefined;
     const frame = requestAnimationFrame(() => {
       document.getElementById('form-pemantauan')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     return () => cancelAnimationFrame(frame);
-  }, [location.hash, id]);
+  }, [location.hash, id, activeFeature]);
 
   // Periksa HAK AKSES lebih dulu, sebelum mencari areanya. Kalau urutannya
   // dibalik, area milik operator lain tidak ditemukan di `areasSaya` sehingga
@@ -87,6 +99,9 @@ export default function AreaDetail() {
   const cleaningRecords = isKolam
     ? pondActivityEvents.filter((item) => item.areaId === area.id && item.activityCode === 'pond-cleaning').slice(0, 5)
     : [];
+  const featureTabs = getAreaFeatures(isKolam);
+  const selectedFeature = featureTabs.some((feature) => feature.id === activeFeature) ? activeFeature : 'sensor';
+  const selectedFeatureLabel = featureTabs.find((feature) => feature.id === selectedFeature)?.label || 'Sensor';
 
   const submitHpp = (event) => {
     event.preventDefault();
@@ -151,6 +166,31 @@ export default function AreaDetail() {
         </div>
       </Card>
 
+      <nav aria-label="Navigasi fitur area" className="min-w-0">
+        <div role="group" aria-label="Pilih fitur area" className="custom-scrollbar flex gap-2 overflow-x-auto pb-2">
+          {featureTabs.map((feature) => {
+            const selected = selectedFeature === feature.id;
+            return (
+              <button
+                key={feature.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setFeatureSelection({
+                  areaId: id,
+                  pathname: location.pathname,
+                  hash: location.hash,
+                  feature: feature.id,
+                })}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${selected ? 'border-primary bg-primary text-white' : 'border-outline-variant/40 bg-white/70 text-on-surface hover:border-primary/50 hover:text-primary dark:bg-[#191e1b]/70'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{feature.icon}</span>
+                {feature.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
         <StatCard label="Total HPP" value={formatRupiah(total)} icon="payments" hint={`${area.hpp.length} item biaya`} />
         <StatCard label="HPP / Unit" value={perUnit ? formatRupiah(perUnit) : '·'} icon="calculate" hint={`per ${area.populationUnit}`} />
@@ -164,7 +204,8 @@ export default function AreaDetail() {
         />
       </div>
 
-      {/* ── Statistik harian kolam dari sensor ── */}
+      <section aria-label={`Fitur area: ${selectedFeatureLabel}`} className="min-w-0 space-y-6">
+      {selectedFeature === 'sensor' && (
       <Card>
         <SectionTitle
           eyebrow="Statistik Harian"
@@ -228,8 +269,9 @@ export default function AreaDetail() {
           </>
         )}
       </Card>
+      )}
 
-      {isKolam && (
+      {isKolam && selectedFeature === 'kematian' && (
         <Card>
           <SectionTitle
             eyebrow="Kematian Ikan"
@@ -276,7 +318,7 @@ export default function AreaDetail() {
         </Card>
       )}
 
-      {isKolam && (
+      {isKolam && selectedFeature === 'pembersihan' && (
         <Card>
           <SectionTitle
             eyebrow="Quest Bulanan"
@@ -322,8 +364,7 @@ export default function AreaDetail() {
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
-        {/* ── HPP ── */}
+      {selectedFeature === 'hpp' && (
         <Card>
           <SectionTitle
             eyebrow="Harga Pokok Produksi"
@@ -383,8 +424,9 @@ export default function AreaDetail() {
             </Table>
           )}
         </Card>
+      )}
 
-        {/* ── Pemantauan manual ── */}
+      {selectedFeature === 'pemantauan' && (
         <Card>
           <SectionTitle eyebrow="Pemantauan" title="Catat kondisi kolam" subtitle="Satu parameter cukup untuk menyimpan catatan. Misi Gamifikasi kualitas air tercentang jika minimal dua parameter manual tercatat hari ini. Setiap catatan memberi +15 poin." />
           <form id="form-pemantauan" onSubmit={submitNote} className="space-y-3 scroll-mt-24">
@@ -409,9 +451,9 @@ export default function AreaDetail() {
             <Button type="submit" icon="save" className="w-full justify-center">Simpan pemantauan</Button>
           </form>
         </Card>
-      </div>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {selectedFeature === 'riwayat' && (
         <Card>
           <SectionTitle eyebrow="Riwayat" title="Catatan pemantauan area" />
           {notes.length === 0 ? (
@@ -439,8 +481,9 @@ export default function AreaDetail() {
             </ul>
           )}
         </Card>
+      )}
 
-        <div className="space-y-4">
+      {selectedFeature === 'panen' && (
           <Card>
             <SectionTitle eyebrow="Panen" title="Catat hasil panen" subtitle="Panen tercatat memberi +100 point." />
             <form onSubmit={submitHarvest} className="grid grid-cols-2 gap-3">
@@ -476,7 +519,9 @@ export default function AreaDetail() {
               </ul>
             )}
           </Card>
+      )}
 
+      {selectedFeature === 'perangkat' && (
           <Card>
             <SectionTitle eyebrow="Perangkat" title="Device IoT di area ini" />
             {areaDevices.length === 0 ? (
@@ -496,8 +541,8 @@ export default function AreaDetail() {
               </ul>
             )}
           </Card>
-        </div>
-      </div>
+      )}
+      </section>
     </div>
   );
 }

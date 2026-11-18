@@ -29,11 +29,42 @@ test('care actions update condition without granting EXP directly', () => {
   assert.equal(updated.level, pet.level);
 });
 
-test('play-only happiness changes do not affect EXP', () => {
+test('happiness updates alone do not add EXP outside the daily play reward', () => {
   const updated = applyPetCare(pet, { happiness: 80 });
   assert.equal(updated.happiness, 80);
   assert.equal(updated.xp, pet.xp);
   assert.equal(updated.level, pet.level);
+});
+
+test('play awards +10 EXP once per pet per local day and rearms the next day', () => {
+  assert.equal(petProgress.PET_DAILY_PLAY_EXP, 10);
+  const first = petProgress.applyDailyPlayExperience(pet, '2026-11-01');
+  assert.equal(first.expAwarded, 10);
+  assert.equal(first.alreadyAwarded, false);
+  assert.equal(first.pet.xp, 110);
+  assert.equal(first.pet.lastPlayExpDate, '2026-11-01');
+
+  const repeated = petProgress.applyDailyPlayExperience(first.pet, '2026-11-01');
+  assert.equal(repeated.expAwarded, 0);
+  assert.equal(repeated.alreadyAwarded, true);
+  assert.equal(repeated.pet.xp, first.pet.xp);
+
+  const nextDay = petProgress.applyDailyPlayExperience(repeated.pet, '2026-11-02');
+  assert.equal(nextDay.expAwarded, 10);
+  assert.equal(nextDay.alreadyAwarded, false);
+  assert.equal(nextDay.pet.xp, 120);
+  assert.equal(nextDay.pet.lastPlayExpDate, '2026-11-02');
+
+  const anotherPet = petProgress.applyDailyPlayExperience({ ...pet, id: 'PET-2' }, '2026-11-01');
+  assert.equal(anotherPet.expAwarded, 10);
+  assert.equal(anotherPet.pet.xp, 110);
+});
+
+test('invalid dates do not award daily play EXP', () => {
+  const result = petProgress.applyDailyPlayExperience(pet, 'not-a-date');
+  assert.equal(result.expAwarded, 0);
+  assert.equal(result.alreadyAwarded, false);
+  assert.equal(result.pet.xp, pet.xp);
 });
 
 test('unchanged and worsened care conditions do not affect EXP', () => {

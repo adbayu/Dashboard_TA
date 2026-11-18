@@ -14,7 +14,9 @@ import {
   SEED_USERS,
   STATUS_AKUN,
 } from '../data/seed';
-import { applyPetCare } from '../../v-pet/model/petProgress.js';
+import { applyDailyPlayExperience, applyPetCare } from '../../v-pet/model/petProgress.js';
+import { nilaiTerhadapAmbang } from '../model/threshold.js';
+export { nilaiTerhadapAmbang } from '../model/threshold.js';
 import { applyKangkungSensorExp } from '../../v-pet/model/kangkungSensorExp.js';
 import { normalizeFishCount, recordDailyMortality, setFishPopulation } from '../../kelola-area/model/fishPopulation';
 import { createPetRecord, isSupportedPetSpecies, migratePetState, patchPetCollection, selectPet } from '../../v-pet/model/petModel';
@@ -64,15 +66,6 @@ export function ambangUntuk(area, kategori, key) {
   return null;
 }
 
-// Penilaian satu nilai terhadap ambang. Dipakai kartu telemetri, List IoT, dan
-// ringkasan statistik supaya bahasanya seragam.
-export function nilaiTerhadapAmbang(value, ambang) {
-  if (value == null || !ambang) return null;
-  const [min, max] = ambang;
-  if (value < min) return 'bawah';
-  if (value > max) return 'atas';
-  return 'dalam';
-}
 
 // Isi QR alat. SATU tempat saja supaya halaman Kelola IoT dan List IoT tidak
 // mencetak format berbeda untuk alat yang sama. Bentuk "JAGOFARM|<kode>|<id>"
@@ -1011,22 +1004,31 @@ export function SmartProvider({ children }) {
           );
         });
       },
-      playPet: (petId) => {
+      playPet: (petId, date = hariKey()) => {
         patch((prev) => {
           const targetId = petId || prev.selectedPetId;
           const pet = prev.pets.find((item) => item.id === targetId);
           if (!pet) return {};
-          const happiness = clamp(pet.happiness + 16, 0, 100);
-          const happinessGain = happiness - pet.happiness;
           const timestamp = now();
-          return updatePet(prev, targetId, (item) => ({
-            ...item,
-            happiness,
-            lastPlayed: timestamp,
-            log: [{ id: uid('P'), at: timestamp, text: `${pet.species} diajak main. EXP tidak bertambah.`, delta: `+${happinessGain} kebahagiaan, 0 EXP` }, ...pet.log].slice(0, 20),
-          }));
+          return updatePet(prev, targetId, (item) => {
+            const happiness = clamp(item.happiness + 16, 0, 100);
+            const happinessGain = happiness - item.happiness;
+            const playReward = item.expMode === 'iot-daily'
+              ? { pet: item, expAwarded: 0 }
+              : applyDailyPlayExperience(item, date);
+            return {
+              ...playReward.pet,
+              happiness,
+              lastPlayed: timestamp,
+              log: [{
+                id: uid('P'),
+                at: timestamp,
+                text: `${item.species} diajak main.`,
+                delta: `+${happinessGain} kebahagiaan, ${playReward.expAwarded ? `+${playReward.expAwarded} EXP (reward harian)` : '0 EXP (reward harian sudah diterima)'}`,
+              }, ...item.log].slice(0, 20),
+            };
+          });
         });
-        notify('Ajak main hanya menambah kebahagiaan; tidak memberi poin atau EXP.');
       },
       cleanPet: (petId) => {
         patch((prev) => {
@@ -1055,7 +1057,7 @@ export function SmartProvider({ children }) {
             targetId,
             'heal',
             { health: 100 },
-            `${pet.species} dirawat.`,
+            `${pet.species} kesehatannya dipulihkan.`,
             timestamp,
           );
         });
@@ -1077,6 +1079,7 @@ export function SmartProvider({ children }) {
             species: current.species,
             appliedToAreaId: current.appliedToAreaId,
             ownerUserId: current.ownerUserId,
+            lastPlayExpDate: current.lastPlayExpDate,
             log: [],
           }));
         });
@@ -1099,7 +1102,7 @@ export function SmartProvider({ children }) {
             health: clamp(item.health - (item.hunger < 30 ? 6 : 2), 0, 100),
           }));
         });
-        notify('Waktu berjalan: kondisi pet menurun, rawat kembali.', 'warn');
+        notify('Waktu berjalan: kondisi pet menurun; beri pakan, bersihkan, atau pulihkan kesehatannya.', 'warn');
       },
 
       // ── Gamifikasi ──────────────────────────────────────────────────────────

@@ -2,14 +2,14 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
 import { Badge, Bar, Card, Empty, SectionTitle, StatCard, STATUS_LABEL, STATUS_TONE, Table } from '../../shared/components/ui';
+import { WARNA_STATUS, TEKS_STATUS } from '../model/thresholdStatus.js';
+import SensorHistorySection from '../components/SensorHistorySection.jsx';
 
-const WARNA_STATUS = { aman: 'ok', waspada: 'warn', bahaya: 'bad', 'tanpa-ambang': 'muted' };
-const TEKS_STATUS = { aman: 'Aman', waspada: 'Waspada', bahaya: 'Keluar ambang', 'tanpa-ambang': 'Tanpa ambang' };
 const angka = (value, digit) => (value == null ? '·' : Number(value).toFixed(digit));
 
 export default function Dashboard() {
   const {
-    areasSaya, devices, categories, monitoring, hppTotal, pet, points, activeAlerts, missions,
+    areasSaya, devices, categories, monitoring, readings, theme, hppTotal, pet, points, activeAlerts, missions,
     statistikArea, totalKematianHariIni, kematianArea, historiArea,
   } = useSmart();
   const areas = areasSaya;
@@ -53,6 +53,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <SensorHistorySection
+        areas={areas}
+        devices={devices}
+        categories={categories}
+        readings={readings}
+        theme={theme}
+        historiArea={historiArea}
+        formatNumber={angka}
+      />
       {/* Sambutan + kondisi utama */}
       <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
         <Card className="bg-gradient-to-br from-primary/10 to-transparent">
@@ -240,99 +249,6 @@ export default function Dashboard() {
             })}
             <p className="text-[11px] text-on-surface-variant">
               Angka kematian ikan diisi manual melalui Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
-            </p>
-          </div>
-        )}
-      </Card>
-
-      {/* ── Histori harian kolam ── */}
-      <Card>
-        <SectionTitle
-          eyebrow="Histori Harian"
-          title="Riwayat kondisi kolam per tanggal"
-          subtitle="Ringkasan tiap hari: rata-rata, terendah, dan tertinggi dari sensor pH, suhu air, dan TDS, lengkap dengan tanggal, bulan, dan tahunnya."
-        />
-        {areaBerSensor.length === 0 ? (
-          <Empty
-            title="Belum ada kolam dengan sensor"
-            hint="Histori harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
-            icon="sensors_off"
-          />
-        ) : (
-          <div className="space-y-6">
-            {areaBerSensor.map((area) => {
-              const histori = historiArea(area.id, 14);
-              return (
-                <div key={area.id}>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <h3 className="font-bold text-on-surface">{area.name}</h3>
-                    <span className="text-[11px] text-on-surface-variant">
-                      {histori.filter((h) => h.adaData).length} hari tercatat ·{' '}
-                      {angka(histori.reduce((s, h) => s + h.jumlah, 0), 0)} pembacaan tersimpan
-                    </span>
-                  </div>
-                  <Table head={['Tanggal', 'pH rata-rata', 'Suhu rata-rata', 'TDS rata-rata', 'Rentang hari ini', 'Ikan mati']}>
-                    {histori.map((h) => (
-                      <tr
-                        key={h.tanggal}
-                        className={h.hariIni ? 'bg-primary/5' : 'hover:bg-primary/5'}
-                      >
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="font-semibold text-on-surface">{h.label}</span>
-                          {h.hariIni && (
-                            <Badge tone="brand" className="ml-2">
-                              Hari ini
-                            </Badge>
-                          )}
-                        </td>
-                        {h.metrik.map((row) => {
-                          const meta = METRIC_META[row.key];
-                          const s = row.stats;
-                          return (
-                            <td key={row.key} className="px-3 py-2 whitespace-nowrap">
-                              {s ? (
-                                <>
-                                  <span className="font-semibold text-on-surface">
-                                    {angka(s.avg, meta.precision)}
-                                  </span>{' '}
-                                  <span className="text-[11px] text-on-surface-variant">{meta.unit}</span>
-                                  <span className="block text-[11px] text-on-surface-variant">
-                                    {angka(s.min, meta.precision)}–{angka(s.max, meta.precision)}
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-[11px] text-on-surface-variant">·</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
-                            {h.metrik.map((row) => (
-                              <Badge key={row.key} tone={WARNA_STATUS[row.status] || 'muted'}>
-                                {METRIC_META[row.key].label.replace(' Air', '').replace(' Nutrisi', '')}{' '}
-                                {TEKS_STATUS[row.status] || 'Tanpa data'}
-                              </Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {h.matiEkor > 0 ? (
-                            <span className="font-bold text-amber-600">{h.matiEkor} ekor</span>
-                          ) : (
-                            <span className="text-[11px] text-on-surface-variant">·</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </Table>
-                </div>
-              );
-            })}
-            <p className="text-[11px] text-on-surface-variant">
-              Rentang hari ini = nilai terendah–tertinggi sepanjang hari itu. Statusnya memakai ambang
-              ideal yang sama dengan kartu statistik di atas. Angka kematian diisi manual melalui
-              Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
             </p>
           </div>
         )}

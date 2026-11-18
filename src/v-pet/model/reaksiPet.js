@@ -136,7 +136,7 @@ export function reaksiPet(parameter, { lapar = 0, kotor = 0, sakit = 0 } = {}) {
   if (kotor >= 70) return { ...dasar, ekspresi: 'kotor',
     pesan: 'Airnya sudah bagus, tapi aku sendiri butuh dibersihkan.', aksi: 'Bersihkan kolam', tingkat: 'waspada', sebab: { key: 'hygiene', label: 'Kebersihan' } };
   if (sakit >= 70) return { ...dasar, ekspresi: 'sakit',
-    pesan: 'Airnya aman, tapi aku sedang tidak enak badan.', aksi: 'Rawat pet', tingkat: 'waspada', sebab: { key: 'health', label: 'Kesehatan' } };
+    pesan: 'Airnya aman, tapi aku sedang tidak enak badan.', aksi: 'Pulihkan kesehatan', tingkat: 'waspada', sebab: { key: 'health', label: 'Kesehatan' } };
   if (!dinilai.length) return { ...dasar, ekspresi: 'mengantuk',
     pesan: 'Belum ada sensor di area ini, jadi aku belum bisa bilang apa-apa tentang airnya.', aksi: 'Pasang sensor di area ini', tingkat: 'aman', sebab: null };
 

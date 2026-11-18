@@ -8,11 +8,14 @@ ROOT = Path(__file__).resolve().parents[2] / "src" / "v-pet" / "assets"
 SENSOR_KEYS = ("aman", "bahaya", "ph", "tds", "temp", "waspada")
 SUPPORTED_SPECIES_KEYS = frozenset(("nila", "gurame", "kangkung"))
 LEVEL_GIF_SPECIES = ("nila", "gurame", "kangkung")
+ACTION_GIF_SPECIES = ("nila", "gurame")
 LEVELS = range(1, 5)
 CONDITIONS = ("normal", "senang", "sedih", "kepanasan", "kedinginan")
 PNG_SIGNATURE = bytes((137, 80, 78, 71, 13, 10, 26, 10))
 GIF_SIGNATURES = (b"GIF87a", b"GIF89a")
 LEVEL_IMAGE_PATTERN = re.compile(r"karakter-level/([a-z0-9-]+)/level-(\d+)(?:-(\d+))?(?:__[a-z0-9-]+)?\.(?:png|gif)$")
+ACTION_GIF_PATTERN = re.compile(r"aksi/(nila|gurame)/\1-L(\d+)-(?:beri-pakan|main)(?:__(senang|sedih|kedinginan|kepanasan))?\.gif$", re.IGNORECASE)
+
 
 
 def main() -> int:
@@ -44,10 +47,12 @@ def main() -> int:
         is_base_art_path = len(parts) == 3 and parts[0] == "karakter-arcade" and parts[2] == "body.png" and path.suffix.lower() == ".png"
         is_base_art = is_base_art_path and parts[1] in SUPPORTED_SPECIES_KEYS
         level_match = LEVEL_IMAGE_PATTERN.fullmatch(relative)
+        action_match = ACTION_GIF_PATTERN.fullmatch(relative)
+
         if is_base_art_path and parts[1] not in SUPPORTED_SPECIES_KEYS:
             issues.append((relative, "karakter hanya boleh untuk spesies nila, gurame, atau kangkung"))
-        elif not is_base_art and not level_match:
-            issues.append((relative, "gambar hanya boleh berupa body.png atau PNG/GIF level yang dikirim pengguna"))
+        elif not is_base_art and not level_match and not action_match:
+            issues.append((relative, "gambar hanya boleh berupa body.png, PNG/GIF level, atau GIF aksi yang dikirim pengguna"))
         if level_match:
             species_key = level_match.group(1)
             min_level = int(level_match.group(2))
@@ -56,6 +61,11 @@ def main() -> int:
                 issues.append((relative, "karakter hanya boleh untuk spesies nila, gurame, atau kangkung"))
             if min_level < 1 or max_level < min_level:
                 issues.append((relative, "rentang level gambar harus positif dan tidak terbalik"))
+        if action_match:
+            action_level = int(action_match.group(2))
+            if not 1 <= action_level <= 4:
+                issues.append((relative, "animasi aksi Nila/Gurame hanya tersedia untuk level 1–4"))
+
 
         data = path.read_bytes()
         if path.suffix.lower() == ".png":
@@ -87,6 +97,27 @@ def main() -> int:
     for relative in required_condition_gifs:
         if not (ROOT / relative).is_file():
             issues.append((relative, "GIF kondisi Nila/Gurame/Kangkung level 1–4 wajib tersedia"))
+
+    required_action_gifs = [
+        f"aksi/{species}/{species}-L{level}-{action}.gif"
+        for species in ACTION_GIF_SPECIES
+        for level in LEVELS
+        for action in ("beri-pakan", "main")
+    ]
+    for relative in required_action_gifs:
+        if not (ROOT / relative).is_file():
+            issues.append((relative, "GIF animasi aksi Nila/Gurame tidak ditemukan"))
+
+    required_condition_actions = [
+        f"aksi/{species}/{species}-L{level}-{action}__{condition}.gif"
+        for species in ACTION_GIF_SPECIES
+        for level in LEVELS
+        for action in ("beri-pakan", "main")
+        for condition in ("senang", "sedih", "kedinginan", "kepanasan")
+    ]
+    for relative in required_condition_actions:
+        if not (ROOT / relative).is_file():
+            issues.append((relative, "GIF aksi berkondisi Nila/Gurame level 1–4 wajib tersedia"))
 
     print(f"Memeriksa {len(svg_files)} ikon SVG dan {len(character_files)} gambar karakter di {ROOT}")
     if issues:

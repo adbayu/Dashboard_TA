@@ -45,3 +45,27 @@ export function applyPetExperience(pet, amount = 10) {
     xpNext,
   };
 }
+
+export const PET_DAILY_PLAY_EXP = 10;
+const LOCAL_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidLocalDateKey(value) {
+  if (!LOCAL_DATE_KEY.test(String(value || ''))) return false;
+  const [year, month, day] = String(value).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+export function applyDailyPlayExperience(pet, date) {
+  if (!pet || !isValidLocalDateKey(date)) {
+    return { pet, expAwarded: 0, alreadyAwarded: false };
+  }
+  if (pet.lastPlayExpDate === date) {
+    return { pet, expAwarded: 0, alreadyAwarded: true };
+  }
+  return {
+    pet: { ...applyPetExperience(pet, PET_DAILY_PLAY_EXP), lastPlayExpDate: date },
+    expAwarded: PET_DAILY_PLAY_EXP,
+    alreadyAwarded: false,
+  };
+}

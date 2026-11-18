@@ -1,7 +1,7 @@
 export const PET_DAILY_QUESTS = Object.freeze([
   { id: 'feed', title: 'Beri pakan', activityCode: 'feed', exp: 10, kind: 'daily' },
   { id: 'clean', title: 'Bersihkan', activityCode: 'clean', exp: 10, kind: 'daily' },
-  { id: 'heal', title: 'Rawat', activityCode: 'heal', exp: 10, kind: 'daily' },
+  { id: 'heal', title: 'Pulihkan kesehatan', activityCode: 'heal', exp: 10, kind: 'daily' },
   { id: 'water-check', title: 'Cek kualitas air', activityCode: 'monitoring', exp: 10, kind: 'daily' },
 ]);
 

@@ -134,7 +134,7 @@ export function StatCard({ label, value, unit, icon, hint, tone = 'brand' }) {
         )}
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-2xl font-extrabold text-on-surface leading-none">{value}</span>
+        <span className="text-[clamp(0.875rem,4vw,1.5rem)] font-extrabold text-on-surface leading-none">{value}</span>
         {unit && <span className="text-xs font-semibold text-on-surface-variant">{unit}</span>}
       </div>
       {/* min-h menjaga tinggi kartu sama walau hint hanya satu baris */}
@@ -144,7 +144,7 @@ export function StatCard({ label, value, unit, icon, hint, tone = 'brand' }) {
 }
 
 const VARIAN_TOMBOL = {
-  primary: 'bg-primary-action text-white hover:bg-primary-container shadow-emerald-glow dark:border dark:border-primary-fixed-dim/35 dark:shadow-none',
+  primary: 'bg-primary-action text-white hover:bg-primary-container shadow-sm active:shadow-none dark:border dark:border-primary-fixed-dim/35 dark:shadow-none',
   ghost: 'panel-inset text-on-surface hover:border-primary/40',
   danger: 'bg-red-600 text-white hover:bg-red-700',
   soft: 'bg-primary/10 text-primary hover:bg-primary/20 dark:bg-primary-fixed-dim/10 dark:hover:bg-primary-fixed-dim/20 dark:border dark:border-primary-fixed-dim/35 dark:text-primary-fixed-dim',

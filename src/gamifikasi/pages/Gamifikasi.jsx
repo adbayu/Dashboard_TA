@@ -96,8 +96,8 @@ export default function Gamifikasi() {
                 <button
                   key={badge.id}
                   onClick={() => setOpenBadge(badge)}
-                  className={`w-full text-left rounded-2xl border p-3 transition-all ${
-                    unlocked ? 'border-primary/30 bg-primary/5 hover:shadow-glass' : 'border-outline-variant/40 opacity-70'
+                  className={`w-full text-left rounded-2xl border p-3 transition-colors ${
+                    unlocked ? 'border-primary/30 bg-primary/5 hover:bg-primary/10' : 'border-outline-variant/40 opacity-70'
                   }`}
                 >
                   <div className="flex items-center gap-3">

@@ -1,21 +1,24 @@
 import { useLocation } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ambangUntuk, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
 import { localDateKey, localMonthKey, millisecondsUntilNextLocalMidnight } from '../../shared/model/localDate.js';
 import { Badge, Bar, Button, Card, Empty, Field, Input, Modal, SectionTitle, Table, Select } from '../../shared/components/ui';
-import PetKarakter, { IkonSensor } from '../components/PetKarakter';
+import PetKarakter, { IkonSensor, kunciKarakter } from '../components/PetKarakter';
 import { SEED_PETS } from '../data/seed.js';
 import { dailyQuestChecklist, monthlyQuestChecklist } from '../model/petQuests.js';
 import { penjelasanKondisiAir, reaksiPet, URUTAN_PARAMETER } from '../model/reaksiPet';
 import { KANGKUNG_SENSOR_EXP_PER_DAY, kangkungSensorReaction } from '../model/kangkungSensorExp.js';
+import { PET_DAILY_PLAY_EXP } from '../model/petProgress.js';
+import { isPetActionAnimationSupported } from '../model/petActionAnimations.js';
 import { visiblePetsForUser } from '../model/petModel.js';
 import '../styles/pet.css';
 
 const SPECIES = [...new Set(SEED_PETS.map((item) => item.species))];
+const PET_ACTION_ANIMATION_LOAD_TIMEOUT_MS = 60_000;
 const QUEST_TITLES = {
   feed: 'Beri pakan',
   clean: 'Bersihkan',
-  heal: 'Rawat',
+  heal: 'Pulihkan kesehatan',
   'water-check': 'Cek kualitas air',
   mortality: 'Catat kematian ikan',
   harvest: 'Catat panen',
@@ -103,6 +106,7 @@ export default function VPet() {
   const [addPetOpen, setAddPetOpen] = useState(false);
   const [newPetForm, setNewPetForm] = useState({ name: '', species: SPECIES[0] || '', appliedToAreaId: '' });
   const [questDateKey, setQuestDateKey] = useState(() => localDateKey());
+  const [petActionAnimation, setPetActionAnimation] = useState(null);
   const areas = areasSaya;
   const kolamSaya = areas.filter((item) => item.type === 'kolam');
   const devicesSaya = devices.filter((item) => areas.some((areaItem) => areaItem.id === item.areaId));
@@ -131,6 +135,59 @@ export default function VPet() {
     item.petId === pet.id && item.date === questDateKey,
   ));
   const seenActivityEventIds = useRef(null);
+  const petActionAnimationTimer = useRef(null);
+  const petActionAnimationSequence = useRef(0);
+  const activePetActionAnimationId = useRef(null);
+
+  const finishPetActionAnimation = useCallback((animationId) => {
+    if (activePetActionAnimationId.current !== animationId) return;
+    clearTimeout(petActionAnimationTimer.current);
+    petActionAnimationTimer.current = null;
+    activePetActionAnimationId.current = null;
+    setPetActionAnimation((current) => (current?.id === animationId ? null : current));
+  }, []);
+
+  const handlePetActionAnimationLoad = useCallback((animationId, durationMs) => {
+    if (activePetActionAnimationId.current !== animationId) return;
+    clearTimeout(petActionAnimationTimer.current);
+    setPetActionAnimation((current) => (current?.id === animationId ? { ...current, loaded: true } : current));
+    petActionAnimationTimer.current = setTimeout(() => finishPetActionAnimation(animationId), durationMs);
+  }, [finishPetActionAnimation]);
+
+  const handlePetActionAnimationError = useCallback((animationId) => {
+    finishPetActionAnimation(animationId);
+  }, [finishPetActionAnimation]);
+
+  const runPetAction = (action) => {
+    if (!pet || activePetActionAnimationId.current !== null) return;
+    const targetPet = pet;
+    const playRewardDate = localDateKey();
+    const playRewardAvailable = action === 'play'
+      && targetPet.expMode !== 'iot-daily'
+      && targetPet.lastPlayExpDate !== playRewardDate;
+    if (isPetActionAnimationSupported({ speciesKey: kunciKarakter(targetPet.species), level: targetPet.level, action })) {
+      const animationId = ++petActionAnimationSequence.current;
+      activePetActionAnimationId.current = animationId;
+      setPetActionAnimation({
+        id: animationId,
+        petId: targetPet.id,
+        level: targetPet.level,
+        action,
+        condition: ekspresiKarakter,
+        loaded: false,
+      });
+      clearTimeout(petActionAnimationTimer.current);
+      petActionAnimationTimer.current = setTimeout(
+        () => finishPetActionAnimation(animationId),
+        PET_ACTION_ANIMATION_LOAD_TIMEOUT_MS,
+      );
+    }
+    if (action === 'feed') feedPet(targetPet.id);
+    if (action === 'play') {
+      playPet(targetPet.id, playRewardDate);
+      if (playRewardAvailable) notify(`${targetPet.name} mendapat +${PET_DAILY_PLAY_EXP} EXP dari bermain hari ini.`);
+    }
+  };
 
   useEffect(() => {
     let midnightTimer;
@@ -145,6 +202,23 @@ export default function VPet() {
     refreshLocalDay();
     return () => clearTimeout(midnightTimer);
   }, []);
+
+  useEffect(() => {
+    if (!petDialogId && activePetActionAnimationId.current !== null) {
+      finishPetActionAnimation(activePetActionAnimationId.current);
+    }
+  }, [petDialogId, finishPetActionAnimation]);
+
+  useEffect(() => () => {
+    clearTimeout(petActionAnimationTimer.current);
+    activePetActionAnimationId.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (petActionAnimation && petActionAnimation.petId !== pet?.id) {
+      finishPetActionAnimation(petActionAnimation.id);
+    }
+  }, [pet?.id, petActionAnimation, finishPetActionAnimation]);
 
   useEffect(() => {
     if (!openMissionActivity || !petDialogId) return undefined;
@@ -242,8 +316,8 @@ export default function VPet() {
   const status = pet && !isSensorDrivenPet ? [
     { key: 'hunger', label: 'Kenyang', value: pet.hunger, icon: 'restaurant', low: 'Lapar, beri pakan' },
     { key: 'happiness', label: 'Kebahagiaan', value: pet.happiness, icon: 'mood', low: 'Murung, ajak bermain' },
-    { key: 'hygiene', label: 'Kebersihan', value: pet.hygiene, icon: 'shower', low: 'Kotor, bersihkan kolam' },
-    { key: 'health', label: 'Kesehatan', value: pet.health, icon: 'favorite', low: 'Lemah, butuh perawatan' },
+    { key: 'hygiene', label: 'Kebersihan', value: pet.hygiene, icon: 'shower', low: 'Kotor, bersihkan pet' },
+    { key: 'health', label: 'Kesehatan', value: pet.health, icon: 'favorite', low: 'Lemah, pulihkan kesehatan' },
   ] : [];
   const avgHealth = status.length
     ? Math.round(status.reduce((sum, row) => sum + row.value, 0) / status.length)
@@ -405,7 +479,35 @@ export default function VPet() {
                   ? `Lokasi: ${petLocation}. EXP dan ekspresi mengikuti pH, suhu, dan TDS.`
                   : `Lokasi: ${petLocation}. Reaksi sensor dan status perawatan dijelaskan di bawah; gambar karakter ditampilkan apa adanya.`}
               />
-              <PetKarakter species={pet.species} level={pet.level} ekspresi={ekspresiKarakter} pesan={reaksi.pesan} tinggi={300} />
+              <PetKarakter
+                species={pet.species}
+                level={pet.level}
+                ekspresi={ekspresiKarakter}
+                pesan={reaksi.pesan}
+                tinggi={300}
+                action={petActionAnimation?.petId === pet.id ? petActionAnimation.action : null}
+                actionId={petActionAnimation?.petId === pet.id ? petActionAnimation.id : null}
+                actionLevel={petActionAnimation?.petId === pet.id ? petActionAnimation.level : null}
+                actionCondition={petActionAnimation?.petId === pet.id ? petActionAnimation.condition : ekspresiKarakter}
+                onActionAnimationLoad={handlePetActionAnimationLoad}
+                onActionAnimationError={handlePetActionAnimationError}
+              />
+              {!isSensorDrivenPet && (
+                <>
+                  <div id="pet-care-actions" className="mt-3 grid grid-cols-2 gap-2">
+                    <Button icon="restaurant" variant="soft" onClick={() => runPetAction('feed')} disabled={Boolean(petActionAnimation)} className="w-full justify-center">Beri pakan</Button>
+                    <Button icon="sports_esports" variant="soft" onClick={() => runPetAction('play')} disabled={Boolean(petActionAnimation)} className="w-full justify-center">Ajak main</Button>
+                  </div>
+                  <p className="mt-1 text-[11px] text-on-surface-variant">Ajak main menambah kebahagiaan dan memberi +{PET_DAILY_PLAY_EXP} EXP sekali sehari per pet.</p>
+                  <p className="mt-2 min-h-5 text-center text-xs text-on-surface-variant" role="status" aria-live="polite" aria-atomic="true">
+                    {petActionAnimation?.petId === pet.id
+                      ? (petActionAnimation.loaded
+                        ? petActionAnimation.action === 'feed' ? 'Pet sedang diberi pakan.' : 'Pet sedang diajak bermain.'
+                        : 'Menyiapkan animasi aksi pet…')
+                      : null}
+                  </p>
+                </>
+              )}
               <p className="mt-2 text-sm text-on-surface-variant">{reaksi.pesan}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-[1fr,auto] sm:items-center">
                 <p className="text-sm text-on-surface-variant">
@@ -441,7 +543,7 @@ export default function VPet() {
                 <p className="mt-1 text-[11px] leading-relaxed text-on-surface-variant dark:mt-2">
                   {isSensorDrivenPet
                     ? `EXP Kangkung: +${KANGKUNG_SENSOR_EXP_PER_DAY} sekali sehari saat pH, suhu, dan TDS semuanya dalam ambang.`
-                    : 'Quest kolam yang selesai memberi +10 EXP kepada setiap pet di kolam tersebut. EXP quest terpisah dari poin farm akun.'}
+                    : `Quest kolam yang selesai memberi +10 EXP per pet; Ajak main memberi +${PET_DAILY_PLAY_EXP} EXP sekali sehari per pet. EXP terpisah dari poin farm akun.`}
                 </p>
               </div>
               {!isSensorDrivenPet && (
@@ -457,13 +559,34 @@ export default function VPet() {
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(0,1.2fr)]">
               <Card>
                 <SectionTitle eyebrow="Status Pet" title="Kondisi perawatan" subtitle="Nilai ini milik pet ini saja." />
-                <div id="pet-care-actions" className="mb-4 grid grid-cols-2 gap-2">
-                  <Button icon="restaurant" onClick={() => feedPet(pet.id)} className="justify-center">Beri pakan</Button>
-                  <Button icon="sports_esports" variant="soft" onClick={() => playPet(pet.id)} className="justify-center">Ajak main</Button>
-                  <Button icon="cleaning_services" variant="soft" onClick={() => cleanPet(pet.id)} className="justify-center">Bersihkan</Button>
-                  <Button icon="healing" variant="ghost" onClick={() => healPet(pet.id)} className="justify-center">Rawat</Button>
+                <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                  {status.map((row) => (
+                    <div key={row.key} className="min-w-0 rounded-xl border border-outline-variant/40 p-3">
+                      <div className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold">
+                        <span className="flex min-w-0 items-center gap-1.5 text-on-surface-variant">
+                          <span className="material-symbols-outlined text-[15px]">{row.icon}</span>
+                          {row.label}
+                        </span>
+                        <span className={row.value < 40 ? 'shrink-0 font-bold text-red-600' : 'shrink-0 text-on-surface'}>{row.value}%</span>
+                      </div>
+                      <Bar value={row.value} tone={row.value < 40 ? 'bad' : row.value < 65 ? 'warn' : 'brand'} label={row.label} />
+                      {row.value < 40 && <p className="mt-1 text-[11px] text-red-600">{row.low}</p>}
+                    </div>
+                  ))}
                 </div>
-                <p className="-mt-2 mb-4 text-[11px] text-on-surface-variant">Ajak main hanya menambah kebahagiaan; tidak memberi poin atau EXP.</p>
+                <details className="mb-4 overflow-hidden rounded-xl border border-outline-variant/40 bg-surface">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                    <span>Perawatan lanjutan</span>
+                    <span className="material-symbols-outlined text-[18px] text-on-surface-variant" aria-hidden="true">expand_more</span>
+                  </summary>
+                  <div className="border-t border-outline-variant/40 p-3">
+                    <p className="mb-3 text-[11px] text-on-surface-variant">Bersihkan meningkatkan kebersihan pet; Pulihkan kesehatan memulihkan kesehatannya.</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button icon="cleaning_services" variant="soft" onClick={() => cleanPet(pet.id)} className="w-full justify-center">Bersihkan</Button>
+                      <Button icon="healing" variant="soft" onClick={() => healPet(pet.id)} className="w-full justify-center">Pulihkan kesehatan</Button>
+                    </div>
+                  </div>
+                </details>
                 <section aria-label="Quest harian kolam" className="mb-4 rounded-xl border border-outline-variant/40 bg-surface p-3">
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div>
@@ -548,21 +671,6 @@ export default function VPet() {
                     </p>
                   )}
                 </section>
-                <div className="space-y-3">
-                  {status.map((row) => (
-                    <div key={row.key}>
-                      <div className="mb-1 flex items-center justify-between text-xs font-semibold">
-                        <span className="flex items-center gap-1.5 text-on-surface-variant">
-                          <span className="material-symbols-outlined text-[15px]">{row.icon}</span>
-                          {row.label}
-                        </span>
-                        <span className={row.value < 40 ? 'font-bold text-red-600' : 'text-on-surface'}>{row.value}%</span>
-                      </div>
-                      <Bar value={row.value} tone={row.value < 40 ? 'bad' : row.value < 65 ? 'warn' : 'brand'} label={row.label} />
-                      {row.value < 40 && <p className="mt-1 text-[11px] text-red-600">{row.low}</p>}
-                    </div>
-                  ))}
-                </div>
                 <div className="mt-4 border-t border-outline-variant/40 pt-3">
                   <Button variant="ghost" icon="schedule" onClick={() => decayPet(pet.id)}>Lewati waktu (uji penurunan)</Button>
                   <p className="mt-2 text-[11px] text-on-surface-variant">Simulasi ini menurunkan kondisi pet untuk pengujian.</p>

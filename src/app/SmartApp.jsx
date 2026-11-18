@@ -120,7 +120,7 @@ function Shell() {
     <div className="min-h-screen">
       <SmartSidebar />
 
-      <div className="pl-52 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
+      <div className="pl-16 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
         <SmartTopBar title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} />
 
         <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-[1500px] mx-auto pb-16">

@@ -9,6 +9,7 @@ test('provides daily routine checklist rows unchecked for an assigned pond', () 
   assert.equal(typeof questModel.dailyQuestChecklist, 'function');
   const rows = questModel.dailyQuestChecklist([], 'AR-01', '2026-10-13', []);
   assert.deepEqual(rows.map((row) => row.id), ['feed', 'clean', 'heal', 'water-check']);
+  assert.equal(rows.find((row) => row.id === 'heal').title, 'Pulihkan kesehatan');
   assert.ok(rows.every((row) => row.done === false));
 });
 

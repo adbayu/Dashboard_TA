@@ -19,7 +19,7 @@ export const SEED_BADGES = [
 export const SEED_MISSIONS = [
   { id: 'M-1', title: 'Cek kualitas air pagi', target: 'catat-minimal-2-parameter', activityCode: 'water-check', done: false },
   { id: 'M-2', title: 'Beri pakan virtual pet', target: 'feed', activityCode: 'feed', done: false },
-  { id: 'M-3', title: 'Bersihkan atau rawat pet', target: 'clean-or-heal', activityCode: 'care', done: false },
+  { id: 'M-3', title: 'Bersihkan atau pulihkan kesehatan pet', target: 'clean-or-heal', activityCode: 'care', done: false },
 ];
 
 // Catatan: TIDAK ADA const SEED_LEADERBOARD di sini. Papan peringkat diturunkan

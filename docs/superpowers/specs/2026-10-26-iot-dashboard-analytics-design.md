@@ -1,6 +1,6 @@
 # Desain Dashboard Analitik IoT
 
-Status: menunggu ulasan pengguna
+Status: disetujui untuk implementasi dengan data simulasi sementara
 
 ## Tujuan
 
@@ -20,6 +20,7 @@ Design Read: dashboard pemantauan aquaponik untuk operator farm, memakai sistem 
 
 ### Dashboard utama `/`
 
+- Letakkan kartu `Riwayat Sensor` sebagai konten pertama Dashboard `/`, sebelum ringkasan hari ini, agar grafik menjadi fokus utama saat halaman dibuka.
 - Pertahankan kartu telemetri saat ini dan bagian `Histori Harian`.
 - Tambahkan kontrol `Grafik` dan `Tabel` di dalam bagian histori. `Grafik` menjadi tampilan awal; `Tabel` tetap menyajikan ringkasan tanggal, rata-rata, minimum, maksimum, status ambang, dan kematian ikan yang sudah ada.
 - Jika pengguna memiliki lebih dari satu area dengan sensor, sediakan filter area yang hanya memuat area dalam `areasSaya`. Jika hanya satu area, tampilkan namanya tanpa dropdown yang tidak berguna.
@@ -30,9 +31,10 @@ Design Read: dashboard pemantauan aquaponik untuk operator farm, memakai sistem 
 
 ### Gaya grafik
 
-- Gunakan token warna, permukaan, teks, dan tema terang/gelap JagoFarm. Warna membedakan pH, suhu, TDS, dan status ambang, tetapi label teks tetap menyebut parameter dan statusnya.
+- Pada Dashboard utama `/`, gunakan token warna, permukaan, teks, dan tema terang/gelap JagoFarm. Pada `/pilot`, selaraskan warna garis, grid, tooltip, dan tipografi dengan palet JagoFarm dalam tema terang yang sudah digunakan halaman itu; tahap ini tidak menambahkan tema gelap baru ke Pilot. Warna membedakan pH, suhu, TDS, dan status ambang, tetapi label teks tetap menyebut parameter dan statusnya.
 - Sumbu, grid, tooltip, legenda, dan tipografi grafik mengikuti sistem visual yang sama. Grafik garis per perangkat di `/pilot` diselaraskan secara visual tanpa mengubah sumber data, API, atau batas aksesnya.
 - Grafik memakai komposisi responsif: tiga panel pada layar lebar dan tersusun vertikal di layar sempit.
+- Di bawah 640px, sidebar SmartDashboard menjadi rail ikon 64px agar area konten tetap cukup lebar untuk grafik; setiap item menampilkan label ringkas dan mempertahankan nama aksesibel. Pada 640px ke atas, sidebar tetap memakai lebar penuh yang sekarang.
 - Referensi gambar hanya menjadi inspirasi kepadatan dan variasi visual. Angka penjualan, nama toko, funnel, rasio konversi, atau metrik bisnis lain tidak dibawa ke JagoFarm karena tidak tersedia sebagai data sensor.
 
 ## Data dan akses

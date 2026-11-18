@@ -7,7 +7,7 @@ const LABELS = {
   monitoring: 'Catat pemantauan kolam',
   feed: 'Beri pakan virtual pet',
   clean: 'Bersihkan virtual pet',
-  heal: 'Rawat virtual pet',
+  heal: 'Pulihkan kesehatan virtual pet',
   mortality: 'Catat kematian ikan',
   harvest: 'Panen tercatat',
   'pond-cleaning': 'Pembersihan area kolam ikan',
@@ -16,7 +16,7 @@ const LABELS = {
 const QUEST_LABELS = {
   feed: 'Beri pakan',
   clean: 'Bersihkan',
-  heal: 'Rawat',
+  heal: 'Pulihkan kesehatan',
   'water-check': 'Cek kualitas air',
   mortality: 'Catat kematian ikan',
   harvest: 'Catat panen',
