@@ -19,7 +19,9 @@
     "test:security": "node --import tsx --test server/auth/security-limits.test.ts",
     "test:vpet": "node --test tests/v-pet/pet-model.test.mjs tests/v-pet/pet-condition.test.mjs tests/v-pet/pet-progression.test.mjs tests/kelola-area/fish-population.test.mjs tests/v-pet/pet-character-levels.test.mjs tests/v-pet/kangkung-sensor-exp.test.mjs tests/v-pet/pet-quests.test.mjs tests/gamifikasi/mission-navigation.test.mjs tests/gamifikasi/pond-activity-rewards.test.mjs tests/gamifikasi/pond-activity-state.test.mjs",
     "test:qr": "node --test tests/detail-information/qr-scanner.test.mjs",
-    "cek:aset": "python scripts/v-pet/cek-aset.py"
+    "cek:aset": "python scripts/v-pet/cek-aset.py",
+    "design:themes": "node scripts/design/gen-themes.mjs",
+    "test:ui": "node --test \"src/**/*.test.js\" \"tests/design/*.test.mjs\""
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
