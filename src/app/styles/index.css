@@ -189,6 +189,25 @@
   .modal-overlay { left: 18rem; }
 }
 
+/* QR alat: modul hitam di atas zona tenang putih di SEMUA tema dan mode.
+   Sengaja bukan token tema (surface bisa gelap atau kaca di Lumina) supaya
+   kamera tetap bisa membaca. Warna cetak ada di @media print di bawah. */
+.qr-plate {
+  --qr-terang: white;
+  --qr-gelap: black;
+  background: var(--qr-terang);
+  color: var(--qr-gelap);
+}
+
+/* Video kamera pemindai: latar hitam seperti jendela kamera di tema apa pun,
+   dan bingkai bidik putih bergaris tepi gelap agar terlihat di atas gambar
+   kamera apa pun. */
+.qr-kamera { background: black; }
+.qr-bidik {
+  border: 3px solid white;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(0 0 0 / 0.45);
+}
+
 @media print {
   @page { size: 50mm 30mm; margin: 0; }
   body * { visibility: hidden !important; }
@@ -224,6 +243,11 @@
     text-align: left !important;
   }
   .iot-qr-print img { width: 18mm !important; height: 18mm !important; }
+  .qr-plate {
+    background: white !important;
+    color: black !important;
+    border-color: black !important;
+  }
 }
 
 @media (max-width: 720px) {

@@ -2,27 +2,9 @@ import clsx from 'clsx';
 import { UKURAN } from '../ui.jsx';
 import { IkonSlot } from './IkonSlot.jsx';
 import { FOKUS } from './tones.js';
+import { kelasTombol, varianTombol } from './tombol.js';
 
-// Empat varian design system. Tinggi selalu dari UKURAN (sm 32, md 40, lg 44)
-// dan semua varian punya garis 1 px (transparan bila tak terlihat) supaya
-// tombol berbeda varian tetap persis sama tinggi dalam satu baris.
-const VARIAN = {
-  primary: 'bg-primary text-on-primary border-transparent enabled:hover:bg-primary-hover',
-  secondary: 'bg-surface text-text border-text-2 enabled:hover:bg-surface-2',
-  danger: 'bg-surface text-bad-fg border-bad-fg enabled:hover:bg-bad-bg',
-  ghost: 'bg-transparent text-text border-transparent enabled:hover:bg-surface-2',
-};
-
-// Nama varian lama dari halaman yang belum dimigrasi.
-const ALIAS_VARIAN = { soft: 'secondary' };
-
-const NONAKTIF = 'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-text-2 disabled:border-surface-2';
-
-function varianDari(variant) {
-  const nama = ALIAS_VARIAN[variant] || variant;
-  return VARIAN[nama] ? nama : 'primary';
-}
-
+// Kelas varian dan ukuran ada di tombol.js, dipakai bersama <TautanTombol>.
 export function Button({
   children,
   variant = 'primary',
@@ -34,20 +16,12 @@ export function Button({
   ...rest
 }) {
   const u = UKURAN[size] || UKURAN.md;
-  const nama = varianDari(variant);
   return (
     <button
       type={type}
       data-ui="button"
-      data-variant={nama}
-      className={clsx(
-        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control border font-semibold transition-colors duration-200',
-        u.kontrol,
-        VARIAN[nama],
-        NONAKTIF,
-        FOKUS,
-        className,
-      )}
+      data-variant={varianTombol(variant)}
+      className={kelasTombol({ variant, size, className })}
       {...rest}
     >
       <IkonSlot icon={icon} size={u.ikonPx} />

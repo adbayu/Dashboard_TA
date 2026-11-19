@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { Icon } from '../../components/Icon.jsx';
+import { opsiGambarQr } from '../opsiQr.js';
 
-// QR asli (bisa dipindai kamera) berisi tautan detail alat.
+// QR asli (bisa dipindai kamera) berisi tautan detail alat. Gambar selalu
+// hitam di atas putih dan duduk di `.qr-plate` (pelat terang tetap, lihat
+// index.css), jadi tetap terbaca di kelima tema, terang maupun gelap.
 export default function QrCode({ value, size = 200, caption }) {
   const [src, setSrc] = useState('');
 
   useEffect(() => {
     let alive = true;
-    QRCode.toDataURL(value, { width: size * 2, margin: 1, color: { dark: '#0f5238', light: '#ffffff' } })
+    QRCode.toDataURL(value, opsiGambarQr(size * 2))
       .then((url) => {
         if (alive) setSrc(url);
       })
@@ -22,25 +26,22 @@ export default function QrCode({ value, size = 200, caption }) {
   if (!src) {
     return (
       <div
-        className="rounded-2xl border border-outline-variant/40 bg-surface-container flex items-center justify-center"
+        className="flex items-center justify-center gap-2 rounded-card border border-border bg-surface-2 text-sm text-text-2"
         style={{ width: size, height: size }}
         role="status"
       >
-        <span className="material-symbols-outlined text-outline animate-spin">progress_activity</span>
+        <Icon name="loader-circle" className="animate-spin motion-reduce:animate-none" />
+        <span className="sr-only">Membuat kode QR...</span>
       </div>
     );
   }
 
   return (
     <figure className="text-center">
-      <img
-        src={src}
-        width={size}
-        height={size}
-        alt={`Kode QR alat ${caption || value}`}
-        className="rounded-2xl border border-outline-variant/40 bg-white p-2 mx-auto"
-      />
-      <figcaption className="text-[11px] text-on-surface-variant mt-2 break-all max-w-[240px] mx-auto">{value}</figcaption>
+      <span className="qr-plate mx-auto inline-block rounded-control border border-border p-2">
+        <img src={src} width={size} height={size} alt={`Kode QR alat ${caption || value}`} className="block" />
+      </span>
+      <figcaption className="mx-auto mt-2 max-w-[240px] break-all font-mono text-xs text-text-2">{value}</figcaption>
     </figure>
   );
 }

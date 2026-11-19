@@ -34,4 +34,5 @@ export { Modal } from './ui/Modal.jsx';
 export { PageHeader } from './ui/PageHeader.jsx';
 export { StatusPill, StatusPill as Badge } from './ui/StatusPill.jsx';
 export { AksiBaris, Table } from './ui/Table.jsx';
+export { Tautan, TautanTombol } from './ui/Tautan.jsx';
 export { Tabs } from './ui/Tabs.jsx';

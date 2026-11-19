@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { Button } from '../../components/ui';
+import { opsiGambarQr } from '../opsiQr.js';
 
 // Aksi pada kartu QR alat: UNDUH PNG, SALIN ISI, CETAK LABEL.
 //
@@ -16,10 +17,13 @@ import { Button } from '../../components/ui';
 // (±7,6 cm pada 300 dpi) supaya hasil cetak tajam, tidak pecah seperti QR 200px
 // yang diperbesar. Semua dibuat saat tombol diklik, jadi tidak ada kerja
 // tambahan saat halaman dibuka.
+//
+// Label adalah bahan cetak, jadi warnanya hitam di atas putih di semua tema
+// (kata kunci warna CSS, bukan token tema dan bukan hex).
 
 const LEBAR = 900;
 const QR_PX = 820;
-const WARNA = { qr: '#0f5238', kode: '#0f5238', nama: '#3f4a44', isi: '#6b7770' };
+const WARNA = { latar: 'white', kode: 'black', nama: 'black', isi: 'dimgray' };
 
 // Perkecil huruf sampai teksnya muat di lebar kanvas — isi QR bisa berupa tautan
 // panjang (…/iot/IOT-001) yang akan melewati tepi kalau ukurannya dipatok.
@@ -36,11 +40,7 @@ function ukuranMuat(g, teks, maks, awal) {
 // Label PNG (data URL) berisi QR + keterangan alat.
 // oxlint-disable-next-line react/only-export-components -- Shared QR helper stays beside its existing consumer.
 export async function buatLabelPng(value, { kode, nama } = {}) {
-  const qrUrl = await QRCode.toDataURL(value, {
-    width: QR_PX,
-    margin: 2,
-    color: { dark: WARNA.qr, light: '#ffffff' },
-  });
+  const qrUrl = await QRCode.toDataURL(value, opsiGambarQr(QR_PX));
   const img = new Image();
   await new Promise((selesai, gagal) => {
     img.onload = selesai;
@@ -52,7 +52,7 @@ export async function buatLabelPng(value, { kode, nama } = {}) {
   canvas.width = LEBAR;
   canvas.height = 1100;
   const g = canvas.getContext('2d');
-  g.fillStyle = '#ffffff';
+  g.fillStyle = WARNA.latar;
   g.fillRect(0, 0, LEBAR, canvas.height);
   g.drawImage(img, 40, 40, QR_PX, QR_PX);
 
@@ -180,7 +180,8 @@ export default function AksiQr({ value, kode, nama, size = 'sm', className = '' 
     dok.head.appendChild(meta);
     const style = dok.createElement('style');
     style.textContent = 'body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;'
-      + 'background:#fff;font-family:system-ui,sans-serif}img{width:76mm;height:auto}';
+      + 'font-family:system-ui,sans-serif}img{width:76mm;height:auto}'
+      + '@media print{body{background:white;color:black}}';
     dok.head.appendChild(style);
     const gambar = dok.createElement('img');
     gambar.src = url;
@@ -195,20 +196,20 @@ export default function AksiQr({ value, kode, nama, size = 'sm', className = '' 
   return (
     <div className={className}>
       <div className="flex flex-wrap gap-2">
-        <Button size={size} icon="download" onClick={unduh} disabled={sibuk}>
+        <Button size={size} variant="secondary" icon="download" onClick={unduh} disabled={sibuk}>
           Unduh PNG
         </Button>
-        <Button size={size} variant="ghost" icon="content_copy" onClick={salin} disabled={sibuk}>
+        <Button size={size} variant="ghost" icon="copy" onClick={salin} disabled={sibuk}>
           Salin isi QR
         </Button>
-        <Button size={size} variant="ghost" icon="print" onClick={cetak} disabled={sibuk}>
+        <Button size={size} variant="ghost" icon="printer" onClick={cetak} disabled={sibuk}>
           Cetak label
         </Button>
       </div>
       {pesan && (
         <p
           role="status"
-          className={`mt-2 text-[11px] font-semibold ${jenis === 'gagal' ? 'text-red-600' : 'text-on-surface-variant'}`}
+          className={`mt-2 text-sm ${jenis === 'gagal' ? 'font-semibold text-bad-fg' : 'text-text-2'}`}
         >
           {pesan}
         </p>
