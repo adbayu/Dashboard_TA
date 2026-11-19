@@ -22,7 +22,7 @@ async function loadModules(t) {
     vite.ssrLoadModule('/src/components/iot/AreaSection.jsx'),
     vite.ssrLoadModule('/src/components/iot/TaskList.jsx'),
   ]);
-  return { SensorReading, RangeBar, AreaSection, TaskList };
+  return { SensorReading, RangeBar, AreaSection, TaskList, vite };
 }
 
 const render = (component, props) => renderToStaticMarkup(React.createElement(component, props));
@@ -70,6 +70,25 @@ test('SensorReading maps normal, low and stale to their texts and icons', async 
   assert.match(stale, /data-icon="clock"/);
   assert.match(stale, /data-tone="info"/);
   assert.match(stale, /Diukur/);
+});
+
+test('SensorReading without an icon uses the activity icon, not the fallback', async t => {
+  const { SensorReading, vite } = await loadModules(t);
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  let markup;
+  try {
+    markup = render(SensorReading, { name: 'Sensor', value: 3, decimals: 0, status: 'normal' });
+  } finally {
+    console.warn = original;
+  }
+  assert.match(markup, /data-icon="activity"/);
+  assert.equal(warnings.filter(text => text.includes('[Icon]')).length, 0);
+  const { Activity, CircleHelp } = await import('lucide-react');
+  const { ICON_MAP } = await vite.ssrLoadModule('/src/shared/components/Icon.jsx');
+  assert.equal(ICON_MAP.activity, Activity);
+  assert.notEqual(ICON_MAP.activity, CircleHelp);
 });
 
 test('SensorReading leaves tile or row to the theme unless variant forces it', async t => {

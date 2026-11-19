@@ -1,4 +1,5 @@
 import {
+  Activity,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -125,6 +126,7 @@ export const FALLBACK_ICON = CircleHelp
 
 /** Nama lucide (kebab-case) -> komponen. */
 const LUCIDE = {
+  activity: Activity,
   'arrow-down': ArrowDown,
   'arrow-left': ArrowLeft,
   'arrow-right': ArrowRight,
