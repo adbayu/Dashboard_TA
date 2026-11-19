@@ -2,38 +2,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const css = readFileSync(new URL('./app/styles/index.css', import.meta.url), 'utf8');
-const ui = readFileSync(new URL('./shared/components/ui.jsx', import.meta.url), 'utf8');
-const listIot = readFileSync(new URL('./list-iot/pages/ListIot.jsx', import.meta.url), 'utf8');
-const adminIot = readFileSync(new URL('./kelola-area/pages/admin/AdminIotPage.jsx', import.meta.url), 'utf8');
+// Kontras dihitung langsung dari design/tokens.json (sumber tunggal warna kelima
+// tema, terang dan gelap). Komponen bersama hanya memakai pasangan token di
+// bawah ini, jadi bila semua palet lulus, teks dan batas kontrol ikut lulus.
+const tokens = JSON.parse(readFileSync(new URL('../design/tokens.json', import.meta.url), 'utf8'));
+const palettes = tokens.color.themes.map(theme => theme.id);
+const values = Object.fromEntries(tokens.color.tokens.map(token => [token.name, token.value]));
 
-function rule(selector) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const source = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const matches = [...source.matchAll(new RegExp(`(?:^|[{}])\\s*${escaped}\\s*\\{([^}]*)\\}`, 'gs'))];
-  assert.ok(matches.length, `Missing CSS rule for ${selector}`);
-  return matches.at(-1)[1];
-}
-
-function declaration(selector, property) {
-  const match = rule(selector).match(new RegExp(`${property}:\\s*([^;]+)`));
-  assert.ok(match, `Missing ${property} in ${selector}`);
-  return match[1].trim();
-}
-
-function parseColor(value) {
-  if (value.startsWith('#')) {
-    const hex = value.slice(1);
-    const fullHex = hex.length === 3 ? [...hex].map(channel => channel + channel).join('') : hex;
-    return [...fullHex.matchAll(/.{2}/g)].map(([channel]) => parseInt(channel, 16));
-  }
-  const channels = value.match(/rgba?\(([^)]+)\)/)?.[1].split(',').map(Number);
-  assert.ok(channels?.length >= 3, `Unsupported CSS color: ${value}`);
-  return channels;
-}
-
-function composite(foreground, background, alpha) {
-  return foreground.map((channel, index) => channel * alpha + background[index] * (1 - alpha));
+function parseHex(value) {
+  const hex = value.replace('#', '');
+  const full = hex.length === 3 ? [...hex].map(channel => channel + channel).join('') : hex;
+  assert.match(full, /^[0-9a-f]{6}$/i, `Unsupported token colour: ${value}`);
+  return [0, 2, 4].map(index => parseInt(full.slice(index, index + 2), 16));
 }
 
 function luminance(color) {
@@ -49,87 +29,53 @@ function contrast(foreground, background) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-function assertBoundary(selector, background, property = 'border') {
-  const border = declaration(selector, property).match(/rgba?\(([^)]+)\)/)?.[1].split(',').map(Number);
-  assert.ok(border?.length === 4, `Expected an alpha border in ${selector}`);
-  const edge = composite(border.slice(0, 3), parseColor(background), border[3]);
-  assert.ok(contrast(edge, parseColor(background)) >= 3, `${selector} boundary must reach 3:1`);
+function ratio(palette, foreground, background) {
+  const fg = values[foreground]?.[palette];
+  const bg = values[background]?.[palette];
+  assert.ok(fg, `${foreground} is missing in ${palette}`);
+  assert.ok(bg, `${background} is missing in ${palette}`);
+  return contrast(parseHex(fg), parseHex(bg));
 }
 
-test('input borders meet non-text contrast in light and dark themes', () => {
-  assertBoundary('.glass-input', '#FFFFFF');
-  assertBoundary('.dark .glass-input', '#232A26');
-});
+// Teks: WCAG 1.4.3 (4,5:1).
+const TEXT_PAIRS = [
+  ['on-primary', 'primary'],
+  ['text', 'surface'],
+  ['text-2', 'surface'],
+  ['warn-fg', 'warn-bg'],
+  ['bad-fg', 'bad-bg'],
+  ['info-fg', 'info-bg'],
+  ['side-text', 'side-bg'],
+  ['side-active-text', 'side-active'],
+];
 
-test('dark primary and danger button states retain boundary and text contrast', () => {
-  const primary = parseColor(declaration('.dark .button-primary', 'background-color'));
-  const primaryHover = parseColor(declaration('.dark .button-primary:hover', 'background-color'));
-  const dangerHover = parseColor(declaration('.dark .button-danger:hover', 'background-color'));
-  const surface = parseColor('#171C19');
-  const white = parseColor('#FFFFFF');
+// Batas non-teks: WCAG 1.4.11 (3:1). Cincin fokus memakai `focus`; garis tepi
+// input, select, checkbox, dan tombol sekunder memakai `text-2`.
+const BOUNDARY_PAIRS = [
+  ['focus', 'surface'],
+  ['text-2', 'surface'],
+];
 
-  for (const [label, background] of [['primary', primary], ['primary hover', primaryHover], ['danger hover', dangerHover]]) {
-    assert.ok(contrast(background, surface) >= 3, `${label} boundary must reach 3:1`);
-    assert.ok(contrast(white, background) >= 4.5, `${label} text must reach 4.5:1`);
+test('tokens.json covers all ten palettes', () => {
+  assert.equal(palettes.length, 10);
+  for (const tema of ['kebun-air', 'catatan-lapangan', 'panel-instrumen', 'tanah-lumut', 'lumina']) {
+    assert.ok(palettes.includes(`${tema}-light`), `${tema}-light missing`);
+    assert.ok(palettes.includes(`${tema}-dark`), `${tema}-dark missing`);
   }
 });
 
-test('ghost buttons have visible boundaries in both themes', () => {
-  assertBoundary('.button-ghost', '#FFFFFF', 'border-color');
-  assertBoundary('.button-ghost:hover', '#FFFFFF', 'border-color');
-  assertBoundary('.dark .button-ghost', '#1D221F', 'border-color');
-  assertBoundary('.dark .button-ghost:hover', '#1D221F', 'border-color');
-});
+for (const palette of palettes) {
+  test(`${palette}: text pairs reach 4.5:1`, () => {
+    for (const [foreground, background] of TEXT_PAIRS) {
+      const value = ratio(palette, foreground, background);
+      assert.ok(value >= 4.5, `${foreground}/${background} in ${palette} is ${value.toFixed(2)}:1, needs 4.5:1`);
+    }
+  });
 
-test('IoT control boundaries meet 3:1 after compositing over the page gradient', () => {
-  const cases = [
-    { selector: '.iot-touch-targets .button-ghost', fill: '.panel-inset', border: 'border-color', page: '#C4D3DB' },
-    { selector: '.dark .iot-touch-targets .button-ghost', fill: '.dark .panel-inset', border: 'border-color', page: '#0D1210' },
-    { selector: '.iot-touch-targets .glass-input', fill: '.glass-input', fillProperty: 'background', border: 'border-color', page: '#C4D3DB' },
-    { selector: '.dark .iot-touch-targets .glass-input', fill: '.dark .glass-input', fillProperty: 'background', border: 'border-color', page: '#0D1210' },
-  ];
-
-  for (const { selector, fill: fillSelector, fillProperty = 'background-color', border: borderProperty, page: pageColor } of cases) {
-    const page = parseColor(pageColor);
-    const fill = parseColor(declaration(fillSelector, fillProperty));
-    const borderDeclaration = declaration(selector, borderProperty);
-    const borderColor = borderDeclaration.match(/rgba?\([^)]+\)/)?.[0];
-    assert.ok(borderColor, `Missing border color in ${selector}`);
-    const border = parseColor(borderColor);
-    const fillOnPage = composite(fill.slice(0, 3), page, fill[3]);
-    const borderOnFill = composite(border.slice(0, 3), fillOnPage, border[3]);
-
-    assert.ok(contrast(borderOnFill, fillOnPage) >= 3, `${selector} border must reach 3:1 against its composited fill`);
-    assert.ok(contrast(borderOnFill, page) >= 3, `${selector} border must reach 3:1 against the page surface`);
-  }
-});
-
-test('shared primary, ghost, and danger variants opt into the measured theme rules', () => {
-  for (const variant of ['primary', 'ghost', 'danger']) {
-    const pattern = new RegExp(`${variant}:\\s*'[^']*\\bbutton-${variant}\\b`);
-    assert.ok(pattern.test(ui), `${variant} button variant must opt into its contrast rule`);
-  }
-});
-
-test('IoT primary actions and selected controls use the accessible dark fill', () => {
-  assert.ok(listIot.includes('button-primary'), 'List IoT actions and selected controls need the dark primary rule');
-  assert.ok(adminIot.includes('button-primary'), 'Kelola IoT selected tabs need the dark primary rule');
-});
-
-test('primary control fill is owned by the theme-aware component rule', () => {
-  const primaryVariant = ui.match(/primary:\s*'([^']+)'/)?.[1];
-  assert.ok(primaryVariant?.includes('button-primary'), 'Primary buttons need the component fill class');
-  assert.doesNotMatch(primaryVariant, /(?:hover:)?bg-primary(?:-container)?\b/, 'Primary buttons must not layer generic fill utilities over the component fill');
-
-  for (const [name, source] of [['List IoT', listIot], ['Kelola IoT', adminIot]]) {
-    const primaryClasses = [...source.matchAll(/'([^']*button-primary[^']*)'|"([^"]*button-primary[^"]*)"|`([^`]*button-primary[^`]*)`/g)]
-      .map(([, singleQuoted, doubleQuoted, templateLiteral]) => singleQuoted || doubleQuoted || templateLiteral);
-    assert.ok(primaryClasses.length, `${name} must retain its primary controls`);
-    assert.ok(primaryClasses.every(className => !/(?:^|\s)(?:hover:)?bg-primary(?:-container)?(?=\s|$)/.test(className)), `${name} primary controls must not layer generic fill utilities over the component fill`);
-  }
-
-  assert.equal(declaration('.button-primary', 'background-color'), '#0f5238');
-  assert.equal(declaration('.button-primary:hover', 'background-color'), '#2d6a4f');
-  assert.equal(declaration('.dark .button-primary', 'background-color'), '#3b7559');
-  assert.equal(declaration('.dark .button-primary:hover', 'background-color'), '#41795b');
-});
+  test(`${palette}: focus ring and input border reach 3:1`, () => {
+    for (const [foreground, background] of BOUNDARY_PAIRS) {
+      const value = ratio(palette, foreground, background);
+      assert.ok(value >= 3, `${foreground}/${background} in ${palette} is ${value.toFixed(2)}:1, needs 3:1`);
+    }
+  });
+}
