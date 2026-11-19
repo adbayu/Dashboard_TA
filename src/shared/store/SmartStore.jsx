@@ -26,8 +26,8 @@ import { IOT_SOURCE, iotApi } from '../../services/iotApi.js';
 import { iotMonitoringStore } from '../../services/iotMonitoringStore.js';
 import { mapSessionUser } from '../../services/sessionUser.js';
 import { activationCodeMemory, beginActivationCodeLogout } from '../../utils/activationCodeMemory.js';
+import { KEY } from './storageKey.js';
 
-const KEY = 'aquasmart_smart_v1';
 const GAMIFICATION_STATE_VERSION = 2;
 const SmartCtx = createContext(null);
 
@@ -233,7 +233,6 @@ function buatRiwayatTanggal(devices, tanggal = hariKey()) {
 const buatRiwayatHariIni = (devices) => buatRiwayatTanggal(devices, hariKey());
 
 const DEFAULT_STATE = {
-  theme: 'light',
   categories: SEED_CATEGORIES,
   areas: SEED_AREAS,
   devices: SEED_DEVICES,
@@ -430,10 +429,6 @@ export function SmartProvider({ children }) {
     return () => { current = false; };
   }, []);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', state.theme === 'dark');
-  }, [state.theme]);
-
   const notify = useCallback((message, tone = 'ok') => {
     setToast({ message, tone, id: Date.now() });
     clearTimeout(toastTimer.current);
@@ -512,7 +507,6 @@ export function SmartProvider({ children }) {
 
   const actions = useMemo(
     () => ({
-      toggleTheme: () => setState((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' })),
       notify,
 
       // ── Login / logout ──────────────────────────────────────────────────────
@@ -1237,7 +1231,7 @@ export function SmartProvider({ children }) {
       },
       resetDemo: () => {
         if (IOT_SOURCE === 'local') iotApi.resetLocalData();
-        setState({ ...DEFAULT_STATE, theme: state.theme, sessionUserId: state.sessionUserId });
+        setState({ ...DEFAULT_STATE, sessionUserId: state.sessionUserId });
         notify('Data demo dikembalikan ke kondisi awal.', 'warn');
       },
     }),

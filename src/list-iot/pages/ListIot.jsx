@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
+import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
 import { iotApi } from '../../services/iotApi.js';
 import { Badge, Button, Card, Empty, Field, Input, SectionTitle, Select, StatCard } from '../../shared/components/ui';
 import { areaFilterOptions } from '../../utils/frontendReview.js';
@@ -299,7 +300,7 @@ export default function ListIot() {
 
 export function DeviceDetail() {
   const { id } = useParams();
-  const { theme } = useSmart();
+  const { resolvedMode } = useTampilan();
   const [result, setResult] = useState(null);
   const [state, setState] = useState('loading');
   const [error, setError] = useState('');
@@ -532,7 +533,7 @@ export function DeviceDetail() {
           )}
           {telemetry.state === 'loading' ? <p role="status" className="py-5 text-sm text-on-surface-variant">Memuat riwayat sensor...</p>
             : selected && telemetry.historyErrors[selected.code] && !series ? <p role="alert" className="py-4 text-sm text-on-surface">Riwayat {selected.name || selected.code} tidak dapat dimuat: {telemetry.historyErrors[selected.code]}</p>
-              : selected && series ? <ReadingChart sensor={selected} points={series.points || []} threshold={series.threshold || selected.threshold} theme={theme} />
+              : selected && series ? <ReadingChart sensor={selected} points={series.points || []} threshold={series.threshold || selected.threshold} theme={resolvedMode} />
                 : <Empty title="Konfigurasi sensor belum tersedia" icon="sensors" />}
         </Card>
 

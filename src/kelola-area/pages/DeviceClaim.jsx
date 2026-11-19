@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
+import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
 import { iotApi, IOT_SOURCE } from '../../services/iotApi.js';
 import { Badge, Button, Card, Empty, IconButton } from '../../shared/components/ui';
 import PublicAreaLabel from '../../components/iot/PublicAreaLabel.jsx';
@@ -10,7 +11,9 @@ import { activationCodeMemory, claimAndForgetActivationCode } from '../../utils/
 export default function DeviceClaim() {
   const { code = '' } = useParams();
   const location = useLocation();
-  const { currentUser, isLoggedIn, sessionStatus, sessionError, theme, toggleTheme, role } = useSmart();
+  const { currentUser, isLoggedIn, sessionStatus, sessionError, role } = useSmart();
+  const { resolvedMode, setMode } = useTampilan();
+  const gelap = resolvedMode === 'dark';
   const navigate = useNavigate();
   const urlActivationCode = new URLSearchParams(location.search).get('c') || '';
   const subscribeActivationCodes = useCallback(listener => activationCodeMemory.subscribe(listener), []);
@@ -190,9 +193,9 @@ export default function DeviceClaim() {
         <header className="flex items-center justify-between gap-3">
           <p className="font-extrabold text-on-surface">JagoFarm</p>
           <IconButton
-            icon={theme === 'dark' ? 'light_mode' : 'dark_mode'}
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}
+            icon={gelap ? 'light_mode' : 'dark_mode'}
+            onClick={() => setMode(gelap ? 'terang' : 'gelap')}
+            title={gelap ? 'Mode terang' : 'Mode gelap'}
             size="lg"
             className="panel-inset"
           />

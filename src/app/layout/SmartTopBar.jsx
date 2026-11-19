@@ -1,9 +1,12 @@
 import { useSmart } from '../../shared/store/SmartStore';
 import { IOT_SOURCE } from '../../services/iotApi.js';
 import { IconButton } from '../../shared/components/ui';
+import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
 
 export default function SmartTopBar({ title, subtitle, onMenuClick }) {
-  const { theme, toggleTheme, role, resetDemo } = useSmart();
+  const { role, resetDemo } = useSmart();
+  const { resolvedMode, setMode } = useTampilan();
+  const gelap = resolvedMode === 'dark';
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#191e1b]/85 border-b border-white/40 dark:border-white/10 px-4 sm:px-6 py-3">
@@ -24,9 +27,9 @@ export default function SmartTopBar({ title, subtitle, onMenuClick }) {
         </div>
 
         <IconButton
-          icon={theme === 'dark' ? 'light_mode' : 'dark_mode'}
-          onClick={toggleTheme}
-          title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}
+          icon={gelap ? 'light_mode' : 'dark_mode'}
+          onClick={() => setMode(gelap ? 'terang' : 'gelap')}
+          title={gelap ? 'Mode terang' : 'Mode gelap'}
           tone="netral"
           className="panel-inset"
         />
