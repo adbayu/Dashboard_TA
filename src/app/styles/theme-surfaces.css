@@ -23,6 +23,18 @@
      data-ui="task-list" > task (data-done) > task-box
      data-ui="live" + data-state (live|polling|reconnecting|...) > live-dot
      data-ui="attention-badge" | "event-chip" | "log-table"
+     Kerangka aplikasi (src/app):
+     data-ui="sidebar"     <aside> SmartSidebar; anaknya brand-mark (logo) dan
+                           nav-item (NavLink menu, aria-current="page" saat aktif)
+     data-ui="shell-content"  pembungkus top bar + konten di kanan sidebar
+     data-ui="topbar"      <header> SmartTopBar
+     Pemilih tampilan (src/shared/theme):
+     data-ui="theme-picker" radiogroup ThemePicker; tiap kartu memuat
+                           [data-pratinjau][data-theme][data-mode] (pratinjau bertema
+                           lokal, variabelnya dari themes.css) dengan bagian
+                           pratinjau-side dan pratinjau-tile
+     data-ui="mode-toggle" radiogroup ModeToggle
+     data-ui="theme-menu"  popover ThemeQuickMenu di top bar
    Komponen baru memakai pola yang sama; jangan menambah kelas khusus tema di
    JSX. Perlakuan Lumina hanya boleh muncul di bawah [data-theme="lumina"]. */
 
@@ -371,4 +383,80 @@
   [data-theme="lumina"] [data-ui="live"][data-state="live"] [data-ui="live-dot"] {
     animation: none;
   }
+}
+
+/* ══ Kerangka aplikasi dan pemilih tampilan ══════════════════════════════════ */
+
+/* ── Sidebar: Lumina mengambang bergradien (tema lain menempel, polos; warna
+   per tema, termasuk Catatan Lapangan sewarna kertas, datang dari token side-*).
+   Di layar sempit (laci) sidebar Lumina tetap menempel tanpa sudut. ── */
+[data-theme="lumina"] [data-ui="sidebar"] {
+  border-right-width: 0;
+  background-image: linear-gradient(180deg, rgb(var(--c-side-bg)), rgb(var(--c-side-active)));
+  box-shadow: 0 20px 50px -12px rgb(var(--c-side-bg) / 0.55);
+}
+
+@media (min-width: 721px) {
+  [data-theme="lumina"] [data-ui="sidebar"] {
+    top: 12px;
+    bottom: 12px;
+    left: 12px;
+    border-radius: 24px;
+  }
+
+  [data-theme="lumina"] [data-ui="shell-content"] {
+    margin-left: 12px;
+  }
+}
+
+[data-theme="lumina"] [data-ui="sidebar"] [data-ui="nav-item"] {
+  border-radius: 14px;
+}
+
+[data-theme="lumina"] [data-ui="brand-mark"] {
+  border-radius: 10px;
+  background-image: linear-gradient(135deg, rgb(var(--c-mark-bg)), rgb(var(--c-focus)));
+  box-shadow: 0 0 18px rgb(var(--c-mark-bg) / 0.7);
+}
+
+/* ── Top bar dan popover tema: Lumina berkaca (tanpa dukungan tetap padat) ── */
+[data-theme="lumina"] [data-ui="theme-menu"] {
+  box-shadow: 0 8px 32px -4px rgb(var(--c-primary) / 0.18);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="lumina"] [data-ui="topbar"] {
+    background-color: rgb(var(--c-bg) / 0.7);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+/* ── Pratinjau mini ThemePicker: perlakuan bentuk tema yang dipratinjau.
+   Selektor memakai [data-pratinjau][data-theme] pada elemen yang sama, jadi
+   tidak bergantung pada tema halaman. ── */
+[data-pratinjau][data-theme="catatan-lapangan"] [data-ui="pratinjau-tile"] {
+  background: transparent;
+  border-width: 1px 0;
+  border-color: rgb(var(--c-border));
+  border-radius: 0;
+}
+
+[data-pratinjau][data-theme="lumina"][data-mode="light"] {
+  background-image: linear-gradient(135deg, rgb(var(--c-bg)), rgb(var(--c-water-bg)) 55%, rgb(var(--c-leaf-bg)));
+}
+
+[data-pratinjau][data-theme="lumina"][data-mode="dark"] {
+  background-image: radial-gradient(circle at 20% 0%, rgb(var(--c-leaf-line)), rgb(var(--c-bg)) 55%);
+}
+
+[data-pratinjau][data-theme="lumina"] [data-ui="pratinjau-side"] {
+  margin: 4px 0 4px 4px;
+  border: 0;
+  border-radius: 10px;
+  background-image: linear-gradient(180deg, rgb(var(--c-side-bg)), rgb(var(--c-side-active)));
+}
+
+[data-pratinjau][data-theme="lumina"] [data-ui="pratinjau-tile"] {
+  background-color: rgb(var(--c-surface) / 0.62);
 }

@@ -1,80 +1,92 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import clsx from 'clsx';
 import { useSmart } from '../../shared/store/SmartStore';
 import { IOT_SOURCE } from '../../services/iotApi.js';
 import { iotMonitoringStore } from '../../services/iotMonitoringStore.js';
 import { Avatar } from '../../shared/components/ui';
+import { Icon } from '../../shared/components/Icon.jsx';
 import AttentionBadge from '../../components/iot/AttentionBadge.jsx';
 import { countAttentionDevices } from '../../utils/monitoring.js';
 import { shouldConnectIotMonitoring } from '../../utils/roleAccess.js';
 
 // ── Definisi menu per role ────────────────────────────────────────────────────
+// Grup, label, dan ikon (lucide) mengikuti kanvas Main/admin (Ruling R12); rute,
+// `end`, dan `attention` tetap. Tanpa deskripsi di bawah menu.
 // oxlint-disable-next-line react/only-export-components -- Shared menu data stays beside its existing consumer.
 export const MENUS = {
   pengguna: [
     {
       group: 'Pemantauan',
       items: [
-        { to: '/', end: true, label: 'Dashboard', icon: 'dashboard', hint: 'Ringkasan kolam & sensor aktif' },
-        { to: '/iot', label: 'List IoT', icon: 'sensors', hint: 'Semua perangkat terpasang' },
-        { to: '/monitoring', label: 'Monitoring', icon: 'query_stats', hint: 'Nilai sensor, area & kejadian', attention: true },
-        { to: '/detail-informasi', label: 'Detail Information', icon: 'qr_code_scanner', hint: 'Pindai QR alat & baca penjelasannya' },
+        { to: '/', end: true, label: 'Pantauan', icon: 'activity' },
+        { to: '/iot', label: 'Alat IoT', icon: 'radio' },
+        { to: '/monitoring', label: 'Monitoring', icon: 'thermometer', attention: true },
+        { to: '/detail-informasi', label: 'Pindai QR', icon: 'qr-code' },
       ],
     },
     {
-      group: 'Operasional Farm',
+      group: 'Operasional',
       items: [
-        { to: '/area', label: 'Kelola Area', icon: 'water', hint: 'Kolam, growbed, HPP & pemantauan' },
-        { to: '/v-pet', label: 'V-Pet', icon: 'pets', hint: 'Pelihara hewan virtual farm' },
+        { to: '/area', label: 'Area & kolam', icon: 'waves' },
+        { to: '/v-pet', label: 'V-Pet', icon: 'heart' },
       ],
     },
     {
-      group: 'Belajar & Poin',
+      group: 'Belajar & poin',
       items: [
-        { to: '/gamifikasi', label: 'Gamifikasi', icon: 'emoji_events', hint: 'Misi, badge, papan peringkat' },
-        { to: '/chatbot', label: 'Chatbot Aquaponik', icon: 'smart_toy', hint: 'Tanya soal ikan, sayur & sistem' },
+        { to: '/gamifikasi', label: 'Misi & poin', icon: 'square-check' },
+        { to: '/chatbot', label: 'Chatbot akuaponik', icon: 'info' },
       ],
     },
     {
       group: 'Integrasi',
-      items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key dan pemakaian' }],
+      items: [{ to: '/developer', label: 'Developer', icon: 'lock' }],
     },
   ],
   pengelola: [
     {
       group: 'Ringkasan',
       items: [
-        { to: '/admin', end: true, label: 'Dashboard Pengelola', icon: 'dashboard', hint: 'Kondisi seluruh farm' },
-        { to: '/monitoring', label: 'Monitoring', icon: 'query_stats', hint: 'Nilai sensor, area & kejadian', attention: true },
+        { to: '/admin', end: true, label: 'Dashboard pengelola', icon: 'activity' },
+        { to: '/monitoring', label: 'Monitoring', icon: 'thermometer', attention: true },
       ],
     },
     {
-      group: 'Kelola Master Data',
+      group: 'Kelola data',
       items: [
-        { to: '/admin/pengguna', label: 'Kelola User', icon: 'group', hint: 'Akun pengguna & hak akses area' },
-        { to: '/admin/iot', label: 'Kelola IoT', icon: 'devices', hint: 'Perangkat, kalibrasi & QR alat' },
-        { to: '/admin/detail-informasi', label: 'Detail Information', icon: 'qr_code_2', hint: 'Penjelasan alat yang dibaca pengguna' },
-        { to: '/admin/kategori', label: 'Kategori Device', icon: 'category', hint: 'Jenis alat & parameter ukurnya' },
-        { to: '/admin/area', label: 'Kelola Area', icon: 'water', hint: 'Kolam/growbed yang sudah dipasangi IoT' },
-        { to: '/admin/v-pet', label: 'Kelola Virtual Pet', icon: 'pets', hint: 'Jenis pet, kondisi & reset' },
-        { to: '/admin/point', label: 'Sistem Point', icon: 'stars', hint: 'Aturan poin, badge & saldo pengguna' },
+        { to: '/admin/pengguna', label: 'Pengguna', icon: 'user' },
+        { to: '/admin/iot', label: 'Alat IoT', icon: 'radio' },
+        { to: '/admin/detail-informasi', label: 'Detail informasi', icon: 'qr-code' },
+        { to: '/admin/kategori', label: 'Kategori alat', icon: 'inbox' },
+        { to: '/admin/area', label: 'Area', icon: 'waves' },
+        { to: '/admin/v-pet', label: 'V-Pet', icon: 'heart' },
+        { to: '/admin/point', label: 'Sistem poin', icon: 'square-check' },
       ],
     },
     {
       group: 'Integrasi',
-      items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key dan pemakaian' }],
+      items: [{ to: '/developer', label: 'Developer', icon: 'lock' }],
     },
   ],
   mitra: [
     {
       group: 'Integrasi',
-      items: [{ to: '/developer', label: 'Developer', icon: 'key', hint: 'API key Test dan sandbox' }],
+      items: [{ to: '/developer', label: 'Developer', icon: 'lock' }],
     },
   ],
 };
 
+const PERAN = { pengelola: 'Akun Pengelola', mitra: 'Akun Mitra', pengguna: 'Akun Pengguna' };
+
+// Cincin fokus di atas sidebar gelap memakai `side-text` (design system), bukan `focus`.
+const FOKUS_SIDEBAR =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-side-text';
+
 // ── Sidebar per role: menu diambil dari MENUS sesuai role aktif (dari URL) ───
 // Tombol Keluar sengaja TIDAK ada di sini — logout ada di halaman /profil.
+// Perlakuan per tema (Lumina mengambang bergradien) ada di theme-surfaces.css
+// lewat data-ui="sidebar".
 export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }) {
   const { role: roleCtx, currentUser, points } = useSmart();
   const role = roleProp || roleCtx;
@@ -107,95 +119,71 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
     <>
       {isOpen && <button type="button" className="sidebar-backdrop" aria-label="Tutup menu" onClick={onClose} />}
       <aside
-        className={`smart-sidebar fixed left-0 top-0 bottom-0 z-50 w-52 sm:w-56 md:w-64 xl:w-72 flex flex-col ${isOpen ? 'is-open' : ''}`}
-        style={{ background: 'linear-gradient(180deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
+        data-ui="sidebar"
+        aria-label="Navigasi utama"
+        className={clsx(
+          'smart-sidebar fixed left-0 top-0 bottom-0 z-50 flex w-52 flex-col gap-[18px] border-r border-side-line bg-side-bg px-3.5 py-5 text-side-text sm:w-56 md:w-64 xl:w-72',
+          isOpen && 'is-open',
+        )}
       >
-        {/* Kepala: brand */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-accent/20 border border-white/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-white text-[24px] fill">eco</span>
-          </div>
-          <div className="leading-tight min-w-0">
-            <p className="text-white font-extrabold tracking-tight">JagoFarm</p>
-            <p className="text-[11px] font-semibold text-emerald-accent">SmartDashboard Aquaponik</p>
-          </div>
+        {/* Merek */}
+        <div className="flex items-center gap-2.5 px-1.5 font-head text-lg font-bold leading-6">
+          <span data-ui="brand-mark" className="grid h-7 w-7 shrink-0 place-items-center rounded-control bg-mark-bg text-mark-fg">
+            <Icon name="sprout" size={18} />
+          </span>
+          JagoFarm
         </div>
 
-        {/* Identitas pengguna aktif — bisa diklik menuju halaman profil */}
-        <div className="px-4 py-4 border-b border-white/10 space-y-2">
-          <Link
-            to="/profil"
-            title="Buka profil saya"
-            onClick={onClose}
-            className="flex items-center gap-3 rounded-2xl bg-white/10 border border-white/10 p-3 hover:bg-white/20 transition-colors group"
-          >
-            <Avatar avatar={currentUser.avatar} nama={currentUser.name} size={40} className="ring-2 ring-emerald-accent/40" />
-            <div className="min-w-0 flex-1">
-              <p className="text-white text-sm font-bold truncate">{currentUser.name}</p>
-              <p className="text-[11px] text-white/60 truncate">
-                 {role === 'pengelola' ? 'Akun Pengelola' : role === 'mitra' ? 'Akun Mitra' : 'Akun Pengguna'}
-              </p>
-            </div>
-            <span className="material-symbols-outlined text-[18px] text-white/50 group-hover:text-white">chevron_right</span>
-          </Link>
-
-          <Link
-            to="/profil"
-            onClick={onClose}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-2 py-1.5 text-[11px] font-bold text-white/80 hover:bg-white/15 hover:text-white transition-colors"
-          >
-            <span className="material-symbols-outlined text-[15px]">account_circle</span>
-            Profil Saya
-          </Link>
-        </div>
-
-        {/* Daftar menu */}
-        <nav className="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-5">
+        {/* Daftar menu per grup */}
+        <div className="custom-scrollbar flex-1 space-y-[18px] overflow-y-auto">
           {menu.map((section) => (
-            <div key={section.group}>
-              <p className="px-2 mb-2 text-[10px] font-extrabold uppercase tracking-widest text-white/60">{section.group}</p>
-              <div className="space-y-1">
+            <nav key={section.group} aria-label={section.group}>
+              <p className="mb-1.5 px-2 text-[13px] leading-[18px] text-side-text-2">{section.group}</p>
+              <div className="flex flex-col gap-0.5">
                 {section.items.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.end}
                     onClick={onClose}
+                    data-ui="nav-item"
                     className={({ isActive }) =>
-                      `flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all group ${
-                        isActive
-                          ? 'bg-white text-primary dark:bg-inverse-primary/15 dark:text-inverse-primary'
-                          : 'text-white/80 hover:bg-white/10 hover:text-white'
-                      }`
+                      clsx(
+                        'flex items-center gap-2.5 rounded-control p-2 text-[15px] leading-[22px] transition-colors duration-200',
+                        isActive ? 'bg-side-active text-side-active-text font-semibold' : 'text-side-text hover:bg-side-active',
+                        FOKUS_SIDEBAR,
+                      )
                     }
                   >
-                    {({ isActive }) => (
-                      <>
-                        <span className={`material-symbols-outlined text-[20px] mt-0.5 ${isActive ? 'fill text-primary' : ''}`}>{item.icon}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-bold leading-tight">{item.label}</span>
-                          <span className={`block text-[11px] leading-tight ${isActive ? 'text-on-surface-variant dark:text-inverse-primary' : 'text-white/60'}`}>{item.hint}</span>
-                        </span>
-                        {item.attention && attentionCount !== null && <AttentionBadge count={attentionCount} />}
-                      </>
-                    )}
+                    <Icon name={item.icon} size={18} className="shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {item.attention && attentionCount !== null && <AttentionBadge count={attentionCount} />}
                   </NavLink>
                 ))}
               </div>
-            </div>
+            </nav>
           ))}
-        </nav>
+        </div>
 
-        {/* Kaki: poin & catatan */}
-        <div className="px-4 py-4 border-t border-white/10 space-y-2">
-          <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[11px] font-bold text-white/70">
-              <span className="material-symbols-outlined text-[16px] text-emerald-accent">stars</span>
-              Point Anda
-            </span>
-            <span className="text-sm font-extrabold text-white">{points.toLocaleString('id-ID')}</span>
-          </div>
-          <p className="text-[10px] text-white/70 leading-snug">
+        {/* Kaki: akun aktif (menuju profil) dan catatan sumber data */}
+        <div className="space-y-2 border-t border-side-line pt-2.5">
+          {currentUser && (
+            <Link
+              to="/profil"
+              title="Buka profil saya"
+              onClick={onClose}
+              className={clsx('flex items-center gap-2.5 rounded-control p-2 transition-colors duration-200 hover:bg-side-active', FOKUS_SIDEBAR)}
+            >
+              <Avatar avatar={currentUser.avatar} nama={currentUser.name} size="sm" />
+              <span className="min-w-0 flex-1 text-sm leading-5">
+                <span className="block truncate font-semibold">{currentUser.name}</span>
+                <span className="block truncate text-[13px] leading-[18px] text-side-text-2">
+                  {PERAN[role] || PERAN.pengguna} · {points.toLocaleString('id-ID')} poin
+                </span>
+              </span>
+            </Link>
+          )}
+          <p className="px-2 text-xs leading-4 text-side-text-2">
             {IOT_SOURCE === 'api' ? 'Fitur non-IoT menggunakan data contoh.' : 'Data contoh lokal. IoT contoh hanya berlaku selama sesi ini.'}
           </p>
         </div>

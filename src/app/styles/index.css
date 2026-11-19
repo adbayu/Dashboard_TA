@@ -150,15 +150,6 @@
   background-color: rgb(var(--c-bad-bg));
 }
 
-.tombol-keluar {
-  border-color: rgb(var(--c-bad-fg));
-  color: rgb(var(--c-bad-fg));
-}
-
-.tombol-keluar:hover {
-  background-color: rgb(var(--c-bad-bg));
-}
-
 /* Custom Slim Scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

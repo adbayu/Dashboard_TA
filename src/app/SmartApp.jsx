@@ -31,27 +31,28 @@ import Monitoring from '../kelola-area/pages/Monitoring';
 import DeviceLog from '../kelola-area/pages/DeviceLog';
 import { loginDestination, roleCanOpenPath } from '../utils/roleAccess.js';
 
-// Judul halaman untuk top bar
+// Judul halaman untuk top bar. Judul mengikuti label menu kanvas (Ruling R12);
+// subtitle hanya dipasang bila menambah informasi di luar judul.
 const TITLES = [
-  { path: '/admin/pengguna', title: 'Kelola User', subtitle: 'Akun pengguna, peran, dan area tanggung jawab' },
-  { path: '/admin/iot', title: 'Kelola IoT', subtitle: 'Registrasi perangkat, kalibrasi, dan QR penjelas alat' },
+  { path: '/admin/pengguna', title: 'Pengguna', subtitle: 'Akun pengguna, peran, dan area tanggung jawab' },
+  { path: '/admin/iot', title: 'Alat IoT', subtitle: 'Registrasi perangkat, kalibrasi, dan QR penjelas alat' },
   { path: '/developer', title: 'Developer', subtitle: 'API key dan pemakaian API' },
   { path: '/monitoring', title: 'Monitoring', subtitle: 'Nilai sensor, area, dan kejadian perangkat live' },
-  { path: '/admin/kategori', title: 'Kategori Device', subtitle: 'Jenis alat beserta parameter dan ambang idealnya' },
-  { path: '/admin/detail-informasi', title: 'Detail Information', subtitle: 'Penjelasan alat yang sama dengan yang dibaca pengguna' },
-  { path: '/admin/area', title: 'Kelola Area', subtitle: 'Kolam, growbed, dan tandon yang sudah dipasangi IoT' },
-  { path: '/admin/v-pet', title: 'Kelola Virtual Pet', subtitle: 'Jenis, kondisi, dan area pemantauan virtual pet' },
-  { path: '/admin/point', title: 'Sistem Point', subtitle: 'Aturan poin, badge, dan saldo pengguna' },
-  { path: '/admin', title: 'Dashboard Pengelola', subtitle: 'Ringkasan seluruh sistem aquaponik' },
-  { path: '/profil', title: 'Profil Saya', subtitle: 'Ubah data diri, foto, dan password akun Anda' },
-  { path: '/detail-informasi', title: 'Detail Information', subtitle: 'Pindai QR alat untuk penjelasan lengkap perangkat' },
-  { path: '/iot', title: 'List IoT', subtitle: 'Perangkat yang terpasang di farm' },
-  { path: '/iot/:id/log', title: 'Log sensor', subtitle: 'Riwayat pembacaan sensor perangkat' },
-  { path: '/area', title: 'Kelola Area', subtitle: 'HPP dan pemantauan kolam Anda' },
-  { path: '/v-pet', title: 'Virtual Pet', subtitle: 'Pemantauan farm dalam bentuk hewan peliharaan' },
-  { path: '/gamifikasi', title: 'Gamifikasi', subtitle: 'Misi, badge, dan papan peringkat' },
-  { path: '/chatbot', title: 'Chatbot Aquaponik', subtitle: 'Tanya seputar ikan, sayur, dan sistem aquaponik' },
-  { path: '/', title: 'SmartDashboard Aquaponik', subtitle: 'Pantauan kolam, device IoT, dan farm Anda' },
+  { path: '/admin/kategori', title: 'Kategori alat', subtitle: 'Jenis alat beserta parameter dan ambang idealnya' },
+  { path: '/admin/detail-informasi', title: 'Detail informasi', subtitle: 'Penjelasan alat yang sama dengan yang dibaca pengguna' },
+  { path: '/admin/area', title: 'Area', subtitle: 'Kolam, growbed, dan tandon yang sudah dipasangi IoT' },
+  { path: '/admin/v-pet', title: 'V-Pet', subtitle: 'Jenis, kondisi, dan area pemantauan virtual pet' },
+  { path: '/admin/point', title: 'Sistem poin', subtitle: 'Aturan poin, badge, dan saldo pengguna' },
+  { path: '/admin', title: 'Dashboard pengelola', subtitle: 'Ringkasan seluruh sistem aquaponik' },
+  { path: '/profil', title: 'Profil dan tampilan', subtitle: 'Atur akun Anda dan pilih tampilan dashboard' },
+  { path: '/detail-informasi', title: 'Pindai QR', subtitle: 'Penjelasan lengkap perangkat dari kode QR alat' },
+  { path: '/iot', title: 'Alat IoT' },
+  { path: '/iot/:id/log', title: 'Log sensor' },
+  { path: '/area', title: 'Area & kolam', subtitle: 'HPP dan pemantauan kolam Anda' },
+  { path: '/v-pet', title: 'V-Pet', subtitle: 'Pemantauan farm dalam bentuk hewan peliharaan' },
+  { path: '/gamifikasi', title: 'Misi & poin', subtitle: 'Badge dan papan peringkat' },
+  { path: '/chatbot', title: 'Chatbot akuaponik', subtitle: 'Tanya seputar ikan, sayur, dan sistem aquaponik' },
+  { path: '/', title: 'Pantauan' },
 ];
 
 function Toast() {
@@ -138,7 +139,7 @@ function Shell() {
     <div className="min-h-screen">
       <SmartSidebar isOpen={menuOpen} onClose={closeMobileMenu} />
 
-      <div className="shell-content pl-52 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
+      <div data-ui="shell-content" className="shell-content pl-52 sm:pl-56 md:pl-64 xl:pl-72 flex flex-col min-h-screen">
         <SmartTopBar title={match?.title || 'SmartDashboard'} subtitle={match?.subtitle} onMenuClick={openMobileMenu} />
 
         <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-[1500px] mx-auto pb-16">

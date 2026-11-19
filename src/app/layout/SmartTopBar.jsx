@@ -1,48 +1,27 @@
 import { useSmart } from '../../shared/store/SmartStore';
 import { IOT_SOURCE } from '../../services/iotApi.js';
 import { IconButton } from '../../shared/components/ui';
-import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
+import { ThemeQuickMenu } from '../../shared/theme/ThemeQuickMenu.jsx';
 
+// Bilah atas (kanvas Main): judul halaman, pulihkan data contoh (mode lokal),
+// lalu tombol tema cepat. Tanpa eyebrow "Mode ..." di atas judul.
 export default function SmartTopBar({ title, subtitle, onMenuClick }) {
-  const { role, resetDemo } = useSmart();
-  const { resolvedMode, setMode } = useTampilan();
-  const gelap = resolvedMode === 'dark';
+  const { resetDemo } = useSmart();
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#191e1b]/85 border-b border-white/40 dark:border-white/10 px-4 sm:px-6 py-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <IconButton
-          icon="menu"
-          onClick={onMenuClick}
-          title="Menu"
-          size="lg"
-          className="mobile-menu-button panel-inset shrink-0"
-        />
+    <header data-ui="topbar" className="sticky top-0 z-30 border-b border-border bg-bg px-4 py-2.5 sm:px-6">
+      <div className="flex min-h-10 min-w-0 items-center gap-3">
+        <IconButton icon="menu" onClick={onMenuClick} label="Buka menu" size="lg" className="mobile-menu-button shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-primary/80 dark:text-inverse-primary/75">
-            {role === 'pengelola' ? 'Mode Pengelola' : role === 'mitra' ? 'Mode Mitra' : 'Mode Pengguna'}
-          </p>
-          <h1 className="text-lg sm:text-xl font-extrabold text-on-surface truncate leading-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-on-surface-variant break-words">{subtitle}</p>}
+          <h1 className="truncate font-head text-base font-semibold leading-[22px] text-text">{title}</h1>
+          {subtitle && <p className="text-xs text-text-2 break-words">{subtitle}</p>}
         </div>
 
-        <IconButton
-          icon={gelap ? 'light_mode' : 'dark_mode'}
-          onClick={() => setMode(gelap ? 'terang' : 'gelap')}
-          title={gelap ? 'Mode terang' : 'Mode gelap'}
-          tone="netral"
-          className="panel-inset"
-        />
-
         {IOT_SOURCE === 'local' && (
-          <IconButton
-            icon="restart_alt"
-            onClick={resetDemo}
-            title="Pulihkan data contoh"
-            tone="netral"
-            className="panel-inset"
-          />
+          <IconButton icon="refresh-cw" onClick={resetDemo} label="Pulihkan data contoh" tone="netral" />
         )}
+
+        <ThemeQuickMenu />
       </div>
     </header>
   );

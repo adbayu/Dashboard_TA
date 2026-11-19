@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
-import { Avatar, AvatarPilih, Badge, Button, Card, Field, Input, SectionTitle, StatCard, TextArea } from '../../shared/components/ui';
+import { Avatar, AvatarPilih, Badge, Button, Card, Field, Input, SectionTitle, StatCard, StatusPill, TextArea } from '../../shared/components/ui';
+import { ModeToggle } from '../../shared/theme/ModeToggle.jsx';
+import { ThemePicker } from '../../shared/theme/ThemePicker.jsx';
+import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
+import { teksAktif } from '../../shared/theme/temaInfo.js';
 import { AVATAR_PILIHAN } from '../../kelola-user/data/seed.js';
 import { passwordChangeAvailable } from '../../utils/frontendReview.js';
 import { IOT_SOURCE } from '../../services/iotApi.js';
@@ -11,6 +15,7 @@ import { IOT_SOURCE } from '../../services/iotApi.js';
 export default function Profil() {
   const { currentUser, updateProfile, changePassword, areas, role, points, logout } = useSmart();
   const navigate = useNavigate();
+  const { tema, mode, resolvedMode, setTema, setMode } = useTampilan();
 
   const [form, setForm] = useState(() => ({
     name: currentUser?.name || '',
@@ -74,6 +79,26 @@ export default function Profil() {
 
   return (
     <div className="space-y-6">
+      {/* Tampilan: tema dan mode tersimpan di browser ini (jagofarm.tampilan) */}
+      <Card title="Tampilan" subtitle="Pilihan tersimpan di browser ini dan berlaku di semua halaman, termasuk Masuk dan Daftar.">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2.5">
+            <h3 className="text-[15px] font-semibold leading-[22px] text-text">Tema</h3>
+            <ThemePicker value={tema} onChange={setTema} mode={resolvedMode} />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-5">
+            <div className="flex flex-col gap-2">
+              <h3 className="text-[15px] font-semibold leading-[22px] text-text">Mode warna</h3>
+              <ModeToggle value={mode} onChange={setMode} />
+            </div>
+            <p className="max-w-[46ch] flex-[1_1_260px] text-sm text-text-2">
+              Ikuti sistem memakai pengaturan terang atau gelap di perangkat Anda. Mode dipilih terpisah dari tema.
+            </p>
+            <StatusPill tone="ok" icon="circle-check">{teksAktif(tema, resolvedMode)}</StatusPill>
+          </div>
+        </div>
+      </Card>
+
       {/* Ringkasan akun */}
       <Card>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
@@ -94,14 +119,7 @@ export default function Profil() {
           </div>
 
           {/* Tombol keluar akun — sengaja ditaruh di profil, bukan sidebar */}
-          <button
-            type="button"
-            onClick={keluar}
-            className="tombol-keluar shrink-0 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-red-500/40 px-4 text-[13px] font-bold text-red-600 hover:bg-red-600/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">logout</span>
-            Keluar
-          </button>
+          <Button variant="danger" icon="log-out" onClick={keluar} className="shrink-0">Keluar</Button>
         </div>
         {logoutError && <p role="alert" className="mt-3 text-sm font-semibold text-red-800 dark:text-red-200">{logoutError}</p>}
       </Card>
