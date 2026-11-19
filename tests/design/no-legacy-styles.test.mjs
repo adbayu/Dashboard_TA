@@ -28,22 +28,48 @@ export const LEGACY = [
 ];
 
 // Ganti komentar dengan spasi (nomor baris tetap) supaya catatan di komentar
-// yang menyebut gaya lama tidak dianggap pelanggaran. Komentar `//` hanya
-// dibuang bila jumlah tanda kutip sebelum `//` genap (bukan di dalam string/URL).
+// yang menyebut gaya lama tidak dianggap pelanggaran. Pemindai satu lintasan
+// yang sadar string: `/*` dan `//` di dalam '...', "..." atau `...` bukan
+// komentar (glob rute, accept="image/*", URL). String ' dan " berakhir di
+// akhir baris supaya apostrof nyasar di teks JSX hanya berdampak pada barisnya.
+// `//` hanya dianggap komentar di awal baris atau setelah spasi (bukan http://).
 export function stripComments(source) {
   const blank = (text) => text.replace(/[^\r\n]/g, ' ');
-  const tanpaBlok = source.replace(/\/\*[\s\S]*?\*\//g, blank);
-  return tanpaBlok
-    .split('\n')
-    .map((line) => {
-      for (let i = line.indexOf('//'); i !== -1; i = line.indexOf('//', i + 2)) {
-        const sebelum = line.slice(0, i);
-        const genap = ['\'', '"', '`'].every((q) => (sebelum.split(q).length - 1) % 2 === 0);
-        if (genap && (i === 0 || /\s/.test(line[i - 1]))) return sebelum + blank(line.slice(i));
+  let hasil = '';
+  let kutip = null;
+  let i = 0;
+  while (i < source.length) {
+    const c = source[i];
+    const dua = source.slice(i, i + 2);
+    if (kutip) {
+      if (c === '\\') {
+        hasil += source.slice(i, i + 2);
+        i += 2;
+        continue;
       }
-      return line;
-    })
-    .join('\n');
+      if (c === kutip || (c === '\n' && kutip !== '`')) kutip = null;
+      hasil += c;
+      i += 1;
+    } else if (c === '\'' || c === '"' || c === '`') {
+      kutip = c;
+      hasil += c;
+      i += 1;
+    } else if (dua === '/*') {
+      const akhir = source.indexOf('*/', i + 2);
+      const sampai = akhir === -1 ? source.length : akhir + 2;
+      hasil += blank(source.slice(i, sampai));
+      i = sampai;
+    } else if (dua === '//' && (i === 0 || /\s/.test(source[i - 1]))) {
+      let sampai = source.indexOf('\n', i);
+      if (sampai === -1) sampai = source.length;
+      hasil += blank(source.slice(i, sampai));
+      i = sampai;
+    } else {
+      hasil += c;
+      i += 1;
+    }
+  }
+  return hasil;
 }
 
 export function findLegacy(path, source) {
@@ -71,6 +97,61 @@ test('pola hex tidak mengenai entitas HTML atau id', () => {
   assert.doesNotMatch('id="a#abc"', hex);
   assert.match('color: #0f5238;', hex);
   assert.match("fill='#fff'", hex);
+});
+
+// Regresi: string yang memuat `/*` (glob rute, accept="image/*") tidak boleh
+// membuka komentar palsu yang menelan baris asli sampai `*/` berikutnya.
+test('stripComments sadar string: "/admin/*" tidak menelan baris sesudahnya', () => {
+  const sumber = '<Route path="/admin/*" />\n<p className="text-red-600" />\n{/* catatan */}';
+  assert.deepEqual(findLegacy('x.jsx', sumber), ['x.jsx:2: text-red-600']);
+  assert.equal(stripComments(sumber).split('\n').length, 3);
+});
+
+test('stripComments sadar string: glob dan accept tidak membuka komentar palsu', () => {
+  const kasus = [
+    'const m = import.meta.glob(\'./pages/*.jsx\');\n<i className="bg-emerald-50" />\n/* tutup */',
+    '<input accept="image/*" />\n<b className="glass-card" />\n{/* tutup */}',
+    'const re = `src/**/*.jsx`;\n<b className="panel-inset" />\n/* tutup */',
+  ];
+  for (const sumber of kasus) {
+    const hasil = findLegacy('x.jsx', sumber);
+    assert.equal(hasil.length, 1, sumber);
+    assert.match(hasil[0], /^x\.jsx:2: /);
+  }
+});
+
+test('stripComments tetap membuang komentar asli dan menjaga nomor baris', () => {
+  const sumber = [
+    '<a href="/x/*">ok</a> /* text-red-600',
+    'glass-card */ <b className="bg-red-50" />',
+    '{/* material-symbols-outlined */}',
+    "const u = 'http://x'; // eyebrow=",
+    '<c className="panel-inset" />',
+  ].join('\n');
+  assert.equal(stripComments(sumber).split('\n').length, 5);
+  assert.deepEqual(findLegacy('x.jsx', sumber), ['x.jsx:2: bg-red-50', 'x.jsx:5: panel-inset']);
+});
+
+// Setiap pola LEGACY harus terdeteksi lewat findLegacy; kalau pembersih
+// komentar rusak lagi, ratchet tidak boleh lulus karena menelan semuanya.
+const CONTOH_PELANGGARAN = [
+  ['kelas warna palet', '<p className="bg-red-50" />', 'bg-red-50'],
+  ['material symbols', '<span className="material-symbols-outlined">eco</span>', 'material-symbols-outlined'],
+  ['glass', '<div className="glass-card" />', 'glass-card'],
+  ['panel-inset', '<div className="panel-inset" />', 'panel-inset'],
+  ['gradien tailwind', '<div className="bg-gradient-to-r" />', 'bg-gradient-to-'],
+  ['hex 6 digit', "const c = '#0f5238';", '#0f5238'],
+  ['hex 3 digit', 'color: #fff;', '#fff'],
+  ['eyebrow', '<SectionTitle eyebrow="Data" />', 'eyebrow='],
+];
+
+test('setiap pola LEGACY terdeteksi oleh findLegacy (uji diri positif)', () => {
+  for (const [nama, sumber, cocok] of CONTOH_PELANGGARAN) {
+    assert.deepEqual(findLegacy('x.jsx', sumber), [`x.jsx:1: ${cocok}`], nama);
+  }
+  for (const pola of LEGACY) {
+    assert.ok(CONTOH_PELANGGARAN.some(([, sumber]) => pola.test(sumber)), `pola ${pola} punya contoh`);
+  }
 });
 
 test('halaman yang sudah dimigrasi bebas dari gaya lama', async () => {
