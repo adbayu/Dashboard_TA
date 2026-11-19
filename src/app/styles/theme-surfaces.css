@@ -13,6 +13,16 @@
      data-ui="alert" | "table" | "metric" | "modal" | "modal-foot"
      data-ui="page-title"  h1 PageHeader
      data-ui="tab" | "chip" | "empty"
+     Komponen domain IoT (src/components/iot):
+     data-ui="sensor-reading" + data-variant="auto|tile|row" + data-status="normal|
+                           high|low|stale|unknown"; bagiannya sensor-top, sensor-name,
+                           sensor-chip (ikon), sensor-device, sensor-value, sensor-empty,
+                           sensor-foot. auto = baris di Catatan Lapangan, petak di tema lain.
+     data-ui="range-bar" > range-track (role=meter) > range-band, range-marker
+     data-ui="area-section" + data-area; bagiannya area-icon dan readings (kisi)
+     data-ui="task-list" > task (data-done) > task-box
+     data-ui="live" + data-state (live|polling|reconnecting|...) > live-dot
+     data-ui="attention-badge" | "event-chip" | "log-table"
    Komponen baru memakai pola yang sama; jangan menambah kelas khusus tema di
    JSX. Perlakuan Lumina hanya boleh muncul di bawah [data-theme="lumina"]. */
 
@@ -160,6 +170,205 @@
 @media (prefers-reduced-motion: reduce) {
   [data-theme="lumina"] [data-ui] {
     transition: none;
+    animation: none;
+  }
+}
+
+/* ══ Komponen domain IoT ═════════════════════════════════════════════════════ */
+
+/* ── AreaSection ─────────────────────────────────────────────────────────────── */
+[data-ui="area-section"] + [data-ui="area-section"] {
+  margin-top: 2rem;
+}
+
+[data-ui="area-icon"] {
+  color: rgb(var(--area-fg, var(--c-primary)));
+}
+
+[data-theme="catatan-lapangan"] [data-ui="area-icon"],
+[data-theme="panel-instrumen"] [data-ui="area-icon"] {
+  display: none;
+}
+
+[data-theme="tanah-lumut"] [data-ui="area-icon"] {
+  color: rgb(var(--c-primary));
+}
+
+/* Catatan Lapangan: pembacaan menjadi baris log di bawah garis atas, bukan kisi. */
+[data-theme="catatan-lapangan"] [data-ui="readings"] {
+  display: block;
+  border-top: 1px solid rgb(var(--c-border));
+}
+
+/* ── SensorReading ───────────────────────────────────────────────────────────── */
+/* Di luar batas: warna area berganti ke warn (juga untuk kepala petak Kebun Air). */
+[data-ui="sensor-reading"][data-status="high"],
+[data-ui="sensor-reading"][data-status="low"] {
+  --area-bg: var(--c-warn-bg);
+  --area-line: var(--c-warn-line);
+  --area-fg: var(--c-warn-fg);
+  border-color: rgb(var(--c-warn-line));
+}
+
+/* Nilai besar per tema (tema.md): ukuran, bobot, jarak huruf. */
+[data-theme="catatan-lapangan"] [data-ui="sensor-value"] {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+[data-theme="tanah-lumut"] [data-ui="sensor-value"] {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="lumina"] [data-ui="sensor-value"] {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+/* Kebun Air: kepala petak berwarna area, ikon dalam chip 26 px. overflow:hidden
+   aman di sini karena petak tidak memuat popover. */
+[data-theme="kebun-air"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) {
+  padding: 0;
+  gap: 8px;
+  overflow: hidden;
+  border-color: rgb(var(--area-line, var(--c-border)));
+}
+
+[data-theme="kebun-air"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) > [data-ui="sensor-top"] {
+  background: rgb(var(--area-bg, var(--c-surface)));
+  border-bottom: 1px solid rgb(var(--area-line, var(--c-border)));
+  padding: 12px 16px;
+}
+
+[data-theme="kebun-air"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) > :not([data-ui="sensor-top"]) {
+  padding-inline: 16px;
+}
+
+[data-theme="kebun-air"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) > :last-child {
+  padding-bottom: 14px;
+}
+
+[data-theme="kebun-air"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) [data-ui="sensor-chip"] {
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgb(var(--area-fg, var(--c-primary)));
+  color: rgb(var(--c-chip-ink));
+}
+
+[data-theme="kebun-air"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) [data-ui="sensor-device"] {
+  margin-left: 34px;
+}
+
+[data-theme="kebun-air"] [data-ui="sensor-reading"][data-variant="row"] [data-ui="sensor-device"] {
+  margin-left: 26px;
+}
+
+/* Lumina: petak kaca, ikon dalam chip gradien 30 px. Tanpa backdrop-filter
+   petak tetap `surface` padat (kelas token di JSX). */
+[data-theme="lumina"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) {
+  box-shadow: 0 8px 32px -4px rgb(var(--c-primary) / 0.18);
+}
+
+[data-theme="lumina"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) [data-ui="sensor-chip"] {
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border-radius: 10px;
+  background-image: linear-gradient(135deg, rgb(var(--c-ok-bg)), rgb(var(--c-info-bg)));
+  color: rgb(var(--c-primary));
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="lumina"] [data-ui="sensor-reading"]:is([data-variant="tile"], [data-variant="auto"]) {
+    background-color: rgb(var(--c-surface) / 0.62);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+/* Baris seperti log: kolom nama, nilai, rentang, status (variant="row" di tema
+   mana pun, dan otomatis di Catatan Lapangan). Harus setelah aturan petak. */
+[data-ui="sensor-reading"][data-variant="row"],
+[data-theme="catatan-lapangan"] [data-ui="sensor-reading"][data-variant="auto"] {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.4fr auto;
+  gap: 18px;
+  align-items: center;
+  overflow: visible;
+  padding: 14px 2px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--c-border));
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-ui="sensor-reading"][data-variant="row"] > [data-ui="sensor-top"],
+[data-theme="catatan-lapangan"] [data-ui="sensor-reading"][data-variant="auto"] > [data-ui="sensor-top"] {
+  display: contents;
+}
+
+[data-ui="sensor-reading"][data-variant="row"] > [data-ui="sensor-top"] > [data-ui="pill"],
+[data-theme="catatan-lapangan"] [data-ui="sensor-reading"][data-variant="auto"] > [data-ui="sensor-top"] > [data-ui="pill"] {
+  order: 4;
+  justify-self: start;
+}
+
+[data-ui="sensor-reading"][data-variant="row"] [data-ui="range-bar"],
+[data-theme="catatan-lapangan"] [data-ui="sensor-reading"][data-variant="auto"] [data-ui="range-bar"] {
+  margin-top: 0;
+}
+
+@media (max-width: 719px) {
+  [data-ui="sensor-reading"][data-variant="row"],
+  [data-theme="catatan-lapangan"] [data-ui="sensor-reading"][data-variant="auto"] {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── RangeBar: Lumina memakai lintasan 8 px pill dan pita gradien ───────────── */
+[data-theme="lumina"] [data-ui="range-track"] {
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+[data-theme="lumina"] [data-ui="range-band"] {
+  background-image: linear-gradient(90deg, rgb(var(--c-band)), rgb(var(--c-info-bg)));
+  border-radius: var(--radius-pill);
+}
+
+/* ── TaskList: garis pemisah mengikuti warna area bila ada ───────────────────── */
+[data-ui="task"] {
+  border-color: rgb(var(--area-line, var(--c-border)));
+}
+
+/* ── LiveIndicator: Lumina menambah titik berdenyut 1,6 s (hanya status live) ── */
+@keyframes jf-pulse {
+  50% { opacity: 0.35; }
+}
+
+[data-theme="lumina"] [data-ui="live"][data-state="live"] [data-ui="live-dot"] {
+  display: inline-block;
+  box-shadow: 0 0 8px currentColor;
+  animation: jf-pulse 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="lumina"] [data-ui="live"][data-state="live"] [data-ui="live-dot"] {
     animation: none;
   }
 }
