@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
-import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
 import { iotApi, IOT_SOURCE } from '../../services/iotApi.js';
-import { Badge, Button, Card, Empty, IconButton } from '../../shared/components/ui';
+import { Alert, Badge, Button, Card, Empty, Field, Input } from '../../shared/components/ui';
+import { Icon } from '../../shared/components/Icon.jsx';
+import { PublicHeader } from '../../shared/components/PublicFrame.jsx';
 import PublicAreaLabel from '../../components/iot/PublicAreaLabel.jsx';
 import { claimedDeviceState } from '../../utils/frontendReview.js';
 import { activationCodeMemory, claimAndForgetActivationCode } from '../../utils/activationCodeMemory.js';
@@ -12,8 +13,6 @@ export default function DeviceClaim() {
   const { code = '' } = useParams();
   const location = useLocation();
   const { currentUser, isLoggedIn, sessionStatus, sessionError, role } = useSmart();
-  const { resolvedMode, setMode } = useTampilan();
-  const gelap = resolvedMode === 'dark';
   const navigate = useNavigate();
   const urlActivationCode = new URLSearchParams(location.search).get('c') || '';
   const subscribeActivationCodes = useCallback(listener => activationCodeMemory.subscribe(listener), []);
@@ -156,50 +155,41 @@ export default function DeviceClaim() {
   const returnToQr = location.pathname;
   const previewCard = viewPreview && (
     <Card>
-      {viewPreview.label && <p className="mb-3 text-xs font-bold text-on-surface-variant">{viewPreview.label}</p>}
-      <p className="text-xs font-bold uppercase tracking-wider text-primary dark:text-inverse-primary">
+      {viewPreview.label && <p className="mb-3 text-xs font-semibold text-text-2">{viewPreview.label}</p>}
+      <p className="text-sm leading-5 text-text-2">
         {viewPreview.device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {viewPreview.device.type?.code || 'Tipe tidak tersedia'}
       </p>
-      <h1 className="mt-2 text-2xl font-extrabold text-on-surface break-words">{viewPreview.device.name}</h1>
-      <p className="mt-1 font-mono text-sm text-on-surface-variant break-all">{viewPreview.device.code}</p>
+      <h1 className="mt-2 break-words font-head text-2xl font-bold text-text">{viewPreview.device.name}</h1>
+      <p className="mt-1 break-all font-num text-sm text-text-2">{viewPreview.device.code}</p>
       <PublicAreaLabel areaRef={viewPreview.device.areaRef} />
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Badge tone={viewPreview.device.claimed ? 'muted' : 'info'} icon={viewPreview.device.claimed ? 'lock' : 'hourglass_top'}>
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+        <Badge tone={viewPreview.device.claimed ? 'muted' : 'info'} icon={viewPreview.device.claimed ? 'lock' : 'clock'}>
           {viewPreview.device.claimed ? 'Sudah diklaim' : 'Belum diklaim'}
         </Badge>
-        <Badge tone={viewPreview.device.activationValid ? 'ok' : 'warn'} icon={viewPreview.device.activationValid ? 'check_circle' : 'schedule'}>
+        <Badge tone={viewPreview.device.activationValid ? 'ok' : 'warn'} icon={viewPreview.device.activationValid ? 'circle-check' : 'triangle-alert'}>
           {viewPreview.device.activationValid ? 'Kode berlaku' : 'Kode tidak berlaku'}
         </Badge>
       </div>
-      <div className="mt-5">
-        <h2 className="text-sm font-bold text-on-surface">Sensor</h2>
+      <div className="mt-5 border-t border-border pt-3">
+        <h2 className="font-head text-base font-bold leading-[22px] text-text">Sensor</h2>
         {viewPreview.device.sensors.length ? (
           <ul className="mt-2 space-y-2">
             {viewPreview.device.sensors.map(sensor => (
-              <li key={sensor.code} className="flex min-w-0 items-start gap-2 text-sm text-on-surface-variant">
-                <span className="material-symbols-outlined mt-0.5 text-[17px] text-primary" aria-hidden="true">sensors</span>
+              <li key={sensor.code} className="flex min-w-0 items-start gap-2 text-[15px] leading-[22px] text-text-2">
+                <Icon name="radio" size={17} className="mt-[3px] shrink-0 text-primary" />
                 <span className="break-words">{sensor.name || sensor.label || sensor.code}{sensor.unit ? ` (${sensor.unit})` : ''}</span>
               </li>
             ))}
           </ul>
-        ) : <p className="mt-2 text-sm text-on-surface-variant">Informasi sensor belum tersedia.</p>}
+        ) : <p className="mt-2 text-[15px] leading-[22px] text-text-2">Informasi sensor belum tersedia.</p>}
       </div>
     </Card>
   );
 
   return (
-    <main className="min-h-screen w-full px-4 py-6 sm:py-10">
+    <main className="iot-touch-targets min-h-screen w-full px-4 py-6 sm:py-10">
       <div className="mx-auto w-full max-w-lg space-y-4">
-        <header className="flex items-center justify-between gap-3">
-          <p className="font-extrabold text-on-surface">JagoFarm</p>
-          <IconButton
-            icon={gelap ? 'light_mode' : 'dark_mode'}
-            onClick={() => setMode(gelap ? 'terang' : 'gelap')}
-            title={gelap ? 'Mode terang' : 'Mode gelap'}
-            size="lg"
-            className="panel-inset"
-          />
-        </header>
+        <PublicHeader />
 
         {viewState === 'loading' && <DeviceClaimLoadingState />}
         {previewCard}
@@ -207,9 +197,9 @@ export default function DeviceClaim() {
         {viewState === 'login-required' && (
           <Card>
             <SectionTitle title="Masuk untuk melanjutkan" />
-            <p className="text-sm text-on-surface-variant">Masuk diperlukan untuk memeriksa kepemilikan dan mengklaim alat.</p>
-            <Link to="/masuk" state={{ from: returnToQr }} className="mt-4 block">
-              <Button size="lg" icon="login" className="!h-[52px] w-full">Masuk untuk klaim</Button>
+            <p className="text-[15px] leading-[22px] text-text-2">Masuk diperlukan untuk memeriksa kepemilikan dan mengklaim alat.</p>
+            <Link to="/masuk" state={{ from: returnToQr }} className="mt-4 w-full">
+              <Button size="lg" icon="log-in" className="!h-[52px] w-full">Masuk untuk klaim</Button>
             </Link>
           </Card>
         )}
@@ -218,15 +208,15 @@ export default function DeviceClaim() {
           <ActivationRequiredState
             manualActivationCode={manualActivationCode}
             viewError={viewError}
-            onManualActivationCodeChange={event => setManualActivationCode(event.target.value)}
+            onManualActivationCodeChange={setManualActivationCode}
             onSubmit={submitActivationCode}
           />
         )}
 
         {viewState === 'claimable' && (
           <Card>
-            <p className="text-sm text-on-surface-variant">Kode aktivasi pada QR masih berlaku. Klaim perangkat ini untuk menambahkannya ke akun Anda.</p>
-            <Button size="lg" icon="add_circle" onClick={claim} disabled={claiming} className="mt-4 !h-[52px] w-full">
+            <p className="text-[15px] leading-[22px] text-text">Kode aktivasi pada QR masih berlaku. Klaim perangkat ini untuk menambahkannya ke akun Anda.</p>
+            <Button size="lg" icon="plus" onClick={claim} disabled={claiming} className="mt-4 !h-[52px] w-full">
               {claiming ? 'Mengklaim perangkat...' : 'Klaim alat ini'}
             </Button>
           </Card>
@@ -234,18 +224,18 @@ export default function DeviceClaim() {
 
         {viewState === 'success' && (
           <Card>
-            <Empty title={`${viewPreview?.device.code || code} sudah masuk ke akun Anda.`} hint="Perangkat berhasil diklaim." icon="check_circle" />
-            {deviceId && <Link to={`/iot/${encodeURIComponent(deviceId)}`} className="block">
-              <Button size="lg" icon="sensors" className="!h-[52px] w-full">Buka detail perangkat</Button>
+            <Empty title={`${viewPreview?.device.code || code} sudah masuk ke akun Anda.`} hint="Perangkat berhasil diklaim." icon="circle-check" />
+            {deviceId && <Link to={`/iot/${encodeURIComponent(deviceId)}`} className="mt-4 w-full">
+              <Button size="lg" className="!h-[52px] w-full">Buka detail perangkat</Button>
             </Link>}
           </Card>
         )}
 
         {viewState === 'own' && (
           <Card>
-            <Empty title="Perangkat ini milik akun Anda" hint="Buka halaman detail untuk melihat status, sensor, dan informasi kesehatan yang tersedia." icon="check_circle" />
-            <Link to={deviceId ? `/iot/${encodeURIComponent(deviceId)}` : '/iot'} className="block">
-              <Button size="lg" icon="sensors" className="!h-[52px] w-full">Buka detail perangkat</Button>
+            <Empty title="Perangkat ini milik akun Anda" hint="Buka halaman detail untuk melihat status, sensor, dan informasi kesehatan yang tersedia." icon="circle-check" />
+            <Link to={deviceId ? `/iot/${encodeURIComponent(deviceId)}` : '/iot'} className="mt-4 w-full">
+              <Button size="lg" className="!h-[52px] w-full">Buka detail perangkat</Button>
             </Link>
           </Card>
         )}
@@ -264,29 +254,29 @@ export default function DeviceClaim() {
 
         {viewState === 'expired' && (
           <Card>
-            <Empty title="Kode aktivasi QR tidak berlaku." hint="Kode di QR ini sudah kedaluwarsa. Minta pengelola mencetak ulang QR." icon="schedule" />
-            {viewError && <p role="alert" className="mt-2 text-sm text-red-800 dark:text-red-200">{viewError}</p>}
-            <Button size="lg" variant="ghost" icon="refresh" onClick={() => setAttempt(value => value + 1)} className="mt-4 !h-[52px] w-full">Muat ulang status</Button>
+            <Empty title="Kode aktivasi QR tidak berlaku." hint="Kode di QR ini sudah kedaluwarsa. Minta pengelola mencetak ulang QR." icon="clock" />
+            {viewError && <Alert tone="bad" className="mt-3">{viewError}</Alert>}
+            <Button size="lg" variant="secondary" icon="refresh-cw" onClick={() => setAttempt(value => value + 1)} className="mt-4 !h-[52px] w-full">Muat ulang status</Button>
           </Card>
         )}
 
         {viewState === 'unknown' && (
           <Card>
-            <Empty title="Kode alat tidak dikenal" hint={viewError || 'Periksa kode QR atau hubungi pengelola.'} icon="search_off" />
-            <Button size="lg" variant="ghost" icon="refresh" onClick={() => setAttempt(value => value + 1)} className="mt-4 !h-[52px] w-full">Coba lagi</Button>
+            <Empty title="Kode alat tidak dikenal" hint={viewError || 'Periksa kode QR atau hubungi pengelola.'} icon="search-x" />
+            <Button size="lg" variant="secondary" icon="refresh-cw" onClick={() => setAttempt(value => value + 1)} className="mt-4 !h-[52px] w-full">Coba lagi</Button>
           </Card>
         )}
 
         {viewState === 'backend-error' && (
           <Card>
-            <div role="alert">
-              <Empty title="Backend tidak tersedia" hint={viewError || 'Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.'} icon="cloud_off" />
-              <Button size="lg" variant="ghost" icon="refresh" onClick={() => setAttempt(value => value + 1)} className="!h-[52px] w-full">Coba lagi</Button>
+            <div role="alert" className="space-y-4">
+              <Empty title="Backend tidak tersedia" hint={viewError || 'Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.'} icon="cloud-off" />
+              <Button size="lg" variant="secondary" icon="refresh-cw" onClick={() => setAttempt(value => value + 1)} className="!h-[52px] w-full">Coba lagi</Button>
             </div>
           </Card>
         )}
 
-        {IOT_SOURCE === 'local' && viewPreview && <p className="text-center text-xs font-semibold text-on-surface-variant">Data contoh. Perubahan demo hanya berlaku selama sesi ini.</p>}
+        {IOT_SOURCE === 'local' && viewPreview && <p className="text-center text-sm leading-5 text-text-2">Data contoh. Perubahan demo hanya berlaku selama sesi ini.</p>}
       </div>
     </main>
   );
@@ -296,11 +286,10 @@ export function ActivationRequiredState({ manualActivationCode, viewError, onMan
   return (
     <Card>
       <SectionTitle title="Masukkan kode aktivasi" />
-      <p className="text-sm text-on-surface-variant">Kode tidak tersimpan di alamat halaman. Minta kode yang masih berlaku dari pengelola untuk melanjutkan.</p>
+      <p className="text-[15px] leading-[22px] text-text-2">Kode tidak tersimpan di alamat halaman. Minta kode yang masih berlaku dari pengelola untuk melanjutkan.</p>
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
-        <div>
-          <label htmlFor="manual-activation-code" className="mb-1 block text-sm font-semibold text-on-surface">Kode aktivasi</label>
-          <input
+        <Field label="Kode aktivasi">
+          <Input
             id="manual-activation-code"
             type="password"
             value={manualActivationCode}
@@ -312,20 +301,20 @@ export function ActivationRequiredState({ manualActivationCode, viewError, onMan
             maxLength={64}
             pattern="[a-f0-9]{64}"
             required
-            className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="!h-12"
           />
-        </div>
-        {viewError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{viewError}</p>}
-        <Button type="submit" size="lg" icon="key" className="!h-[52px] w-full">Periksa kode</Button>
+        </Field>
+        {viewError && <Alert tone="bad">{viewError}</Alert>}
+        <Button type="submit" size="lg" icon="key-round" className="!h-[52px] w-full">Periksa kode</Button>
       </form>
     </Card>
   );
 }
 
 export function DeviceClaimLoadingState() {
-  return <Card><p role="status" className="text-sm text-on-surface-variant">Memuat informasi QR...</p></Card>;
+  return <Card><p role="status" className="text-[15px] leading-[22px] text-text-2">Memuat informasi QR...</p></Card>;
 }
 
 function SectionTitle({ title }) {
-  return <h2 className="text-lg font-bold text-on-surface">{title}</h2>;
+  return <h2 className="mb-2 font-head text-[19px] font-bold leading-[26px] text-text">{title}</h2>;
 }

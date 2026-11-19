@@ -187,6 +187,17 @@ test('SmartTopBar tanpa eyebrow Mode; tombol tema cepat membuka dialog', () => {
   assert.doesNotMatch(markup, /uppercase/);
 });
 
+test('SmartTopBar memakai <p> untuk judul; satu-satunya h1 halaman ada di PageHeader', async () => {
+  const ui = await vite.ssrLoadModule('/src/shared/components/ui.jsx');
+  const markup = withShell(h(topbar.default, { title: 'Pantauan', subtitle: 'Ringkasan', onMenuClick: noop }));
+  assert.doesNotMatch(markup, /<h1\b/, 'top bar tidak boleh membawa h1');
+  assert.match(markup, /<p class="[^"]*\btruncate\b[^"]*">Pantauan<\/p>/);
+  const header = renderToStaticMarkup(h(ui.PageHeader, { title: 'Profil dan tampilan' }));
+  assert.equal((header.match(/<h1\b/g) || []).length, 1);
+  const page = `${markup}${header}`;
+  assert.equal((page.match(/<h1\b/g) || []).length, 1, 'top bar + PageHeader = tepat satu h1');
+});
+
 test('Profil: kartu Tampilan dan tombol Keluar varian danger', () => {
   const source = read('../../profil-saya/pages/Profil.jsx');
   assert.match(source, /<ThemePicker\b/);

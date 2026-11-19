@@ -607,7 +607,8 @@ test('IoT control surfaces scope 44px hit areas without changing shared defaults
 });
 
 test('DeviceClaim clears valid manual input and relies on activation memory for claim state', async () => {
-  const source = await readFile(new URL('./kelola-area/pages/DeviceClaim.jsx', import.meta.url), 'utf8');
+  // Checkout Windows (autocrlf) memberi CRLF; asersi di bawah mencocokkan baris dengan LF.
+  const source = (await readFile(new URL('./kelola-area/pages/DeviceClaim.jsx', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
   const submit = source.match(/function submitActivationCode\(event\) \{([\s\S]*?)\n  \}/)?.[1] || '';
 
   assert.match(submit, /setManualActivationCode\(''\)/);

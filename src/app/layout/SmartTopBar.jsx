@@ -4,7 +4,8 @@ import { IconButton } from '../../shared/components/ui';
 import { ThemeQuickMenu } from '../../shared/theme/ThemeQuickMenu.jsx';
 
 // Bilah atas (kanvas Main): judul halaman, pulihkan data contoh (mode lokal),
-// lalu tombol tema cepat. Tanpa eyebrow "Mode ..." di atas judul.
+// lalu tombol tema cepat. Tanpa eyebrow "Mode ..." di atas judul. Judul di sini
+// <p>, bukan <h1>: satu-satunya <h1> halaman ada di PageHeader.
 export default function SmartTopBar({ title, subtitle, onMenuClick }) {
   const { resetDemo } = useSmart();
 
@@ -13,7 +14,7 @@ export default function SmartTopBar({ title, subtitle, onMenuClick }) {
       <div className="flex min-h-10 min-w-0 items-center gap-3">
         <IconButton icon="menu" onClick={onMenuClick} label="Buka menu" size="lg" className="mobile-menu-button shrink-0" />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate font-head text-base font-semibold leading-[22px] text-text">{title}</h1>
+          <p className="truncate font-head text-base font-semibold leading-[22px] text-text">{title}</p>
           {subtitle && <p className="text-xs text-text-2 break-words">{subtitle}</p>}
         </div>
 

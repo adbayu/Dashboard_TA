@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
-import { AvatarPilih, Button, Field, Input } from '../../shared/components/ui';
+import { Alert, AvatarPilih, Button, Card, Checkbox, Field, Input } from '../../shared/components/ui';
+import { Icon } from '../../shared/components/Icon.jsx';
+import { PublicFrame, PublicPanel, SampleTag } from '../../shared/components/PublicFrame.jsx';
+import { FOKUS } from '../../shared/components/ui/tones.js';
 import { AVATAR_PILIHAN } from '../../kelola-user/data/seed.js';
 
 // Halaman daftar akun sendiri (/daftar).
@@ -17,24 +20,27 @@ const PERAN = [
   {
     value: 'pengguna',
     label: 'Operator Farm',
-    icon: 'agriculture',
+    icon: 'tractor',
     desc: 'Memantau kolam, mencatat pemantauan, HPP, dan panen di area yang ditugaskan pengelola.',
     catatan: 'Langsung aktif. Area kerja diatur pengelola setelah akun dibuat.',
   },
   {
     value: 'pengelola',
     label: 'Pengelola Farm',
-    icon: 'shield_person',
+    icon: 'shield-user',
     desc: 'Mengelola akun, perangkat IoT, kategori alat, area, virtual pet, dan sistem poin.',
     catatan: 'Perlu persetujuan pengelola yang sudah ada sebelum bisa masuk.',
   },
 ];
 
+const FORM_AWAL = { name: '', email: '', phone: '', jabatan: '', avatar: AVATAR_PILIHAN[0] };
+const LABEL_KELOMPOK = 'mb-2 p-0 text-sm font-semibold leading-5 text-text';
+
 export default function Daftar() {
   const { register } = useSmart();
   const navigate = useNavigate();
   const [peran, setPeran] = useState('pengguna');
-  const [form, setForm] = useState({ name: '', email: '', phone: '', jabatan: '', avatar: AVATAR_PILIHAN[0] });
+  const [form, setForm] = useState(FORM_AWAL);
   const [pw, setPw] = useState({ password: '', ulang: '' });
   const [galat, setGalat] = useState('');
   const [lihatPassword, setLihatPassword] = useState(false);
@@ -69,202 +75,178 @@ export default function Daftar() {
   // ── Layar hasil untuk pengajuan pengelola ─────────────────────────────────
   if (berhasil) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-10">
-        <div className="glass-panel rounded-3xl px-7 py-8 shadow-glass-elevated w-full max-w-lg">
-          <span className="material-symbols-outlined text-[40px] text-amber-600">hourglass_top</span>
-          <h2 className="mt-2 text-xl font-extrabold text-on-surface">Pengajuan akun pengelola terkirim</h2>
-          <p className="text-sm text-on-surface-variant mt-2">
-            Akun <strong className="text-on-surface">{berhasil.email}</strong> tercatat sebagai pengelola
-            dan sekarang berstatus <strong className="text-on-surface">menunggu persetujuan</strong>.
+      <PublicFrame>
+        <Card pad="none" className="flex w-full max-w-lg flex-col gap-4 p-8">
+          <h1 className="font-head text-[22px] font-bold leading-7 text-text">Pengajuan akun pengelola terkirim</h1>
+          <p className="text-[15px] leading-[22px] text-text-2">
+            Akun <strong className="text-text">{berhasil.email}</strong> tercatat sebagai pengelola
+            dan sekarang berstatus <strong className="text-text">menunggu persetujuan</strong>.
             Hak pengelola memberi akses penuh ke seluruh farm, jadi harus disetujui pengelola yang sudah
-            ada lewat menu <strong className="text-on-surface">Kelola User</strong>.
+            ada lewat menu <strong className="text-text">Kelola User</strong>.
           </p>
-          <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-amber-900/20 p-3 text-[12px] text-on-surface-variant">
+          <Alert tone="warn" icon="hourglass">
             Saat ini Anda belum bisa masuk dengan akun ini. Hubungi pengelola farm untuk menyetujuinya,
             atau daftar lagi sebagai operator farm bila hanya perlu memantau kolam.
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
+          </Alert>
+          <div className="flex flex-wrap gap-2">
             <Link to="/masuk">
-              <Button icon="login">Ke halaman masuk</Button>
+              <Button>Ke halaman masuk</Button>
             </Link>
             <Button
               variant="ghost"
-              icon="person_add"
               onClick={() => {
                 setBerhasil(null);
                 setPeran('pengguna');
-                setForm({ name: '', email: '', phone: '', jabatan: '', avatar: AVATAR_PILIHAN[0] });
+                setForm(FORM_AWAL);
                 setPw({ password: '', ulang: '' });
               }}
             >
               Daftar sebagai operator farm
             </Button>
           </div>
-        </div>
-      </div>
+        </Card>
+      </PublicFrame>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-5xl grid md:grid-cols-[1fr,1.25fr] gap-6 items-stretch">
+    <PublicFrame>
+      <div className="grid w-full max-w-[1080px] grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] items-stretch gap-6">
         {/* Sisi kiri: penjelasan alur peran */}
-        <div
-          className="rounded-3xl px-8 py-10 text-white shadow-glass-elevated flex flex-col justify-between"
-          style={{ background: 'linear-gradient(165deg, rgb(56, 84, 49) 0%, rgb(38, 60, 34) 55%, rgb(27, 44, 25) 100%)' }}
-        >
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-accent/20 border border-white/20 flex items-center justify-center">
-                <span className="material-symbols-outlined text-white text-[26px] fill">eco</span>
-              </div>
-              <div className="leading-tight">
-                <p className="text-xl font-extrabold tracking-tight">JagoFarm</p>
-                <p className="text-xs font-semibold text-emerald-accent">SmartDashboard Aquaponik</p>
-              </div>
-            </div>
-            <h1 className="mt-8 text-3xl font-extrabold leading-tight">Buat akun JagoFarm</h1>
-            <p className="mt-3 text-sm text-white/70 leading-relaxed">
+        <PublicPanel>
+          <div className="flex flex-col gap-3">
+            <h1 className="text-balance font-head text-[32px] font-bold leading-[38px] tracking-tight">Buat akun JagoFarm</h1>
+            <p className="max-w-[40ch] text-base leading-6">
               Pilih peran sesuai pekerjaan Anda. Peran menentukan menu dan data yang bisa dibuka.
             </p>
           </div>
 
-          <div className="mt-8 space-y-4">
+          <div className="flex flex-col gap-4">
             {PERAN.map((p) => (
-              <div key={p.value} className="flex items-start gap-3">
-                <span className="material-symbols-outlined text-emerald-accent text-[20px] mt-0.5">{p.icon}</span>
-                <div>
-                  <p className="text-sm font-bold">{p.label}</p>
-                  <p className="text-[12px] text-white/60 leading-snug">{p.catatan}</p>
+              <div key={p.value} className="flex items-start gap-2.5">
+                <Icon name={p.icon} size={18} className="mt-0.5 shrink-0" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold">{p.label}</span>
+                  <span className="text-sm leading-5 text-side-text-2">{p.catatan}</span>
                 </div>
               </div>
             ))}
-            <p className="text-[12px] text-white/50 leading-snug pt-2 border-t border-white/10">
+            <p className="border-t border-side-line pt-3.5 text-sm leading-5 text-side-text-2">
               Data demo: akun disimpan di browser ini saja (belum ada server autentikasi).
             </p>
           </div>
-        </div>
+        </PublicPanel>
 
         {/* Sisi kanan: formulir */}
-        <div className="glass-panel rounded-3xl px-7 py-8 shadow-glass-elevated">
-          <h2 className="text-xl font-extrabold text-on-surface">Daftar akun</h2>
-          <p className="text-sm text-on-surface-variant mt-1">
-            Sudah punya akun?{' '}
-            <Link to="/masuk" className="font-bold text-primary hover:underline">
-              Masuk di sini
-            </Link>
-          </p>
+        <Card pad="none" className="flex flex-col gap-5 p-8">
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-head text-[22px] font-bold leading-7 text-text">Daftar akun</h2>
+              <SampleTag />
+            </div>
+            <p className="text-[15px] leading-[22px] text-text-2">
+              Sudah punya akun?{' '}
+              <Link to="/masuk" className={`rounded-control font-semibold text-primary underline underline-offset-[3px] hover:text-primary-hover ${FOKUS}`}>
+                Masuk di sini
+              </Link>
+            </p>
+          </div>
 
-          <form onSubmit={kirim} className="mt-6 space-y-4">
-            {/* Pilihan peran */}
-            <div>
-              <p className="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
-                Daftar sebagai
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
+          <form onSubmit={kirim} className="flex flex-col gap-[18px]">
+            {/* Pilihan peran: radio bawaan browser supaya panah dan fokus bekerja */}
+            <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
+              <legend className={LABEL_KELOMPOK}>Daftar sebagai</legend>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-2">
                 {PERAN.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setPeran(p.value)}
-                    className={`text-left rounded-2xl border p-3 transition-all ${
-                      peran === p.value
-                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-                        : 'border-outline-variant/50 hover:border-primary/40'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`material-symbols-outlined text-[20px] ${peran === p.value ? 'text-primary' : 'text-on-surface-variant'}`}>
-                        {p.icon}
+                  <label key={p.value} className="relative block cursor-pointer">
+                    <input
+                      type="radio"
+                      name="peran"
+                      value={p.value}
+                      checked={peran === p.value}
+                      onChange={() => setPeran(p.value)}
+                      className="peer sr-only"
+                    />
+                    <span className="flex h-full min-h-11 flex-col gap-1 rounded-card border border-border bg-surface p-3.5 text-left text-text peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-inset peer-checked:ring-primary peer-focus-visible:ring-2 peer-focus-visible:ring-focus">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Icon name={p.icon} size={18} className="text-primary" />
+                        {p.label}
                       </span>
-                      <span className="text-sm font-bold text-on-surface">{p.label}</span>
+                      <span className="text-sm leading-5 text-text-2">{p.desc}</span>
                     </span>
-                    <span className="mt-1 block text-[11px] text-on-surface-variant leading-snug">{p.desc}</span>
-                  </button>
+                  </label>
                 ))}
               </div>
-              <p className="mt-2 rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-[11px] text-on-surface-variant">
+              <p className="flex items-start gap-1.5 text-sm leading-5 text-text-2">
+                <Icon name="info" size={16} className="mt-0.5 shrink-0 text-info-fg" />
                 {peranTerpilih.catatan}
               </p>
-            </div>
+            </fieldset>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-4">
               <Field label="Nama lengkap">
                 <Input value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="cth. Rina Kartika" required />
               </Field>
               <Field label="Email">
                 <Input type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nama@jagofarm.id" autoComplete="username" required />
               </Field>
-              <Field label="Nomor telepon" hint="Opsional.">
-                <Input value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="cth. 0812-3456-7890" />
+              <Field label="Nomor telepon" optional>
+                <Input type="tel" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="cth. 0812-3456-7890" />
               </Field>
-              <Field label="Jabatan / peran di farm" hint="Opsional.">
+              <Field label="Jabatan di farm" optional>
                 <Input value={form.jabatan} onChange={(v) => setForm({ ...form, jabatan: v })} placeholder="cth. Operator Kolam" />
               </Field>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Password" hint="Minimal 6 karakter.">
-                <div className="relative">
-                  <Input
-                    type={lihatPassword ? 'text' : 'password'}
-                    value={pw.password}
-                    onChange={(v) => setPw({ ...pw, password: v })}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setLihatPassword((v) => !v)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-8 w-8 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
-                    aria-label={lihatPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">{lihatPassword ? 'visibility_off' : 'visibility'}</span>
-                  </button>
-                </div>
+                <Input
+                  type={lihatPassword ? 'text' : 'password'}
+                  value={pw.password}
+                  onChange={(v) => setPw({ ...pw, password: v })}
+                  autoComplete="new-password"
+                  required
+                />
               </Field>
               <Field label="Ulangi password">
                 <Input
                   type={lihatPassword ? 'text' : 'password'}
                   value={pw.ulang}
                   onChange={(v) => setPw({ ...pw, ulang: v })}
-                  placeholder="••••••••"
                   autoComplete="new-password"
                   required
                 />
               </Field>
             </div>
 
-            <div>
-              <p className="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">Foto profil</p>
-              <div className="flex flex-wrap gap-2">
+            <Checkbox
+              label="Tampilkan password"
+              checked={lihatPassword}
+              onChange={(e) => setLihatPassword(e.target.checked)}
+            />
+
+            <fieldset className="m-0 min-w-0 border-0 p-0">
+              <legend className={LABEL_KELOMPOK}>Foto profil</legend>
+              <div className="flex flex-wrap gap-2.5">
                 {AVATAR_PILIHAN.map((pilihan) => (
                   <AvatarPilih
                     key={pilihan.id}
                     avatar={pilihan}
                     nama={form.name}
-                    size={48}
+                    size={44}
+                    label={`Warna ${pilihan.id}`}
                     terpilih={form.avatar?.id === pilihan.id}
                     onClick={() => setForm({ ...form, avatar: pilihan })}
                   />
                 ))}
               </div>
-            </div>
+            </fieldset>
 
-            {galat && (
-              <p role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 dark:bg-red-900/25 border border-red-300/60 px-3 py-2 text-sm font-semibold text-red-800 dark:text-red-200">
-                <span className="material-symbols-outlined text-[18px]">error</span>
-                {galat}
-              </p>
-            )}
+            {galat && <Alert tone="bad">{galat}</Alert>}
 
-            <Button type="submit" disabled={proses} icon="how_to_reg" className="w-full justify-center">
+            <Button type="submit" size="lg" disabled={proses} className="w-full">
               {proses ? 'Mendaftarkan…' : peran === 'pengelola' ? 'Ajukan akun pengelola' : 'Daftar & masuk'}
             </Button>
           </form>
-        </div>
+        </Card>
       </div>
-    </div>
+    </PublicFrame>
   );
 }

@@ -28,6 +28,8 @@
                            nav-item (NavLink menu, aria-current="page" saat aktif)
      data-ui="shell-content"  pembungkus top bar + konten di kanan sidebar
      data-ui="topbar"      <header> SmartTopBar
+     data-ui="public-panel"  panel gelap pengantar di Masuk dan Daftar (PublicFrame); anaknya
+                           brand-mark dipakai bersama kepala publik
      Pemilih tampilan (src/shared/theme):
      data-ui="theme-picker" radiogroup ThemePicker; tiap kartu memuat
                            [data-pratinjau][data-theme][data-mode] (pratinjau bertema
@@ -417,6 +419,14 @@
   border-radius: 10px;
   background-image: linear-gradient(135deg, rgb(var(--c-mark-bg)), rgb(var(--c-focus)));
   box-shadow: 0 0 18px rgb(var(--c-mark-bg) / 0.7);
+}
+
+/* ── Panel publik (Masuk, Daftar): Lumina bergradien dan membulat seperti sidebar ── */
+[data-theme="lumina"] [data-ui="public-panel"] {
+  border-width: 0;
+  border-radius: 24px;
+  background-image: linear-gradient(180deg, rgb(var(--c-side-bg)), rgb(var(--c-side-active)));
+  box-shadow: 0 20px 50px -12px rgb(var(--c-side-bg) / 0.55);
 }
 
 /* ── Top bar dan popover tema: Lumina berkaca (tanpa dukungan tetap padat) ── */

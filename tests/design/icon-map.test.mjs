@@ -116,6 +116,21 @@ const komponenValid = (v) =>
 test('pemindai menemukan nama ikon lama di src (bukan daftar kosong)', () => {
   const nama = pindaiSemua()
   assert.ok(nama.size > 60, `hanya ${nama.size} nama ditemukan; pemindai kemungkinan rusak`)
+})
+
+// Nama tertentu di src hilang begitu halamannya dimigrasi (Fase B), jadi
+// kemampuan pemindai diperiksa pada contoh tetap, bukan pada isi src yang berubah.
+test('pemindai menangkap semua bentuk pemakaian ikon pada contoh tetap', () => {
+  const contoh = `
+    <Button icon="sensors" />
+    const a = { icon: 'water' }
+    <IconButton icon={gelap ? 'light_mode' : 'dark_mode'} />
+    <Badge icon={ok ? 'check_circle' : 'warning'} tone={x ? 'warn' : 'ok'} />
+    <span className="material-symbols-outlined">{muat ? 'visibility_off' : 'visibility'}</span>
+    <span className="material-symbols-outlined">pets</span>
+    const KAT_ICONS = ['trending_down', 'deployed_code']
+  `
+  const nama = pindaiFile(contoh)
   for (const wajib of ['sensors', 'water', 'dark_mode', 'check_circle', 'warning', 'pets']) {
     assert.ok(nama.has(wajib), `pemindai harus menemukan "${wajib}"`)
   }
@@ -123,6 +138,7 @@ test('pemindai menemukan nama ikon lama di src (bukan daftar kosong)', () => {
   for (const kondisional of ['light_mode', 'visibility_off', 'trending_down', 'deployed_code']) {
     assert.ok(nama.has(kondisional), `ikon kondisional "${kondisional}" harus tertangkap`)
   }
+  assert.equal(nama.has('warn'), false, 'tone={x ? warn : ok} bukan ikon')
 })
 
 test('seed server tidak memuat nama ikon yang dirender UI', () => {
