@@ -48,6 +48,7 @@
   --radius-pill: 999px;
 }
 
+[data-pratinjau][data-theme="kebun-air"],
 :root[data-theme="kebun-air"] {
   --font-head: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
   --font-body: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
@@ -57,6 +58,7 @@
   --radius-pill: 999px;
 }
 
+[data-pratinjau][data-theme="kebun-air"][data-mode="light"],
 :root[data-theme="kebun-air"][data-mode="light"] {
   --c-bg: 244 241 233;
   --c-surface: 255 253 248;
@@ -99,6 +101,7 @@
   --c-chip-ink: 255 255 255;
 }
 
+[data-pratinjau][data-theme="kebun-air"][data-mode="dark"],
 :root[data-theme="kebun-air"][data-mode="dark"] {
   --c-bg: 20 19 14;
   --c-surface: 29 27 20;
@@ -141,6 +144,7 @@
   --c-chip-ink: 16 23 10;
 }
 
+[data-pratinjau][data-theme="catatan-lapangan"],
 :root[data-theme="catatan-lapangan"] {
   --font-head: "Fraunces Variable", Fraunces, Georgia, serif;
   --font-body: "Source Sans 3 Variable", "Source Sans 3", system-ui, sans-serif;
@@ -150,6 +154,7 @@
   --radius-pill: 999px;
 }
 
+[data-pratinjau][data-theme="catatan-lapangan"][data-mode="light"],
 :root[data-theme="catatan-lapangan"][data-mode="light"] {
   --c-bg: 247 246 241;
   --c-surface: 255 254 251;
@@ -192,6 +197,7 @@
   --c-chip-ink: 255 255 255;
 }
 
+[data-pratinjau][data-theme="catatan-lapangan"][data-mode="dark"],
 :root[data-theme="catatan-lapangan"][data-mode="dark"] {
   --c-bg: 21 23 19;
   --c-surface: 28 31 26;
@@ -234,6 +240,7 @@
   --c-chip-ink: 16 32 15;
 }
 
+[data-pratinjau][data-theme="panel-instrumen"],
 :root[data-theme="panel-instrumen"] {
   --font-head: "Source Sans 3 Variable", "Source Sans 3", system-ui, sans-serif;
   --font-body: "Source Sans 3 Variable", "Source Sans 3", system-ui, sans-serif;
@@ -243,6 +250,7 @@
   --radius-pill: 999px;
 }
 
+[data-pratinjau][data-theme="panel-instrumen"][data-mode="light"],
 :root[data-theme="panel-instrumen"][data-mode="light"] {
   --c-bg: 241 243 240;
   --c-surface: 252 253 252;
@@ -285,6 +293,7 @@
   --c-chip-ink: 255 255 255;
 }
 
+[data-pratinjau][data-theme="panel-instrumen"][data-mode="dark"],
 :root[data-theme="panel-instrumen"][data-mode="dark"] {
   --c-bg: 17 18 16;
   --c-surface: 24 25 23;
@@ -327,6 +336,7 @@
   --c-chip-ink: 6 24 15;
 }
 
+[data-pratinjau][data-theme="tanah-lumut"],
 :root[data-theme="tanah-lumut"] {
   --font-head: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
   --font-body: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
@@ -336,6 +346,7 @@
   --radius-pill: 999px;
 }
 
+[data-pratinjau][data-theme="tanah-lumut"][data-mode="light"],
 :root[data-theme="tanah-lumut"][data-mode="light"] {
   --c-bg: 243 239 230;
   --c-surface: 255 252 246;
@@ -378,6 +389,7 @@
   --c-chip-ink: 255 255 255;
 }
 
+[data-pratinjau][data-theme="tanah-lumut"][data-mode="dark"],
 :root[data-theme="tanah-lumut"][data-mode="dark"] {
   --c-bg: 22 20 15;
   --c-surface: 31 28 21;
@@ -420,6 +432,7 @@
   --c-chip-ink: 24 32 11;
 }
 
+[data-pratinjau][data-theme="lumina"],
 :root[data-theme="lumina"] {
   --font-head: "Inter Variable", Inter, system-ui, sans-serif;
   --font-body: "Inter Variable", Inter, system-ui, sans-serif;
@@ -429,6 +442,7 @@
   --radius-pill: 999px;
 }
 
+[data-pratinjau][data-theme="lumina"][data-mode="light"],
 :root[data-theme="lumina"][data-mode="light"] {
   --c-bg: 236 253 245;
   --c-surface: 255 255 255;
@@ -471,6 +485,7 @@
   --c-chip-ink: 255 255 255;
 }
 
+[data-pratinjau][data-theme="lumina"][data-mode="dark"],
 :root[data-theme="lumina"][data-mode="dark"] {
   --c-bg: 2 6 23;
   --c-surface: 15 23 42;

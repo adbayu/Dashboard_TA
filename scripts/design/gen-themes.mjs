@@ -64,10 +64,15 @@ export function buildThemesCss(tokens) {
     block(':root', [...colorLines(colors, `${fallbackTheme}-light`), ...varLines(THEME_VARS[fallbackTheme])]),
   ]
 
+  // Selektor [data-pratinjau] (Ruling R11) membuat elemen mana pun bertema lokal,
+  // mis. pratinjau mini ThemePicker: <span data-pratinjau data-theme="lumina" data-mode="dark">.
+  // Selektor pratinjau ditulis lebih dulu agar `:root[...] {` tetap utuh dalam satu baris.
+  const selectors = (attrs) => `[data-pratinjau]${attrs},\n:root${attrs}`
   for (const [theme, vars] of Object.entries(THEME_VARS)) {
-    blocks.push(block(`:root[data-theme="${theme}"]`, varLines(vars)))
+    const themeAttr = `[data-theme="${theme}"]`
+    blocks.push(block(selectors(themeAttr), varLines(vars)))
     for (const palette of palettes.filter((p) => p.theme === theme)) {
-      blocks.push(block(`:root[data-theme="${theme}"][data-mode="${palette.mode}"]`, colorLines(colors, palette.id)))
+      blocks.push(block(selectors(`${themeAttr}[data-mode="${palette.mode}"]`), colorLines(colors, palette.id)))
     }
   }
 

@@ -25,7 +25,9 @@ test('blok gelap Lumina memuat primary emerald-400', () => {
 })
 
 test('ada 10 blok tema x mode, masing-masing 39 token warna', () => {
-  assert.equal(css.match(/\[data-mode=/g).length, 10)
+  // Tiap blok kini juga punya selektor pratinjau (Ruling R11), jadi hitung per bentuk selektor.
+  assert.equal(css.match(/:root\[data-theme="[a-z-]+"\]\[data-mode=/g).length, 10)
+  assert.equal(css.match(/\[data-pratinjau\]\[data-theme="[a-z-]+"\]\[data-mode=/g).length, 10)
   for (const theme of ['kebun-air', 'catatan-lapangan', 'panel-instrumen', 'tanah-lumut', 'lumina']) {
     for (const mode of ['light', 'dark']) {
       const body = block(`:root[data-theme="${theme}"][data-mode="${mode}"]`)
@@ -64,6 +66,21 @@ test(':root polos adalah cadangan Kebun Air terang', () => {
   assert.ok(fallback.includes('--c-surface: 255 253 248;'))
   assert.ok(fallback.includes('--radius-card: 8px;'))
   assert.ok(fallback.includes('"Plus Jakarta Sans Variable"'))
+})
+
+test('pratinjau tema lokal: setiap blok tema juga cocok dengan [data-pratinjau] (Ruling R11)', () => {
+  const selectorList = (body) => css.slice(css.lastIndexOf('}', css.indexOf(body)) + 1, css.indexOf(body)).trim()
+  for (const theme of ['kebun-air', 'catatan-lapangan', 'panel-instrumen', 'tanah-lumut', 'lumina']) {
+    // Blok huruf/radius: pratinjau berbagi isi yang sama dengan :root[data-theme].
+    const fontSelectors = selectorList(`:root[data-theme="${theme}"] {`)
+    assert.ok(fontSelectors.includes(`[data-pratinjau][data-theme="${theme}"],`), `${theme} font/radius pratinjau`)
+    assert.ok(!fontSelectors.includes('[data-mode='), `${theme} blok huruf tanpa mode`)
+    for (const mode of ['light', 'dark']) {
+      const colorSelectors = selectorList(`:root[data-theme="${theme}"][data-mode="${mode}"] {`)
+      assert.ok(colorSelectors.includes(`[data-pratinjau][data-theme="${theme}"][data-mode="${mode}"],`), `${theme}/${mode} pratinjau`)
+    }
+  }
+  assert.ok(!/^\[data-pratinjau\] \{/m.test(css), 'tidak ada blok pratinjau tanpa tema')
 })
 
 test('output deterministik dan memakai LF', () => {
