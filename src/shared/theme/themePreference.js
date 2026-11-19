@@ -37,6 +37,19 @@ export function writePreference(storage, pref) {
   }
 }
 
+/**
+ * Gabungkan `patch` ke preferensi `prev` tanpa memutasi `prev`. Hanya tema dan
+ * mode yang dikenal yang diterima; patch yang tidak mengubah apa pun
+ * mengembalikan `prev` itu sendiri. Dipakai sebagai updater fungsional
+ * (`setPref(prev => mergePreference(prev, patch))`) agar dua perubahan di tick
+ * yang sama (setTema lalu setMode) tidak saling menimpa.
+ */
+export function mergePreference(prev, patch) {
+  const tema = TEMA.includes(patch?.tema) ? patch.tema : prev.tema;
+  const mode = MODE.includes(patch?.mode) ? patch.mode : prev.mode;
+  return tema === prev.tema && mode === prev.mode ? prev : { tema, mode };
+}
+
 export function resolveMode(mode, prefersDark) {
   if (mode === 'gelap') return 'dark';
   if (mode === 'terang') return 'light';

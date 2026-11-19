@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import {
   DEFAULT_PREFERENCE,
   MODE,
   STORAGE_KEY,
   TEMA,
   applyToRoot,
+  mergePreference,
   migrateLegacyTheme,
   readPreference,
   resolveMode,
@@ -106,4 +108,42 @@ test('migrateLegacyTheme hanya memindahkan dark; light adalah bawaan lama sehing
     assert.equal(migrateLegacyTheme(storage, legacy), null);
   }
   assert.equal(storage.map.has(STORAGE_KEY), false);
+});
+
+// R13: setTema dan setMode dipanggil di tick yang sama (mis. satu klik yang
+// mengubah keduanya). React menjalankan antrean updater berurutan, jadi
+// updater fungsional harus memegang kedua perubahan.
+test('mergePreference menggabungkan patch ke preferensi sebelumnya dan menolak nilai tak dikenal', () => {
+  const awal = { tema: 'kebun-air', mode: 'sistem' };
+  assert.deepEqual(mergePreference(awal, { tema: 'lumina' }), { tema: 'lumina', mode: 'sistem' });
+  assert.deepEqual(mergePreference(awal, { mode: 'gelap' }), { tema: 'kebun-air', mode: 'gelap' });
+  assert.deepEqual(mergePreference(awal, { tema: 'tak-ada', mode: 'ungu' }), awal);
+  assert.equal(mergePreference(awal, {}), awal, 'tanpa perubahan mengembalikan objek yang sama');
+  assert.deepEqual(awal, { tema: 'kebun-air', mode: 'sistem' }, 'objek sebelumnya tidak dimutasi');
+});
+
+test('setTema("lumina") lalu setMode("gelap") di tick yang sama menyimpan keduanya', () => {
+  // Antrean updater setPref(prev => ...) yang dijalankan React berurutan.
+  const antrean = [
+    (prev) => mergePreference(prev, { tema: 'lumina' }),
+    (prev) => mergePreference(prev, { mode: 'gelap' }),
+  ];
+  const akhir = antrean.reduce((prev, updater) => updater(prev), { ...DEFAULT_PREFERENCE });
+  assert.deepEqual(akhir, { tema: 'lumina', mode: 'gelap' });
+
+  // Urutan sebaliknya juga tidak boleh menjatuhkan salah satunya.
+  const terbalik = [...antrean].reverse().reduce((prev, updater) => updater(prev), { ...DEFAULT_PREFERENCE });
+  assert.deepEqual(terbalik, { tema: 'lumina', mode: 'gelap' });
+
+  const storage = fakeStorage();
+  writePreference(storage, akhir);
+  assert.deepEqual(readPreference(storage), { tema: 'lumina', mode: 'gelap' });
+});
+
+test('TampilanProvider memakai updater fungsional dan menyimpan nilai gabungan, bukan closure', () => {
+  const source = readFileSync(new URL('./TampilanProvider.jsx', import.meta.url), 'utf8');
+  assert.match(source, /setPref\(\(prev\) => mergePreference\(prev, patch\)\)/);
+  assert.doesNotMatch(source, /\.\.\.pref,\s*\.\.\.patch/, 'update() tidak boleh menggabung ke pref hasil closure');
+  assert.match(source, /writePreference\(browserStorage\(\), pref\)/, 'yang disimpan adalah state terbaru');
+  assert.match(source, /const update = useCallback\(\(patch\) => \{[^}]*\}, \[\]\);/, 'update() tidak bergantung pada pref');
 });

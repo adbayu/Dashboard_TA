@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { KEY as SMART_STORE_KEY } from '../store/storageKey.js';
 import { loadThemeFonts } from './loadThemeFonts.js';
 import {
@@ -6,6 +6,7 @@ import {
   MODE,
   TEMA,
   applyToRoot,
+  mergePreference,
   migrateLegacyTheme,
   readPreference,
   resolveMode,
@@ -84,10 +85,19 @@ export function TampilanProvider({ children }) {
     return () => query.removeEventListener('change', onChange);
   }, []);
 
+  // Updater fungsional: dua perubahan di tick yang sama (setTema lalu setMode)
+  // digabung berurutan, bukan masing-masing ke pref hasil closure.
   const update = useCallback((patch) => {
-    const next = { ...pref, ...patch };
-    writePreference(browserStorage(), next);
-    setPref(next);
+    setPref((prev) => mergePreference(prev, patch));
+  }, []);
+
+  // Simpan state terbaru (hasil gabungan), bukan nilai di closure. Render awal
+  // tidak menulis: pilihan belum berubah, dan migrasi lama sudah menulis sendiri.
+  const savedRef = useRef(initial.pref);
+  useEffect(() => {
+    if (savedRef.current === pref) return;
+    savedRef.current = pref;
+    writePreference(browserStorage(), pref);
   }, [pref]);
 
   const setTema = useCallback((tema) => {
