@@ -1,3 +1,19 @@
+import { readFileSync } from "node:fs";
+
+// Warna dibangun dari design/tokens.json (sumber tunggal 39 token). Nilainya
+// dibaca dari variable CSS `--c-<nama>` (triplet RGB) yang diisi per tema di
+// src/app/styles/themes.css, sehingga modifier opacity Tailwind
+// (mis. border-border/40) tetap bekerja. JANGAN kembalikan ke hex statis.
+const tokens = JSON.parse(
+  readFileSync(new URL("./design/tokens.json", import.meta.url), "utf8"),
+);
+
+const cssVar = (name) => `rgb(var(--c-${name}) / <alpha-value>)`;
+
+const tokenColors = Object.fromEntries(
+  tokens.color.tokens.map(({ name }) => [name, cssVar(name)]),
+);
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -8,77 +24,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#0f5238",
-        "primary-action": "rgb(var(--c-primary-action) / <alpha-value>)",
-        "primary-container": "#2d6a4f",
-        "on-primary": "#ffffff",
-        "on-primary-container": "#a8e7c5",
-        "primary-fixed": "#b1f0ce",
-        "primary-fixed-dim": "#95d4b3",
-        "on-primary-fixed": "#002114",
-        "on-primary-fixed-variant": "#0e5138",
-        "inverse-primary": "#95d4b3",
+        ...tokenColors,
 
-        secondary: "#00696c",
-        "secondary-container": "#8ff3f6",
-        "on-secondary": "#ffffff",
-        "on-secondary-container": "#007073",
-        "secondary-fixed": "#8ff3f6",
-        "secondary-fixed-dim": "#72d6da",
-        "on-secondary-fixed": "#002021",
-        "on-secondary-fixed-variant": "#004f52",
-
-        tertiary: "#134b74",
-        "tertiary-container": "#32638d",
-        "on-tertiary": "#ffffff",
-        "on-tertiary-container": "#bfddff",
-        "tertiary-fixed": "#cfe5ff",
-        "tertiary-fixed-dim": "#9ccbfb",
-        "on-tertiary-fixed": "#001d33",
-        "on-tertiary-fixed-variant": "#124a73",
-
-        // ── Token semantik (dipakai ~300x di seluruh halaman) ─────────────────
-        // Nilainya adalah CSS variable dalam bentuk triplet RGB agar modifier
-        // opacity Tailwind (mis. border-outline-variant/40) tetap bekerja.
-        // Variable diisi di src/app/styles/index.css: nilai terang di :root, nilai gelap di
-        // .dark. JANGAN kembalikan ke hex statis — hex statis membuat dark mode
-        // memakai warna tema terang (teks #191c1d di atas latar gelap, kontras
-        // 1.01:1 sehingga tidak terbaca).
-        background: "rgb(var(--c-background) / <alpha-value>)",
-        "on-background": "rgb(var(--c-on-background) / <alpha-value>)",
-        surface: "rgb(var(--c-surface) / <alpha-value>)",
-        "on-surface": "rgb(var(--c-on-surface) / <alpha-value>)",
-        "surface-dim": "rgb(var(--c-surface-dim) / <alpha-value>)",
-        "surface-bright": "rgb(var(--c-surface-bright) / <alpha-value>)",
-        "surface-container-lowest": "rgb(var(--c-surface-container-lowest) / <alpha-value>)",
-        "surface-container-low": "rgb(var(--c-surface-container-low) / <alpha-value>)",
-        "surface-container": "rgb(var(--c-surface-container) / <alpha-value>)",
-        "surface-container-high": "rgb(var(--c-surface-container-high) / <alpha-value>)",
-        "surface-container-highest": "rgb(var(--c-surface-container-highest) / <alpha-value>)",
-        "surface-variant": "rgb(var(--c-surface-variant) / <alpha-value>)",
-        "on-surface-variant": "rgb(var(--c-on-surface-variant) / <alpha-value>)",
-        "inverse-surface": "rgb(var(--c-inverse-surface) / <alpha-value>)",
-        "inverse-on-surface": "rgb(var(--c-inverse-on-surface) / <alpha-value>)",
-        "surface-tint": "#2c694e",
-
-        outline: "rgb(var(--c-outline) / <alpha-value>)",
-        "outline-variant": "rgb(var(--c-outline-variant) / <alpha-value>)",
-
-        error: "#ba1a1a",
-        "error-container": "#ffdad6",
-        "on-error": "#ffffff",
-        "on-error-container": "#93000a",
-
-        botanical: {
-          dark: "#354f2e",
-          base: "#3b5735",
-          mid: "#44633b",
-          light: "#527947",
-        },
-        emerald: {
-          accent: "#00c875",
-          glow: "#00c371",
-        }
+        // Alias sementara untuk halaman lama — hapus di Task 14.
+        // Nama warna lama (Material 3) yang masih dipakai di src/ dipetakan ke
+        // token semantik terdekat supaya halaman yang belum dimigrasi tetap
+        // berwarna dan ikut berganti tema. Nama lama yang tak lagi dipakai
+        // sudah dihapus.
+        "on-surface": cssVar("text"),
+        "on-surface-variant": cssVar("text-2"),
+        "outline-variant": cssVar("border"),
+        outline: cssVar("text-2"),
+        "surface-container-lowest": cssVar("surface"),
+        "surface-container-low": cssVar("surface-2"),
+        "surface-container": cssVar("surface-2"),
+        "surface-container-high": cssVar("surface-2"),
+        "surface-container-highest": cssVar("surface-2"),
+        "surface-variant": cssVar("surface-2"),
+        background: cssVar("bg"),
+        "inverse-primary": cssVar("primary"),
+        "primary-fixed-dim": cssVar("primary"),
+        secondary: cssVar("chart-1"),
+        tertiary: cssVar("water-fg"),
+        error: cssVar("bad-fg"),
+        // Dipakai di panel gelap (sidebar, Masuk, Daftar): primary terlalu gelap
+        // di mode terang, jadi dipetakan ke teks aktif sidebar yang selalu terang.
+        "emerald-accent": cssVar("side-active-text"),
+        "emerald-glow": cssVar("primary"),
       },
       borderRadius: {
         DEFAULT: "0.25rem",
@@ -88,7 +60,10 @@ export default {
         xl: "0.75rem",
         "2xl": "1rem",
         "3xl": "1.5rem",
-        full: "9999px"
+        full: "9999px",
+        card: "var(--radius-card)",
+        control: "var(--radius-control)",
+        pill: "var(--radius-pill)",
       },
       spacing: {
         xs: "4px",
@@ -102,15 +77,19 @@ export default {
         "margin-desktop": "32px",
       },
       fontFamily: {
-        headline: ["Manrope", "sans-serif"],
-        body: ["'Hanken Grotesk'", "sans-serif"],
-        "headline-xl": ["Manrope", "sans-serif"],
-        "headline-lg": ["Manrope", "sans-serif"],
-        "headline-md": ["Manrope", "sans-serif"],
-        "body-lg": ["'Hanken Grotesk'", "sans-serif"],
-        "body-md": ["'Hanken Grotesk'", "sans-serif"],
-        "label-md": ["'Hanken Grotesk'", "sans-serif"],
-        "label-sm": ["'Hanken Grotesk'", "sans-serif"],
+        head: ["var(--font-head)"],
+        body: ["var(--font-body)"],
+        num: ["var(--font-num)"],
+
+        // Alias sementara untuk halaman lama — hapus di Task 14.
+        headline: ["var(--font-head)"],
+        "headline-xl": ["var(--font-head)"],
+        "headline-lg": ["var(--font-head)"],
+        "headline-md": ["var(--font-head)"],
+        "body-lg": ["var(--font-body)"],
+        "body-md": ["var(--font-body)"],
+        "label-md": ["var(--font-body)"],
+        "label-sm": ["var(--font-body)"],
       },
       fontSize: {
         "headline-xl": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }],
@@ -125,8 +104,10 @@ export default {
       boxShadow: {
         glass: "0 8px 32px 0 rgba(15, 82, 56, 0.06)",
         "glass-elevated": "0 12px 40px 0 rgba(15, 82, 56, 0.12)",
-        "emerald-glow": "0 4px 20px rgba(0, 200, 117, 0.4)",
-      }
+        // Alias sementara untuk halaman lama — hapus di Task 14.
+        // Masih dipakai di ui.jsx (shadow-emerald-glow); kini berbasis token primary.
+        "emerald-glow": "0 4px 20px rgb(var(--c-primary) / 0.35)",
+      },
     },
   },
   plugins: [],
