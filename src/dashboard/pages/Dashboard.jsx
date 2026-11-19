@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
 import { Alert, Card, EmptyState, PageHeader, STATUS_LABEL, STATUS_TONE, StatusPill, Table } from '../../shared/components/ui';
 import { Icon } from '../../shared/components/Icon.jsx';
@@ -60,7 +60,6 @@ export default function Dashboard() {
     areasSaya, devices, categories, monitoring, hppTotal, pet, points, activeAlerts, missions, readings,
     statistikArea, kematianArea, historiArea,
   } = useSmart();
-  const navigate = useNavigate();
   const areas = areasSaya;
 
   // Catatan dan sensor yang tampil hanya dari area yang diampu pengguna ini.
@@ -141,11 +140,12 @@ export default function Dashboard() {
   const fokusMeta = fokus ? METRIC_META[fokus.key] : null;
   const titikFokus = fokus ? titik24Jam(readings, fokus.device.areaId, fokus.key) : [];
 
-  const tugas = missions.map((m) => ({ id: m.id, label: m.title, done: m.done, note: m.done ? 'Selesai' : 'Pilih untuk membuka aktivitasnya' }));
-  const bukaAktivitasMisi = (index) => {
-    const destination = missionActivityDestination(missions[index], areas);
-    navigate(destination.path, destination.state ? { state: destination.state } : undefined);
-  };
+  // Status misi berasal dari aktivitas yang disimpan, jadi tiap baris adalah
+  // tautan ke aktivitasnya (bukan kotak centang yang bisa dicentang di sini).
+  const tugas = missions.map((m) => {
+    const tujuan = missionActivityDestination(m, areas);
+    return { id: m.id, label: m.title, done: m.done, to: tujuan.path, state: tujuan.state };
+  });
 
   return (
     <div>
@@ -173,7 +173,7 @@ export default function Dashboard() {
       <div className="grid items-start gap-8 min-[900px]:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex min-w-0 flex-col gap-8">
           {areaBerSensor.length === 0 ? (
-            <EmptyState title="Belum ada kolam dengan sensor" icon="sensors_off">
+            <EmptyState title="Belum ada kolam dengan sensor" icon="wifi-off">
               Pembacaan muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area.
             </EmptyState>
           ) : (
@@ -236,7 +236,7 @@ export default function Dashboard() {
               <EmptyState
                 title="Belum ada kolam dengan sensor"
                 hint="Statistik harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
-                icon="sensors_off"
+                icon="wifi-off"
               />
             ) : (
               <>
@@ -283,7 +283,7 @@ export default function Dashboard() {
               <EmptyState
                 title="Belum ada kolam dengan sensor"
                 hint="Histori harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
-                icon="sensors_off"
+                icon="wifi-off"
               />
             ) : (
               <div className="space-y-6">
@@ -425,7 +425,7 @@ export default function Dashboard() {
             {tugas.length === 0 ? (
               <p className="text-sm text-text-2">Belum ada misi hari ini.</p>
             ) : (
-              <TaskList items={tugas} onToggle={bukaAktivitasMisi} label="Tugas hari ini" />
+              <TaskList items={tugas} label="Tugas hari ini" />
             )}
           </Card>
 

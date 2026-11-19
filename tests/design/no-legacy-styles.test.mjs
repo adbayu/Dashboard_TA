@@ -19,6 +19,8 @@ export const MIGRATED = [
   'src/v-pet/components/PetKarakter.jsx',
   'src/gamifikasi/pages/Gamifikasi.jsx',
   'src/chatbot-aquaponik/pages/Chatbot.jsx',
+  'src/components/iot/SensorReading.jsx',
+  'src/components/iot/TaskList.jsx',
 ];
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML

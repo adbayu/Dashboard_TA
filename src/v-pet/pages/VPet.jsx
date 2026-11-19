@@ -27,7 +27,10 @@ const QUEST_TITLES = {
 
 // Status pembacaan sensor (dalam | bawah | atas | tanpa-ambang | tanpa-data)
 // ke status SensorReading: selalu teks + ikon lewat komponen bersama.
-const STATUS_SENSOR = { dalam: 'normal', bawah: 'low', atas: 'high' };
+const STATUS_SENSOR = { dalam: 'normal', bawah: 'low', atas: 'high', 'tanpa-ambang': 'no-range' };
+// Rentang hanya dikirim bila ambangnya sah (state dalam/bawah/atas); ambang
+// terbalik atau kosong berstatus tanpa-ambang dan tidak boleh digambar.
+const ADA_RENTANG = new Set(['dalam', 'bawah', 'atas']);
 const IKON_SENSOR = { ph: 'flask-conical', temp: 'thermometer', tds: 'droplet' };
 const DESIMAL = { ph: 1, temp: 1, tds: 0 };
 
@@ -43,8 +46,8 @@ function KangkungSensorPanel({ summary, awardedToday }) {
             value={reading.value == null ? null : Number(reading.value)}
             decimals={DESIMAL[reading.key] ?? 1}
             unit={reading.unit}
-            min={reading.threshold?.[0]}
-            max={reading.threshold?.[1]}
+            min={ADA_RENTANG.has(reading.state) ? reading.threshold?.[0] : undefined}
+            max={ADA_RENTANG.has(reading.state) ? reading.threshold?.[1] : undefined}
             status={STATUS_SENSOR[reading.state]}
             emptyText={reading.state === 'tanpa-data' ? 'Belum ada data dari sensor ini.' : undefined}
           />
@@ -540,7 +543,7 @@ export default function VPet() {
                   {readings.length === 0 ? (
                     <EmptyState
                       title={areaAccessTerbatas ? 'Data lokasi tidak tersedia' : 'Belum ada pembacaan sensor'}
-                      icon="sensors_off"
+                      icon="wifi-off"
                       hint={areaAccessTerbatas
                         ? 'Lokasi pet berada di luar area yang ditugaskan kepada akun ini.'
                         : 'Belum ada sensor air di kolam ini. Pet tetap dapat dirawat, tetapi reaksinya belum dapat mengikuti kualitas air.'}
@@ -552,7 +555,8 @@ export default function VPet() {
                         const assessable = read.value != null && Boolean(read.ambang);
                         const level = assessable ? evaluated?.tingkat || (read.ok ? 'aman' : 'waspada') : 'unknown';
                         const posisi = nilaiTerhadapAmbang(read.value, read.ambang);
-                        const statusBaca = !read.ambang ? 'no-range' : posisi === 'atas' ? 'high' : posisi === 'bawah' ? 'low' : 'normal';
+                        const ambangSah = Array.isArray(read.ambang) && Number(read.ambang[0]) <= Number(read.ambang[1]);
+                        const statusBaca = !ambangSah ? 'no-range' : posisi === 'atas' ? 'high' : posisi === 'bawah' ? 'low' : 'normal';
                         const tingkatTeks = level === 'bahaya' ? 'Jauh di luar ambang. ' : level === 'waspada' ? 'Mendekati batas. ' : '';
                         return (
                           <div key={read.key} className="flex min-w-0 flex-col gap-1.5">
@@ -563,8 +567,8 @@ export default function VPet() {
                               value={read.value == null ? null : Number(read.value)}
                               decimals={DESIMAL[read.key] ?? 1}
                               unit={read.unit}
-                              min={read.ambang?.[0]}
-                              max={read.ambang?.[1]}
+                              min={ambangSah ? Number(read.ambang[0]) : undefined}
+                              max={ambangSah ? Number(read.ambang[1]) : undefined}
                               status={statusBaca}
                             />
                             <p className="text-sm text-text-2">{tingkatTeks}{penjelasanKondisiAir(read)}</p>

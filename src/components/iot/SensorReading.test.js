@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import react from '@vitejs/plugin-react';
 import { createServer } from 'vite';
 
@@ -168,4 +169,46 @@ test('SensorReading dengan nilai tetapi tanpa ambang menyebut ambang belum diatu
   assert.match(markup, />7,1</);
   assert.doesNotMatch(markup, />Normal</);
   assert.doesNotMatch(markup, /role="meter"/);
+});
+
+test('SensorReading no-range tidak pernah menggambar RangeBar walau min/max dikirim', async t => {
+  const { SensorReading } = await loadModules(t);
+  const markup = render(SensorReading, { name: 'pH', value: 7.1, decimals: 1, unit: 'pH', min: 7.5, max: 6.5, status: 'no-range' });
+  assert.match(markup, /Ambang belum diatur/);
+  assert.doesNotMatch(markup, /role="meter"/);
+  assert.doesNotMatch(markup, /data-ui="range-bar"/);
+});
+
+test('SensorReading tanpa status dan tanpa rentang memakai no-range, bukan Normal', async t => {
+  const { SensorReading } = await loadModules(t);
+  for (const status of [undefined, 'tanpa-ambang']) {
+    const markup = render(SensorReading, { name: 'TDS', value: 780, unit: 'ppm', status });
+    assert.match(markup, /data-status="no-range"/);
+    assert.match(markup, /Ambang belum diatur/);
+    assert.doesNotMatch(markup, />Normal</);
+  }
+  const normal = render(SensorReading, { name: 'TDS', value: 780, unit: 'ppm', min: 500, max: 900 });
+  assert.match(normal, /data-status="normal"/);
+});
+
+test('TaskList dengan `to` merender tautan, bukan kotak centang, dan status teks + ikon', async t => {
+  const { TaskList } = await loadModules(t);
+  const markup = renderToStaticMarkup(React.createElement(
+    MemoryRouter,
+    null,
+    React.createElement(TaskList, {
+      label: 'Tugas hari ini',
+      items: [
+        { id: 'a', label: 'Cek kualitas air', to: '/area', done: false },
+        { id: 'b', label: 'Beri pakan', to: '/v-pet', state: { openMissionActivity: 'feed' }, done: true },
+      ],
+    }),
+  ));
+  assert.doesNotMatch(markup, /role="checkbox"/);
+  assert.doesNotMatch(markup, /aria-checked/);
+  assert.match(markup, /<a[^>]*href="\/area"/);
+  assert.match(markup, /<a[^>]*href="\/v-pet"/);
+  assert.match(markup, /data-ui="task-box"[^>]*aria-hidden="true"|aria-hidden="true"[^>]*data-ui="task-box"/);
+  assert.match(markup, /data-tone="ok"[\s\S]*?data-icon="circle-check"[\s\S]*?Selesai/);
+  assert.match(markup, /data-tone="muted"[\s\S]*?data-icon="circle-minus"[\s\S]*?Belum/);
 });

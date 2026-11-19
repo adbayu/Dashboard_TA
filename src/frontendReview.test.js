@@ -867,6 +867,11 @@ test('Pantauan merender Alert ringkasan sebelum AreaSection dan paling banyak sa
   assert.ok((markup.match(/data-ui="metric"/g) || []).length <= 4, 'paling banyak satu baris Metric (4 kartu)');
   assert.ok(markup.indexOf('data-ui="sensor-reading"') > areaAt, 'SensorReading berada di dalam AreaSection');
   assert.match(markup, /data-ui="task-list"/);
+  // Baris tugas membuka aktivitas, jadi berupa tautan dengan status teks, bukan kotak centang.
+  const taskList = markup.slice(markup.indexOf('data-ui="task-list"'), markup.indexOf('</ul>', markup.indexOf('data-ui="task-list"')));
+  assert.doesNotMatch(taskList, /role="checkbox"/);
+  assert.match(taskList, /<a[^>]*href="\/(area|v-pet)/);
+  assert.match(taskList, /Belum|Selesai/);
   assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, 'tepat satu h1 lewat PageHeader');
 
   // Jumlah alat di Alert dihitung dari data, bukan teks tetap.
@@ -891,4 +896,36 @@ test('V-Pet dan Chatbot masing-masing merender tepat satu h1 lewat PageHeader', 
     assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, `${modulePath}: tepat satu h1`);
     assert.match(markup, /data-ui="page-header"/, `${modulePath}: memakai PageHeader`);
   }
+});
+
+test('panel Kangkung: nilai tanpa ambang atau ambang terbalik disebut "Ambang belum diatur" tanpa RangeBar', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [{
+      name: 'expose-kangkung-panel-for-tests',
+      transform(source, id) {
+        if (id.replaceAll('\\', '/').endsWith('/src/v-pet/pages/VPet.jsx')) return `${source}\nexport { KangkungSensorPanel };`;
+        return null;
+      },
+    }, react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const { KangkungSensorPanel } = await vite.ssrLoadModule('/src/v-pet/pages/VPet.jsx');
+  const { kangkungSensorReaction } = await vite.ssrLoadModule('/src/v-pet/model/kangkungSensorExp.js');
+  const summary = kangkungSensorReaction([
+    { key: 'ph', label: 'pH', unit: 'pH', value: 6.8, threshold: null },
+    { key: 'temp', label: 'Suhu', unit: '°C', value: 27, threshold: [30, 25] },
+    { key: 'tds', label: 'TDS', unit: 'ppm', value: 700, threshold: [500, 900] },
+  ], 'Kolam Nila A');
+  assert.deepEqual(summary.readings.map(reading => reading.state), ['tanpa-ambang', 'tanpa-ambang', 'dalam']);
+  const markup = renderToStaticMarkup(React.createElement(MemoryRouter, null,
+    React.createElement(KangkungSensorPanel, { summary, awardedToday: false })));
+  assert.equal((markup.match(/Ambang belum diatur/g) || []).length, 2);
+  assert.equal((markup.match(/data-status="no-range"/g) || []).length, 2);
+  assert.equal((markup.match(/role="meter"/g) || []).length, 1, 'hanya TDS (ambang sah) yang punya RangeBar');
+  assert.equal((markup.match(/>Normal</g) || []).length, 1);
 });

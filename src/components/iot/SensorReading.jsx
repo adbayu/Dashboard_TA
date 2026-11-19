@@ -18,9 +18,12 @@ const STATUS = {
 const VARIANTS = ['auto', 'tile', 'row'];
 const isNum = value => typeof value === 'number' && Number.isFinite(value);
 
-function resolveStatus(status, hasValue) {
+// Status yang tidak dikenal (atau tidak dikirim) hanya boleh menjadi "Normal"
+// bila ada rentang min/max; tanpa rentang, nilai itu belum bisa dinilai.
+function resolveStatus(status, hasValue, hasRange) {
   if (!hasValue) return 'unknown';
-  return Object.hasOwn(STATUS, status) && status !== 'unknown' ? status : 'normal';
+  if (Object.hasOwn(STATUS, status) && status !== 'unknown') return status;
+  return hasRange ? 'normal' : 'no-range';
 }
 
 /**
@@ -30,19 +33,20 @@ function resolveStatus(status, hasValue) {
  * (`data-variant="auto"` menjadi baris di Catatan Lapangan, petak di tema lain).
  * `variant="tile"|"row"` memaksanya. Kait CSS: lihat header theme-surfaces.css.
  * Tanpa nilai (`value == null`) status selalu "Belum ada data", apa pun `status`.
- * `status="no-range"`: nilai tampil tanpa RangeBar, keping "Ambang belum diatur".
+ * `status="no-range"` (atau status tak dikenal tanpa min/max): nilai tampil
+ * tanpa RangeBar dan tanpa teks batas, keping "Ambang belum diatur".
  */
 export default function SensorReading({
   name, icon, device, value, decimals = 0, unit, min, max, status, measuredAt, variant = 'auto', emptyText, className = '',
 }) {
   const hasValue = isNum(value);
-  const key = resolveStatus(status, hasValue);
+  const hasRange = isNum(min) && isNum(max);
+  const key = resolveStatus(status, hasValue, hasRange);
   const state = STATUS[key];
   const kind = VARIANTS.includes(variant) ? variant : 'auto';
-  const hasRange = isNum(min) && isNum(max);
   const measured = measuredAt ? formatMeasuredAt(measuredAt) : '';
   const waktu = measured && measured !== 'Belum ada data' ? measured : '';
-  const limitText = [
+  const limitText = key === 'no-range' ? '' : [
     isNum(min) ? `Batas bawah ${formatSensorNumber(min, decimals)}` : '',
     isNum(max) ? `Batas atas ${formatSensorNumber(max, decimals)}` : '',
   ].filter(Boolean).join(', ');
@@ -81,7 +85,7 @@ export default function SensorReading({
         <div data-ui="sensor-empty" className="text-[15px] leading-[22px] text-text-2">{emptyText || 'Alat belum mengirim pembacaan.'}</div>
       )}
 
-      {hasValue && hasRange ? (
+      {hasValue && hasRange && key !== 'no-range' ? (
         <RangeBar
           value={value}
           min={min}
