@@ -10,6 +10,8 @@ const STATUS = {
   high: { tone: 'warn', icon: 'triangle-alert', text: 'Di atas batas' },
   low: { tone: 'warn', icon: 'triangle-alert', text: 'Di bawah batas' },
   stale: { tone: 'info', icon: 'clock', text: 'Data tertunda' },
+  // Nilai ada tetapi area/kategori belum punya ambang: jangan disebut Normal.
+  'no-range': { tone: 'muted', icon: 'circle-minus', text: 'Ambang belum diatur' },
   unknown: { tone: 'muted', icon: 'circle-minus', text: 'Belum ada data' },
 };
 
@@ -28,6 +30,7 @@ function resolveStatus(status, hasValue) {
  * (`data-variant="auto"` menjadi baris di Catatan Lapangan, petak di tema lain).
  * `variant="tile"|"row"` memaksanya. Kait CSS: lihat header theme-surfaces.css.
  * Tanpa nilai (`value == null`) status selalu "Belum ada data", apa pun `status`.
+ * `status="no-range"`: nilai tampil tanpa RangeBar, keping "Ambang belum diatur".
  */
 export default function SensorReading({
   name, icon, device, value, decimals = 0, unit, min, max, status, measuredAt, variant = 'auto', emptyText, className = '',

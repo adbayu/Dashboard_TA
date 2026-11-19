@@ -157,3 +157,15 @@ test('IoT components carry no literal colours or Material font icons', async () 
     assert.doesNotMatch(source, /\b(?:text|bg|border)-(?:amber|emerald|red|green|slate|gray)-\d/, `${name} has a raw palette class`);
   }
 });
+
+test('SensorReading dengan nilai tetapi tanpa ambang menyebut ambang belum diatur, bukan Normal', async t => {
+  const { SensorReading } = await loadModules(t);
+  const markup = render(SensorReading, { name: 'pH', value: 7.1, decimals: 1, unit: 'pH', status: 'no-range' });
+  assert.match(markup, /Ambang belum diatur/);
+  assert.match(markup, /data-icon="circle-minus"/);
+  assert.match(markup, /data-tone="muted"/);
+  assert.match(markup, /data-status="no-range"/);
+  assert.match(markup, />7,1</);
+  assert.doesNotMatch(markup, />Normal</);
+  assert.doesNotMatch(markup, /role="meter"/);
+});
