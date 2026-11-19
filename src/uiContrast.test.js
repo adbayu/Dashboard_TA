@@ -56,6 +56,13 @@ const BOUNDARY_PAIRS = [
   ['text-2', 'surface'],
 ];
 
+// Isi batang progres (Bar) di atas lintasan `track`: WCAG 1.4.11 (3:1).
+const PROGRESS_FILL_PAIRS = [
+  ['primary', 'track'],
+  ['warn-fg', 'track'],
+  ['bad-fg', 'track'],
+];
+
 test('tokens.json covers all ten palettes', () => {
   assert.equal(palettes.length, 10);
   for (const tema of ['kebun-air', 'catatan-lapangan', 'panel-instrumen', 'tanah-lumut', 'lumina']) {
@@ -72,8 +79,8 @@ for (const palette of palettes) {
     }
   });
 
-  test(`${palette}: focus ring and input border reach 3:1`, () => {
-    for (const [foreground, background] of BOUNDARY_PAIRS) {
+  test(`${palette}: focus ring, input border, and progress fill reach 3:1`, () => {
+    for (const [foreground, background] of [...BOUNDARY_PAIRS, ...PROGRESS_FILL_PAIRS]) {
       const value = ratio(palette, foreground, background);
       assert.ok(value >= 3, `${foreground}/${background} in ${palette} is ${value.toFixed(2)}:1, needs 3:1`);
     }

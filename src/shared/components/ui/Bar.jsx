@@ -1,18 +1,21 @@
 import clsx from 'clsx';
 
-// Penanda posisi nilai: `marker` biasa, warna status bila di luar wajar.
-const PENANDA = {
-  brand: 'bg-marker',
-  ok: 'bg-marker',
+// Isi batang memakai warna penuh nada (`primary` bawaan) di atas lintasan
+// `track`; pasangan ini ≥ 3:1 di kesepuluh palet (dicek uiContrast.test.js).
+// `band` tidak dipakai: itu pita rentang wajar RangeBar dan hampir sewarna
+// dengan `track`, jadi jumlah progres tidak akan terlihat.
+const ISI = {
+  brand: 'bg-primary',
+  ok: 'bg-primary',
   warn: 'bg-warn-fg',
   bad: 'bg-bad-fg',
   info: 'bg-info-fg',
 };
 
 /**
- * Batang progres lama (R8): implementasi yang sama, kini dengan token
- * `track` (lintasan), `band` (isi), dan `marker` (penanda ujung).
- * Task 7 mengarahkan `Bar` ke RangeBar.
+ * Batang progres (mis. kenyang V-Pet, menuju badge berikutnya). Komponen ini
+ * tetap terpisah dari RangeBar: RangeBar menampilkan nilai sensor terhadap
+ * rentang wajar, Bar menampilkan seberapa penuh sesuatu.
  */
 export function Bar({ value, max = 100, tone = 'brand', label = 'Progres' }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
@@ -23,12 +26,12 @@ export function Bar({ value, max = 100, tone = 'brand', label = 'Progres' }) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
-      className="relative h-1.5 w-full rounded-pill bg-track"
+      className="h-2 w-full overflow-hidden rounded-pill bg-track"
     >
-      <div className="h-full rounded-pill bg-band transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
       <div
-        className={clsx('absolute -top-1 h-3.5 w-[3px] -translate-x-1/2 rounded-sm', PENANDA[tone] || PENANDA.brand)}
-        style={{ left: `${pct}%` }}
+        data-ui="bar-fill"
+        className={clsx('h-full rounded-pill transition-[width] duration-300 motion-reduce:transition-none', ISI[tone] || ISI.brand)}
+        style={{ width: `${pct}%` }}
       />
     </div>
   );

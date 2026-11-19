@@ -202,6 +202,19 @@ test('legacy exports keep rendering with their current call-site props', () => {
   assert.match(classOf(table, 'th'), /\buppercase\b/, 'uppercase only in table headers');
 });
 
+test('Bar fills with the tone colour on the track, never the pale band', () => {
+  const fillOf = props => render(ui.Bar, { value: 50, label: 'Progres', ...props })
+    .match(/data-ui="bar-fill"[^>]* class="([^"]*)"|class="([^"]*)"[^>]* data-ui="bar-fill"/)
+    ?.slice(1).find(Boolean) ?? '';
+  for (const [tone, expected] of [[undefined, 'bg-primary'], ['brand', 'bg-primary'], ['warn', 'bg-warn-fg'], ['bad', 'bg-bad-fg']]) {
+    const markup = render(ui.Bar, { value: 50, label: 'Progres', tone });
+    const fill = fillOf({ tone });
+    assert.match(fill, new RegExp(`\\b${expected}\\b`), `tone ${tone} fills with ${expected}`);
+    assert.doesNotMatch(markup, /\bbg-band\b/);
+    assert.match(markup, /\bbg-track\b/);
+  }
+});
+
 test('new design-system components are exported', () => {
   const noop = () => {};
   assert.equal(ui.EmptyState, ui.Empty);
