@@ -7,14 +7,17 @@
     <meta name="referrer" content="no-referrer" />
     <title>AquaSmartponik: Dashboard TA JagoFarm</title>
     <meta name="description" content="Dashboard IoT Presisi & Otomasi Akuaponik AquaSmartponik - Farm Alpha JagoFarm" />
-    <!-- Google Fonts: Manrope & Hanken Grotesk -->
+    <!-- Tema dan mode diterapkan sebelum cat pertama supaya tidak berkedip. Daftar nilai harus sama dengan
+         src/shared/theme/themePreference.js (dijaga tests/design/boot-theme.test.mjs). Satu baris: hash CSP
+         di deploy/Caddyfile dihitung dari isi persis skrip ini. -->
+    <script>(function(){var d=document.documentElement,T=['kebun-air','catatan-lapangan','panel-instrumen','tanah-lumut','lumina'],M=['terang','gelap','sistem'],t='kebun-air',m='sistem',r;try{var p=JSON.parse(window.localStorage.getItem('jagofarm.tampilan'));if(p&&typeof p==='object'){if(T.indexOf(p.tema)>-1)t=p.tema;if(M.indexOf(p.mode)>-1)m=p.mode}}catch(e){}if(m==='gelap')r='dark';else if(m==='terang')r='light';else{try{r=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){r='light'}}d.dataset.theme=t;d.dataset.mode=r;d.classList.toggle('dark',r==='dark')})();</script>
+    <!-- Huruf teks di-host sendiri (Fontsource). Preconnect hanya untuk Material Symbols; hapus di Task 14. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <!-- Google Material Symbols Outlined -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
   </head>
-  <body class="bg-surface text-on-surface antialiased overflow-x-hidden transition-colors duration-300">
+  <body class="antialiased overflow-x-hidden transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

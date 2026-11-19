@@ -61,28 +61,17 @@
     overflow-x: hidden;
   }
 
+  /* Latar, teks, dan huruf mengikuti token tema (themes.css). Kelas bg/text
+     tidak dipasang di <body> karena utilitas Tailwind akan menimpa aturan ini. */
   body {
-    /* Gradien latar mode terang sengaja dibuat LEBIH TEDUH daripada kartu.
-       Sebelumnya #f8fafb -> #d8dadb (terlalu terang): kartu putih di atasnya
-       hanya berjarak 1.07:1 sehingga seluruh halaman tampak menyatu dan batas
-       kartu tidak terlihat. Dengan latar lebih dalam, kartu putih terbaca
-       sebagai bidang terpisah. */
-    background: linear-gradient(135deg, #e7eef2 0%, #d9e3e9 50%, #c4d3db 100%);
     min-height: 100vh;
-    font-family: 'Hanken Grotesk', sans-serif;
-    /* Pakai variable, BUKAN hex statis: hex di sini berada di @layer base
-       sehingga menimpa .text-on-surface milik Tailwind (utilities) dan membuat
-       SEMUA teks yang tidak punya kelas warna tetap gelap di mode gelap. */
-    color: rgb(var(--c-on-surface));
-  }
-
-  .dark body {
-    background: linear-gradient(135deg, #131715 0%, #191c1d 50%, #0d1210 100%);
-    color: rgb(var(--c-on-surface));
+    background: rgb(var(--c-bg));
+    color: rgb(var(--c-text));
+    font-family: var(--font-body);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-head);
   }
 
   /* ── Indikator fokus (R-32) ──────────────────────────────────────────────

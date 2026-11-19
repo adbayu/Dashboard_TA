@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { KEY as SMART_STORE_KEY } from '../store/storageKey.js';
+import { loadThemeFonts } from './loadThemeFonts.js';
 import {
   DEFAULT_PREFERENCE,
   MODE,
@@ -67,6 +68,11 @@ export function TampilanProvider({ children }) {
   useLayoutEffect(() => {
     applyToRoot(document.documentElement, pref, prefersDark);
   }, [pref, prefersDark]);
+
+  // Muat huruf tema aktif (juga saat awal). Gagal muat ditelan di loadThemeFonts.
+  useEffect(() => {
+    loadThemeFonts(pref.tema);
+  }, [pref.tema]);
 
   // Pantau OS terus (bukan hanya saat mode sistem) agar prefersDark selalu segar
   // ketika pengguna kembali ke mode sistem; hanya mode sistem yang memakainya.

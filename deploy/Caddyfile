@@ -11,7 +11,7 @@
 		X-Frame-Options "DENY"
 		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		Content-Security-Policy "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob: https://images.unsplash.com; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; connect-src 'self'; worker-src 'self' blob:"
+		Content-Security-Policy "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob: https://images.unsplash.com; font-src 'self' data: https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'sha256-qhZ+L+vKdEK53VXH9isuhrkwKIkeZ3VvDwpaCJ2Ejeg='; connect-src 'self'; worker-src 'self' blob:"
 		-Server
 	}
 

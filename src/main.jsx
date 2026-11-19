@@ -1,5 +1,10 @@
 import { createElement, lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
+// Huruf bawaan Kebun Air (juga dipakai Tanah & Lumut dan angka Panel Instrumen); tema lain dimuat lewat loadThemeFonts.
+import '@fontsource-variable/plus-jakarta-sans/wght.css'
+import '@fontsource/jetbrains-mono/latin-400.css'
+import '@fontsource/jetbrains-mono/latin-500.css'
+import '@fontsource/jetbrains-mono/latin-600.css'
 import './app/styles/index.css'
 import { TampilanProvider } from './shared/theme/TampilanProvider.jsx'
 
