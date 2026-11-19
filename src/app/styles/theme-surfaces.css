@@ -1,0 +1,165 @@
+/* ── Perlakuan permukaan per tema ─────────────────────────────────────────────
+   Warna, huruf, dan radius datang dari themes.css (token). Berkas ini hanya
+   memuat perbedaan BENTUK antartema (design/ds-ref tema.md, "Perlakuan
+   permukaan"), dan hanya lewat token: tidak ada hex di sini.
+
+   Kait stabil yang dirender komponen bersama (src/shared/components/ui/*):
+     data-ui="card"        Card; anaknya data-ui="card-head" bila ada judul
+     data-area="water|leaf|neutral"   warna area pada Card (juga dipakai
+                           SensorReading/AreaSection di task berikutnya)
+     data-pad="sm|md|none" padding Card, untuk menghitung kepala selebar kartu
+     data-ui="button" + data-variant="primary|secondary|danger|ghost"
+     data-ui="pill"        StatusPill/Badge
+     data-ui="alert" | "table" | "metric" | "modal" | "modal-foot"
+     data-ui="page-title"  h1 PageHeader
+     data-ui="tab" | "chip" | "empty"
+   Komponen baru memakai pola yang sama; jangan menambah kelas khusus tema di
+   JSX. Perlakuan Lumina hanya boleh muncul di bawah [data-theme="lumina"]. */
+
+/* ── Warna area (semua tema) ──────────────────────────────────────────────────
+   Di Catatan Lapangan dan Panel Instrumen token area bernilai netral, jadi
+   aturan ini otomatis tidak berwarna di sana. */
+[data-area="water"] {
+  --area-bg: var(--c-water-bg);
+  --area-line: var(--c-water-line);
+  --area-fg: var(--c-water-fg);
+}
+
+[data-area="leaf"] {
+  --area-bg: var(--c-leaf-bg);
+  --area-line: var(--c-leaf-line);
+  --area-fg: var(--c-leaf-fg);
+}
+
+[data-area="neutral"] {
+  --area-bg: var(--c-surface);
+  --area-line: var(--c-border);
+  --area-fg: var(--c-primary);
+}
+
+[data-ui="card"][data-area] {
+  border-color: rgb(var(--area-line));
+}
+
+/* ── Kebun Air: kepala kartu berwarna area ───────────────────────────────────── */
+/* Tanpa overflow:hidden di kartu (menu/popover di dalamnya tidak terpotong);
+   sudut atas kepala dibulatkan sendiri mengikuti radius kartu. */
+[data-theme="kebun-air"] [data-ui="card"] > [data-ui="card-head"] {
+  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0;
+  background: rgb(var(--area-bg, var(--c-surface)));
+  border-bottom: 1px solid rgb(var(--area-line, var(--c-border)));
+  padding: 12px 16px;
+  margin: -1.25rem -1.25rem 0.75rem;
+}
+
+[data-theme="kebun-air"] [data-ui="card"][data-pad="sm"] > [data-ui="card-head"] {
+  margin: -1rem -1rem 0.75rem;
+}
+
+[data-theme="kebun-air"] [data-ui="card"][data-pad="none"] > [data-ui="card-head"] {
+  margin: 0 0 0.75rem;
+}
+
+/* ── Catatan Lapangan: tanpa kotak, tanpa bayangan ──────────────────────────── */
+[data-theme="catatan-lapangan"] [data-ui="card"] {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid rgb(var(--c-border));
+  border-radius: 0;
+  padding: 0 0 0 22px;
+}
+
+[data-theme="catatan-lapangan"] [data-ui="table"] {
+  border-width: 1px 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme="catatan-lapangan"] [data-ui] {
+  box-shadow: none;
+}
+
+/* ── Lumina: gradien, kaca, glow (satu-satunya tema dengan bayangan) ─────────── */
+[data-theme="lumina"] body {
+  background-attachment: fixed;
+}
+
+[data-theme="lumina"][data-mode="light"] body {
+  background-image: linear-gradient(135deg, rgb(var(--c-bg)), rgb(var(--c-water-bg)) 55%, rgb(var(--c-leaf-bg)));
+}
+
+[data-theme="lumina"][data-mode="dark"] body {
+  background-image: radial-gradient(circle at 20% 0%, rgb(var(--c-leaf-line)), rgb(var(--c-bg)) 55%);
+}
+
+/* Tanpa dukungan backdrop-filter, kartu tetap `surface` padat (dari kelas
+   token komponen) sehingga teks tidak duduk langsung di atas gradien. */
+[data-theme="lumina"] :is([data-ui="card"], [data-ui="metric"], [data-ui="table"], [data-ui="alert"], [data-ui="modal"]) {
+  box-shadow: 0 8px 32px -4px rgb(var(--c-primary) / 0.18);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="lumina"] :is([data-ui="card"], [data-ui="metric"], [data-ui="table"]) {
+    background-color: rgb(var(--c-surface) / 0.62);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+
+  /* Alert tetap memakai latar nadanya, hanya ditambah kaca. */
+  [data-theme="lumina"] [data-ui="alert"] {
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+[data-theme="lumina"] [data-ui="alert"] {
+  border-radius: 16px;
+}
+
+[data-theme="lumina"] [data-ui="modal-foot"] {
+  background: transparent;
+}
+
+[data-theme="lumina"] [data-ui="button"][data-variant="primary"]:not(:disabled) {
+  background-image: linear-gradient(135deg, rgb(var(--c-primary)), rgb(var(--c-info-fg)));
+  box-shadow: 0 4px 20px rgb(var(--c-primary) / 0.45);
+}
+
+[data-theme="lumina"] [data-ui="page-title"] {
+  background-image: linear-gradient(90deg, rgb(var(--c-primary)), rgb(var(--c-info-fg)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* Keping status Lumina: pill bergaris warna nada, huruf kapital, ikon tetap. */
+[data-theme="lumina"] [data-ui="pill"] {
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+[data-theme="lumina"] [data-ui="tab"] {
+  border: 0;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+}
+
+[data-theme="lumina"] [data-ui="tab"][aria-selected="true"] {
+  background: rgb(var(--c-surface));
+  box-shadow: 0 8px 32px -4px rgb(var(--c-primary) / 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="lumina"] [data-ui] {
+    transition: none;
+    animation: none;
+  }
+}
