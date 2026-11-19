@@ -683,9 +683,17 @@ test('comparison chart uses statically discoverable token classes for all three 
     history: { points: [{ avg: 1, min: 0.5, max: 1.5 }, { avg: 2, min: 1.5, max: 2.5 }] },
   }));
   const markup = renderToStaticMarkup(React.createElement(ComparisonChart, { series, sensor: { name: 'pH', unit: 'pH' } }));
-  for (const className of ['stroke-primary', 'stroke-tertiary', 'stroke-secondary', 'text-primary', 'text-tertiary', 'text-secondary']) {
+  // Seri pembanding memakai warna area (chart-1, water-fg, leaf-fg). Di beberapa
+  // palet dua warna ini sama, jadi tiap seri juga punya pola garis sendiri dan
+  // contoh garis yang sama di legenda bertuliskan nama alat.
+  for (const className of ['stroke-chart-1', 'stroke-water-fg', 'stroke-leaf-fg']) {
     assert.ok(markup.includes(className), `${className} should be present for Tailwind scanning`);
+    assert.ok((markup.match(new RegExp(`\\b${className}\\b`, 'g')) || []).length >= 2, `${className} dipakai garis dan contoh legenda`);
   }
+  const polyDashes = [...markup.matchAll(/<polyline[^>]*>/g)].map(([tag]) => tag.match(/stroke-dasharray="([^"]*)"/)?.[1] ?? 'solid');
+  assert.equal(polyDashes.length, 3);
+  assert.equal(new Set(polyDashes).size, 3, 'tiga seri dibedakan pola garis, bukan hanya warna');
+  for (const name of ['one', 'two', 'three']) assert.match(markup, new RegExp(`<li[^>]*>[\\s\\S]*?${name}[\\s\\S]*?</li>`));
   assert.ok(markup.includes('aria-label="Perbandingan pH 24 jam terakhir: one min'));
   assert.ok(markup.includes('maks'));
 });
@@ -928,4 +936,96 @@ test('panel Kangkung: nilai tanpa ambang atau ambang terbalik disebut "Ambang be
   assert.equal((markup.match(/data-status="no-range"/g) || []).length, 2);
   assert.equal((markup.match(/role="meter"/g) || []).length, 1, 'hanya TDS (ambang sah) yang punya RangeBar');
   assert.equal((markup.match(/>Normal</g) || []).length, 1);
+});
+
+// ── Task 11: halaman IoT pengguna ──────────────────────────────────────────────
+const IOT_PAGE_FILES = {
+  ListIot: './list-iot/pages/ListIot.jsx',
+  Monitoring: './kelola-area/pages/Monitoring.jsx',
+  DeviceLog: './kelola-area/pages/DeviceLog.jsx',
+  DetailInformation: './detail-information/pages/DetailInformation.jsx',
+  QrScanner: './detail-information/components/QrScanner.jsx',
+  PanelInfoAlat: './shared/iot/components/PanelInfoAlat.jsx',
+  AksiQr: './shared/qr/components/AksiQr.jsx',
+  QrCode: './shared/qr/components/QrCode.jsx',
+  SmartApp: './app/SmartApp.jsx',
+};
+const readIotPage = name => readFile(new URL(IOT_PAGE_FILES[name], import.meta.url), 'utf8');
+
+test('halaman IoT pengguna merender tepat satu h1 lewat PageHeader di keadaan awalnya', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    define: { 'import.meta.env.VITE_IOT_SOURCE': JSON.stringify('api') },
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const [{ default: ListIot, DeviceDetail }, { default: Monitoring }, { default: DeviceLog }, { default: DetailInformation }, { SmartProvider }] = await Promise.all([
+    vite.ssrLoadModule('/src/list-iot/pages/ListIot.jsx'),
+    vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx'),
+    vite.ssrLoadModule('/src/kelola-area/pages/DeviceLog.jsx'),
+    vite.ssrLoadModule('/src/detail-information/pages/DetailInformation.jsx'),
+    vite.ssrLoadModule('/src/shared/store/SmartStore.jsx'),
+  ]);
+  for (const [name, Page, path] of [
+    ['Daftar alat', ListIot, '/iot'],
+    ['Detail alat', DeviceDetail, '/iot/device-1'],
+    ['Monitoring', Monitoring, '/monitoring'],
+    ['Log sensor', DeviceLog, '/iot/device-1/log'],
+    ['Pindai QR', DetailInformation, '/detail-informasi'],
+  ]) {
+    const markup = renderToStaticMarkup(React.createElement(
+      MemoryRouter,
+      { initialEntries: [path] },
+      React.createElement(SmartProvider, null, React.createElement(Page)),
+    ));
+    assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, `${name}: tepat satu h1`);
+    assert.match(markup, /data-ui="page-header"/, `${name}: memakai PageHeader`);
+  }
+});
+
+test('halaman IoT pengguna tidak menulis h1 sendiri; judul hanya lewat PageHeader', async () => {
+  for (const name of ['ListIot', 'Monitoring', 'DeviceLog', 'DetailInformation']) {
+    assert.doesNotMatch(await readIotPage(name), /<h1[\s>]/, `${name} tidak boleh punya <h1> sendiri`);
+  }
+});
+
+test('Monitoring memakai Tabs bersama, bukan tablist buatan tangan', async () => {
+  const source = await readIotPage('Monitoring');
+  assert.match(source, /<Tabs\b[\s\S]*?label="Tampilan Monitoring"/);
+  assert.doesNotMatch(source, /role="tablist"|role="tab"/);
+});
+
+test('pilihan sensor riwayat, rentang log, dan filter status memakai FilterChip', async () => {
+  const [list, log] = await Promise.all([readIotPage('ListIot'), readIotPage('DeviceLog')]);
+  const detail = list.slice(list.indexOf('export function DeviceDetail()'));
+  assert.match(detail, /aria-label="Pilih sensor riwayat"[\s\S]*?<FilterChip/);
+  assert.match(log, /aria-label="Pilih rentang waktu log"[\s\S]*?<FilterChip/);
+  assert.match(list.slice(0, list.indexOf('export function DeviceDetail()')), /aria-label="Filter status"[\s\S]*?<FilterChip/);
+  for (const [name, source] of [['ListIot', list], ['DeviceLog', log]]) {
+    assert.doesNotMatch(source, /aria-pressed=/, `${name}: tombol pilihan buatan tangan diganti FilterChip`);
+  }
+  assert.doesNotMatch(list, /StatCard/, 'Daftar alat tanpa baris StatCard pembuka');
+});
+
+test('halaman IoT pengguna hanya memakai nama ikon lucide', async t => {
+  const vite = await createServer({ root: process.cwd(), configFile: false, plugins: [react()], server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
+  t.after(() => vite.close());
+  const { ICON_MAP } = await vite.ssrLoadModule('/src/shared/components/Icon.jsx');
+  const iconSource = await readFile(new URL('./shared/components/Icon.jsx', import.meta.url), 'utf8');
+  const legacyBlock = iconSource.slice(iconSource.indexOf('const NAMA_LAMA = {'), iconSource.indexOf('};', iconSource.indexOf('const NAMA_LAMA = {')));
+  // Nama lama yang dipetakan ke nama lain; `check: 'check'` dan sejenisnya sudah nama lucide.
+  const legacyNames = new Set([...legacyBlock.matchAll(/^\s*'?([a-z0-9_-]+)'?:\s*'([a-z0-9-]+)'/gm)]
+    .filter(match => match[1] !== match[2]).map(match => match[1]));
+  const literal = /\b(?:icon|name)(?:=\{?|:\s*)["']([a-z0-9_-]+)["']/g;
+  for (const name of Object.keys(IOT_PAGE_FILES)) {
+    const source = await readIotPage(name);
+    const inBraces = [...source.matchAll(/\bicon=\{([^}]*)\}/g)].flatMap(match => [...match[1].matchAll(/["']([a-z0-9_-]+)["']/g)].map(inner => inner[1]));
+    const names = [...[...source.matchAll(literal)].map(match => match[1]), ...inBraces].filter(value => Object.hasOwn(ICON_MAP, value) || legacyNames.has(value) || value.includes('_'));
+    const legacy = names.filter(value => legacyNames.has(value) || !Object.hasOwn(ICON_MAP, value));
+    assert.deepEqual(legacy, [], `${name} masih memakai nama ikon Material`);
+  }
 });

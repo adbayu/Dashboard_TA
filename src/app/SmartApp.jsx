@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { SmartProvider, useSmart } from '../shared/store/SmartStore';
 import SmartSidebar from './layout/SmartSidebar';
 import SmartTopBar from './layout/SmartTopBar';
+import { Alert, Button } from '../shared/components/ui';
+import { Icon } from '../shared/components/Icon.jsx';
 
 import Dashboard from '../dashboard/pages/Dashboard';
 import Profil from '../profil-saya/pages/Profil';
@@ -58,18 +60,17 @@ const TITLES = [
 function Toast() {
   const { toast } = useSmart();
   if (!toast) return null;
+  const warn = toast.tone === 'warn';
   return (
     <div className="fixed bottom-5 right-5 z-[70] max-w-sm">
       <div
-        className={`flex items-start gap-2 rounded-2xl px-4 py-3 shadow-glass-elevated border text-sm font-semibold ${
-          toast.tone === 'warn'
-            ? 'bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700'
-            : 'bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-700'
+        className={`flex items-start gap-2 rounded-card border px-4 py-3 text-sm font-semibold shadow-lg ${
+          warn ? 'border-warn-line bg-warn-bg text-warn-fg' : 'border-ok-fg bg-ok-bg text-ok-fg'
         }`}
         role="status"
       >
-        <span className="material-symbols-outlined text-[20px]">{toast.tone === 'warn' ? 'warning' : 'check_circle'}</span>
-        {toast.message}
+        <Icon name={warn ? 'triangle-alert' : 'circle-check'} size={20} className="shrink-0" />
+        <span className="text-text">{toast.message}</span>
       </div>
     </div>
   );
@@ -89,13 +90,16 @@ function Shell() {
   // mati untuknya. Saat nanti tersambung backend, keadaan memuat/gagal jaringan
   // ditambahkan di sini juga.
   const catatanPenyimpanan = kondisi === 'rusak' ? (
-      <div role="alert" className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
-        <strong className="block">Data lokal di browser ini tidak bisa dibaca.</strong>
+      <Alert
+        tone="warn"
+        title="Data lokal di browser ini tidak bisa dibaca."
+        className="mb-4"
+        action={IOT_SOURCE === 'local' && <Button variant="secondary" size="sm" icon="rotate-ccw" onClick={resetDemo}>Pulihkan data contoh</Button>}
+      >
         {IOT_SOURCE === 'api'
           ? 'Fitur selain IoT memakai data contoh yang disiapkan ulang di memori.'
           : 'Sistem memakai data contoh awal. Anda dapat memulihkan data contoh dari top bar.'}
-        {IOT_SOURCE === 'local' && <button type="button" onClick={resetDemo} className="ml-2 underline font-semibold">Pulihkan data contoh</button>}
-      </div>
+      </Alert>
     ) : null;
 
   if (location.pathname.startsWith('/d/')) {
@@ -178,7 +182,7 @@ function Shell() {
           </Routes>
         </main>
 
-        <footer className="px-4 sm:px-6 py-4 border-t border-outline-variant/30 text-[11px] text-on-surface-variant">
+        <footer className="border-t border-border px-4 py-4 text-xs text-text-2 sm:px-6">
           {IOT_SOURCE === 'api'
             ? 'JagoFarm SmartDashboard Aquaponik · Fitur non-IoT menggunakan data contoh.'
             : 'JagoFarm SmartDashboard Aquaponik · Data contoh farm tersimpan di browser. IoT contoh hanya berlaku selama sesi ini.'}

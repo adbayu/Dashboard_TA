@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Card, Field, Input, Select } from '../../shared/components/ui.jsx';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { Alert, Badge, Button, Card, Field, FilterChip, Input, PageHeader, Select, Tautan } from '../../shared/components/ui.jsx';
 import LiveIndicator from '../../components/iot/LiveIndicator.jsx';
 import LogTable from '../../components/iot/LogTable.jsx';
 import { iotApi } from '../../services/iotApi.js';
@@ -26,8 +26,8 @@ const RANGE_OPTIONS = [
 const READING_STATES = { normal: 'Normal', low: 'Di bawah ambang', high: 'Di atas ambang', unknown: 'Tanpa ambang' };
 const DEVICE_STATUS = {
   online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
-  stale: { label: 'Data tertunda', tone: 'warn', icon: 'schedule' },
-  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi_off' },
+  stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },
+  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi-off' },
 };
 
 function createDraft(filters, zone, search) {
@@ -62,28 +62,23 @@ function readingStates(point) {
 }
 
 function ConnectionBadge({ status }) {
-  const info = DEVICE_STATUS[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'help' };
+  const info = DEVICE_STATUS[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'circle-help' };
   return <Badge tone={info.tone} icon={info.icon}>{info.label}</Badge>;
 }
 
 function ErrorMessage({ message, retry }) {
   return (
-    <div role="alert" className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
-      <span className="min-w-0 break-words">{message}</span>
-      {retry && <Button variant="ghost" size="sm" icon="refresh" onClick={retry}>Coba lagi</Button>}
-    </div>
+    <Alert tone="bad" action={retry && <Button variant="secondary" size="sm" icon="refresh-cw" onClick={retry}>Coba lagi</Button>}>
+      <span className="break-words">{message}</span>
+    </Alert>
   );
 }
 
 function DeviceLogBackLink({ id }) {
   return (
-    <Link
-      to={`/iot/${encodeURIComponent(id)}`}
-      className="inline-flex min-h-11 max-w-full items-center gap-1 rounded-lg text-sm font-bold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface dark:text-inverse-primary dark:focus-visible:ring-inverse-primary"
-    >
-      <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
-      Kembali ke detail device
-    </Link>
+    <Tautan to={`/iot/${encodeURIComponent(id)}`} icon="arrow-left" className="mb-3 max-w-full text-sm">
+      Kembali ke detail alat
+    </Tautan>
   );
 }
 
@@ -91,11 +86,12 @@ export function DeviceLogState({ id, loading = false, error = '', retry }) {
   if (!loading && !error) return null;
 
   return (
-    <div className="iot-touch-targets min-w-0 space-y-5">
+    <div className="iot-touch-targets min-w-0">
       <DeviceLogBackLink id={id} />
+      <PageHeader title="Log sensor" />
       <Card>
         {loading
-          ? <p className="text-sm text-on-surface-variant" role="status">Memuat log...</p>
+          ? <p className="text-sm text-text-2" role="status">Memuat log...</p>
           : <ErrorMessage message={error} retry={retry} />}
       </Card>
     </div>
@@ -449,135 +445,124 @@ export default function DeviceLog() {
 
   const rangeChoices = [...RANGE_OPTIONS, { value: 'custom', label: 'Pilih sendiri' }];
   const status = source === 'local' ? 'local' : filters.range === 'custom' ? 'idle' : streamStatus === 'idle' ? 'connecting' : streamStatus;
+  const paket = device?.type?.kind === 'paket';
 
   return (
-    <div className="iot-touch-targets min-w-0 space-y-5">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <DeviceLogBackLink id={id} />
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <div className="iot-touch-targets min-w-0">
+      <DeviceLogBackLink id={id} />
+      <PageHeader
+        title="Log sensor"
+        subtitle={<>
+          <span className="font-semibold text-text">{device?.name || 'Alat'}</span>
+          {' · '}<span className="break-all font-mono">{device?.code || id}</span>
+          {' · '}{paket ? 'Paket' : 'Satuan'} · {device?.type?.code || 'Tipe tidak tersedia'}
+        </>}
+        actions={<>
+          <ConnectionBadge status={device?.status} />
           <LiveIndicator status={status} />
-        </div>
-      </div>
+        </>}
+      />
 
-      <Card>
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge icon={device?.type?.kind === 'paket' ? 'deployed_code' : 'sensors'}>
-                {device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {device?.type?.code || 'Tipe tidak tersedia'}
-              </Badge>
-              <ConnectionBadge status={device?.status} />
-            </div>
-            <h1 className="mt-2 break-words text-2xl font-extrabold text-on-surface">{device?.name || 'Log perangkat'}</h1>
-            <p className="mt-1 break-all font-mono text-sm text-on-surface-variant">{device?.code || id}</p>
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <form className="space-y-4" onSubmit={applyFilters}>
-          <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Rentang waktu</p>
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card title="Rentang waktu" subtitle={`Waktu lokal browser: ${zone.label} (${zone.iana})`}>
+          <form className="flex flex-col gap-4" onSubmit={applyFilters}>
             <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="Pilih rentang waktu log">
               {rangeChoices.map(option => (
-                <button
+                <FilterChip
                   key={option.value}
-                  type="button"
-                  aria-pressed={draft.range === option.value}
+                  active={draft.range === option.value}
                   onClick={() => updateDraft({ range: option.value, error: '' })}
-                  className={`min-h-11 rounded-xl border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${draft.range === option.value ? 'border-primary button-primary text-white' : 'border-outline-variant/60 text-on-surface hover:bg-primary/5'}`}
                 >
                   {option.label}
-                </button>
+                </FilterChip>
               ))}
             </div>
-          </div>
 
-          {draft.range === 'custom' && (
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-              <Field label="Dari">
-                <Input type="datetime-local" value={draft.from} onChange={value => updateDraft({ from: value, error: '' })} />
-              </Field>
-              <Field label="Sampai">
-                <Input type="datetime-local" value={draft.to} onChange={value => updateDraft({ to: value, error: '' })} />
-              </Field>
-              <p className="text-xs text-on-surface-variant sm:col-span-2">Waktu lokal browser: {zone.label} ({zone.iana})</p>
-            </div>
-          )}
+            {draft.range === 'custom' && (
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <Field label="Dari">
+                  <Input type="datetime-local" value={draft.from} onChange={value => updateDraft({ from: value, error: '' })} />
+                </Field>
+                <Field label="Sampai">
+                  <Input type="datetime-local" value={draft.to} onChange={value => updateDraft({ to: value, error: '' })} />
+                </Field>
+              </div>
+            )}
 
-          {device?.type?.kind === 'paket' && (
-            <Field label="Sensor">
-              <Select
-                value={draft.sensor}
-                onChange={value => updateDraft({ sensor: value })}
-                options={[
-                  { value: '', label: 'Semua sensor' },
-                  ...sensors.map(sensor => ({ value: sensor.code, label: sensor.name || sensor.label || sensor.code })),
-                ]}
-              />
-            </Field>
-          )}
+            {paket && (
+              <div className="max-w-xs">
+                <Field label="Sensor">
+                  <Select
+                    value={draft.sensor}
+                    onChange={value => updateDraft({ sensor: value })}
+                    options={[
+                      { value: '', label: 'Semua sensor' },
+                      ...sensors.map(sensor => ({ value: sensor.code, label: sensor.name || sensor.label || sensor.code })),
+                    ]}
+                  />
+                </Field>
+              </div>
+            )}
 
-          {draft.error && <p role="alert" className="text-sm font-semibold text-red-800 dark:text-red-200">{draft.error}</p>}
-          <Button type="submit" icon="filter_alt" className="min-h-11">Terapkan</Button>
-        </form>
-      </Card>
+            {draft.error && <p role="alert" className="text-sm font-semibold text-bad-fg">{draft.error}</p>}
+            <div><Button type="submit" variant="secondary" icon="funnel">Terapkan</Button></div>
+          </form>
+        </Card>
 
-      <Card>
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="break-words text-sm font-semibold text-on-surface">
-              Menampilkan {total ?? 0} sampel dari {formatRangeTime(from)} sampai {formatRangeTime(to)} ({zone.label})
-            </p>
-            {device?.hasReadings === false && points.length === 0 ? (
-              <p className="mt-2 text-sm text-on-surface-variant">Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi.</p>
-            ) : points.length === 0 ? (
-              <p className="mt-2 text-sm text-on-surface-variant">Tidak ada data pada rentang ini. Coba perlebar rentang waktu.</p>
-            ) : null}
-          </div>
-          <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
+        <Card
+          title={`Menampilkan ${total ?? 0} sampel`}
+          subtitle={`Dari ${formatRangeTime(from)} sampai ${formatRangeTime(to)} (${zone.label})`}
+          action={(
             <span role={visibleExportStatus.status === 'pending' ? 'status' : undefined} aria-live={visibleExportStatus.status === 'pending' ? 'polite' : undefined}>
-              <Button icon="download" disabled={exportView.disabled} onClick={exportLog} title={exportView.reason || exportCopy} className="min-h-11">
+              <Button icon="download" disabled={exportView.disabled} onClick={exportLog} title={exportView.reason || exportCopy}>
                 {visibleExportStatus.status === 'pending' ? 'Menyiapkan file...' : 'Ekspor ke Excel'}
               </Button>
             </span>
-            <p className="max-w-full break-words text-xs text-on-surface-variant">{exportCopy}</p>
-            {exportView.reason && <p className="max-w-full break-words text-xs font-semibold text-on-surface-variant">{exportView.reason}</p>}
+          )}
+        >
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="max-w-full break-words text-sm text-text-2">{exportCopy}</p>
+            {exportView.reason && <p className="max-w-full break-words text-sm font-semibold text-text-2">{exportView.reason}</p>}
             {exportView.message && (
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p role={visibleExportStatus.status === 'failure' ? 'alert' : 'status'} className="max-w-full break-words text-xs text-on-surface-variant">{exportView.message}</p>
-                {exportView.retry && <Button variant="ghost" size="sm" icon="refresh" onClick={exportLog}>Coba lagi</Button>}
+                <p role={visibleExportStatus.status === 'failure' ? 'alert' : 'status'} className={`max-w-full break-words text-sm ${visibleExportStatus.status === 'failure' ? 'font-semibold text-bad-fg' : 'text-text-2'}`}>{exportView.message}</p>
+                {exportView.retry && <Button variant="ghost" size="sm" icon="refresh-cw" onClick={exportLog}>Coba lagi</Button>}
               </div>
             )}
+            {device?.hasReadings === false && points.length === 0 ? (
+              <p className="mt-2 text-sm text-text-2">Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi.</p>
+            ) : points.length === 0 ? (
+              <p className="mt-2 text-sm text-text-2">Tidak ada data pada rentang ini. Coba perlebar rentang waktu.</p>
+            ) : null}
           </div>
-        </div>
 
-        {liveError && <div className="mt-4"><ErrorMessage message={liveError} retry={retryLiveRequest} /></div>}
-        <p className="sr-only" aria-live="polite">{pageAnnouncement}</p>
-        <p className="sr-only" aria-live="polite">{thresholdAnnouncement}</p>
+          {liveError && <div className="mt-4"><ErrorMessage message={liveError} retry={retryLiveRequest} /></div>}
+          <p className="sr-only" aria-live="polite">{pageAnnouncement}</p>
+          <p className="sr-only" aria-live="polite">{thresholdAnnouncement}</p>
 
-        {points.length > 0 && (
-          <div className="mt-4">
-            <LogTable
-              points={points}
-              sensors={sensors}
-              selectedSensor={device?.type?.kind === 'paket' ? filters.sensor : ''}
-            />
-          </div>
-        )}
+          {points.length > 0 && (
+            <div className="mt-4">
+              <LogTable
+                points={points}
+                sensors={sensors}
+                selectedSensor={paket ? filters.sensor : ''}
+              />
+            </div>
+          )}
 
-        {points.length > 0 && nextCursor && points.length < 2000 && (
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button variant="ghost" icon="expand_more" disabled={loadingMore} onClick={loadMore} className="min-h-11">
-              {loadingMore ? 'Memuat...' : 'Muat lebih banyak'}
-            </Button>
-            <span className="text-xs text-on-surface-variant">{points.length} dari {total ?? points.length} baris dimuat</span>
-          </div>
-        )}
-        {points.length >= 2000 && nextCursor && (
-          <p className="mt-4 text-sm font-semibold text-on-surface-variant">Untuk data lebih banyak, ekspor ke Excel</p>
-        )}
-      </Card>
+          {points.length > 0 && nextCursor && points.length < 2000 && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button variant="ghost" icon="chevron-down" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? 'Memuat...' : 'Muat lebih banyak'}
+              </Button>
+              <span className="font-num text-sm tabular-nums text-text-2">{points.length} dari {total ?? points.length} baris dimuat</span>
+            </div>
+          )}
+          {points.length >= 2000 && nextCursor && (
+            <p className="mt-4 text-sm font-semibold text-text-2">Untuk data lebih banyak, ekspor ke Excel</p>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

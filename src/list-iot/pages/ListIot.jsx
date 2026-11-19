@@ -1,52 +1,102 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
-import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
 import { iotApi } from '../../services/iotApi.js';
-import { Badge, Button, Card, Empty, Field, Input, SectionTitle, Select, StatCard } from '../../shared/components/ui';
+import { Alert, Badge, Button, Card, Empty, Field, FilterChip, Input, PageHeader, Select, StatusPill, Table, Tautan, TautanTombol } from '../../shared/components/ui';
 import { areaFilterOptions } from '../../utils/frontendReview.js';
 import { iotStreamClient } from '../../services/iotStream.js';
-import { DeviceReadings } from '../../components/iot/Readings.jsx';
-import { formatMeasuredAt, mergeLatestReading, resolveTelemetrySnapshot, sortEventsByIdDescending } from '../../utils/iotPresentation.js';
-import ReadingChart from '../../components/iot/ReadingChart.jsx';
+import { formatMeasuredAt, formatSensorNumber, getSensorState, isMeasurementStale, mergeLatestReading, resolveTelemetrySnapshot, sortEventsByIdDescending } from '../../utils/iotPresentation.js';
+import AreaSection from '../../components/iot/AreaSection.jsx';
 import EventList from '../../components/iot/EventList.jsx';
+import LiveIndicator from '../../components/iot/LiveIndicator.jsx';
+import ReadingChart from '../../components/iot/ReadingChart.jsx';
+import SensorReading from '../../components/iot/SensorReading.jsx';
 
 const STATUS = {
   online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
-  stale: { label: 'Data tertunda', tone: 'warn', icon: 'schedule' },
-  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi_off' },
+  stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },
+  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi-off' },
 };
+// Alat bermasalah tampil paling atas: tidak terhubung, lalu data tertunda.
+const STATUS_ORDER = { offline: 0, stale: 1, online: 2 };
+const STATUS_FILTERS = [
+  { value: '', label: 'Semua' },
+  { value: 'offline', label: 'Tidak terhubung' },
+  { value: 'stale', label: 'Data tertunda' },
+  { value: 'online', label: 'Terhubung' },
+];
+const STREAM_STATES = ['connecting', 'live', 'reconnecting', 'polling'];
+const EMPTY_READING_TEXT = 'Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi.';
 
 function DeviceStatus({ status }) {
-  const info = STATUS[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'help' };
+  const info = STATUS[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'circle-help' };
   return <Badge tone={info.tone} icon={info.icon}>{info.label}</Badge>;
 }
 
+// Status siaran diumumkan sopan lewat LiveIndicator (role="status", aria-live="polite").
 function StreamStatus({ status }) {
-  const details = {
-    connecting: { label: 'Menghubungkan...', tone: 'muted', icon: 'sensors' },
-    live: { label: 'Live', tone: 'ok', icon: 'sensors' },
-    reconnecting: { label: 'Menyambung ulang...', tone: 'warn', icon: 'sync' },
-    polling: { label: 'Diperbarui tiap 30 detik', tone: 'muted', icon: 'schedule' },
-  }[status];
-  if (!details) return null;
-  return <span className="inline-flex" role="status" aria-live="polite"><Badge tone={details.tone} icon={details.icon}>{details.label}</Badge></span>;
+  if (!STREAM_STATES.includes(status)) return null;
+  return <LiveIndicator status={status} />;
 }
 
 const READING_STATE_LABEL = { normal: 'Normal', low: 'Di bawah ambang', high: 'Di atas ambang', unknown: 'Tanpa ambang' };
 
-function ErrorState({ message, retry }) {
+function ErrorState({ title, message, retry, back }) {
   return (
-    <Card>
-      <div className="flex flex-col items-start gap-3" role="alert">
-        <p className="flex items-start gap-2 text-sm font-semibold text-red-800 dark:text-red-200">
-          <span className="material-symbols-outlined text-[18px]">error</span>
-          <span>{message}</span>
-        </p>
-        <Button variant="ghost" icon="refresh" onClick={retry}>Coba lagi</Button>
-      </div>
-    </Card>
+    <div className="iot-touch-targets min-w-0">
+      {back}
+      <PageHeader title={title} />
+      <Alert tone="bad" action={<Button variant="secondary" size="sm" icon="refresh-cw" onClick={retry}>Coba lagi</Button>}>
+        {message}
+      </Alert>
+    </div>
   );
+}
+
+function deviceKindLabel(device) {
+  return `${device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · ${device.type?.name || device.type?.code || 'Tipe tidak tersedia'}`;
+}
+
+function sensorName(sensor) {
+  return sensor.name || sensor.label || sensor.code;
+}
+
+function sensorIcon(sensor) {
+  const code = String(sensor.code || '').toLowerCase();
+  if (code.includes('temp') || code.includes('suhu')) return 'thermometer';
+  if (code.includes('tds')) return 'waves';
+  if (code.includes('ph')) return 'droplet';
+  return 'activity';
+}
+
+// Ambang valid hanya bila kedua batas angka dan bawah < atas; selain itu
+// SensorReading menampilkan "Ambang belum diatur" tanpa RangeBar.
+function validRange(threshold) {
+  const low = Number(threshold?.low);
+  const high = Number(threshold?.high);
+  if (threshold?.low == null || threshold?.high == null || !Number.isFinite(low) || !Number.isFinite(high) || low >= high) return null;
+  return { min: low, max: high };
+}
+
+function readingStatus(state, stale) {
+  if (state === 'low' || state === 'high') return state;
+  if (stale) return 'stale';
+  if (state === 'normal') return 'normal';
+  return 'no-range';
+}
+
+function compactReadings(device, latest) {
+  const readings = new Map((latest?.readings || []).map(reading => [reading.sensor, reading]));
+  return (device.type?.sensors || device.sensors || []).map(sensor => {
+    const reading = readings.get(sensor.code);
+    const value = reading?.value ?? null;
+    const threshold = reading?.threshold ?? sensor.threshold ?? null;
+    return {
+      code: sensor.code,
+      text: value == null ? null : `${formatSensorNumber(value, sensor.decimals ?? 2)}${sensor.unit ? ` ${sensor.unit}` : ''}`,
+      state: reading?.state || getSensorState(value, threshold),
+    };
+  });
 }
 
 export default function ListIot() {
@@ -175,23 +225,30 @@ export default function ListIot() {
     void refreshLatestRef.current?.();
   };
 
+  const scanAction = <TautanTombol to="/detail-informasi" icon="scan-qr-code">Pindai QR alat</TautanTombol>;
+
   if (state === 'loading') {
-    return <Card><p className="text-sm text-on-surface-variant" role="status">Memuat perangkat...</p></Card>;
+    return (
+      <div className="iot-touch-targets min-w-0">
+        <PageHeader title="Daftar alat" subtitle="Cari alat yang terputus atau datanya tertunda." />
+        <Card><p className="text-sm text-text-2" role="status">Memuat perangkat...</p></Card>
+      </div>
+    );
   }
 
-  if (state === 'error') return <ErrorState message={error} retry={retryList} />;
+  if (state === 'error') return <ErrorState title="Daftar alat" message={error} retry={retryList} />;
 
   if (devices.length === 0) {
     return (
-      <Card>
-        {result?.label && <p className="mb-3 text-xs font-bold text-on-surface-variant">{result.label}</p>}
+      <div className="iot-touch-targets min-w-0">
+        <PageHeader title="Daftar alat" subtitle="Cari alat yang terputus atau datanya tertunda." sample={result?.label || undefined} />
         <Empty
-          title="Belum ada perangkat di akun ini."
-          hint="Pindai QR perangkat untuk melihat pratinjau dan mengklaim alat yang tersedia."
-          icon="sensors"
-          action={<Link to="/detail-informasi"><Button icon="qr_code_scanner">Scan QR alat</Button></Link>}
+          title="Belum ada alat di akun ini."
+          hint="Pindai QR pada label alat untuk melihat pratinjau dan mengklaimnya."
+          icon="radio"
+          action={scanAction}
         />
-      </Card>
+      </div>
     );
   }
 
@@ -200,41 +257,49 @@ export default function ListIot() {
     stale: devices.filter(device => device.status === 'stale').length,
     offline: devices.filter(device => device.status === 'offline').length,
   };
+  const problems = devices.filter(device => device.status === 'offline' || device.status === 'stale');
+  const sorted = [...filtered].sort((left, right) => (STATUS_ORDER[left.status] ?? 3) - (STATUS_ORDER[right.status] ?? 3)
+    || String(left.code || '').localeCompare(String(right.code || ''), 'id'));
+  const hasFilter = Boolean(search || kind || areaRef || status);
+  const clearFilters = () => {
+    setSearch('');
+    setKind('');
+    setAreaRef('');
+    setStatus('');
+  };
 
   return (
-    <div className="space-y-5 min-w-0">
-      {result?.label && <p className="text-xs font-bold text-on-surface-variant">{result.label}</p>}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
-        <StatCard label="Total device" value={devices.length} icon="devices" hint="Terlihat di akun ini" />
-        <StatCard label="Terhubung" value={counts.online} icon="wifi" hint="Status dari API" />
-        <StatCard label="Data tertunda" value={counts.stale} icon="schedule" tone="warn" hint="Pengukuran terakhir tertunda" />
-        <StatCard label="Tidak terhubung" value={counts.offline} icon="wifi_off" tone="bad" hint="Status dari API" />
-      </div>
-
-      <Card>
-        <SectionTitle
-          eyebrow="List IoT"
-          title="Perangkat"
-          subtitle="Nilai terakhir dari alat, dengan waktu ukur di setiap kartu."
-        />
-
-        <div className="mb-4 flex w-full min-w-0 flex-wrap items-center gap-2">
+    <div className="iot-touch-targets min-w-0">
+      <PageHeader
+        title="Daftar alat"
+        subtitle={`Cari alat yang terputus atau datanya tertunda. ${devices.length} alat terdaftar di akun ini.`}
+        sample={result?.label || undefined}
+        actions={<>
           <StreamStatus status={streamStatus} />
-          <Link
-            to="/detail-informasi"
-            className="inline-flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-xl button-primary px-3.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
-          >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">qr_code_scanner</span>
-            Scan QR alat
-          </Link>
-        </div>
+          {scanAction}
+        </>}
+      />
 
-        {telemetryError && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"><span>{telemetryError}</span><Button variant="ghost" size="sm" icon="refresh" onClick={retryLatest}>Coba lagi</Button></div>}
+      <div className="flex min-w-0 flex-col gap-4">
+        {problems.length > 0 ? (
+          <Alert tone="warn" title={`${problems.length} alat perlu dicek.`} meta={`${counts.online} dari ${devices.length} alat terhubung`}>
+            Periksa daya dan sinyal WiFi alat yang tidak terhubung atau datanya tertunda.
+          </Alert>
+        ) : (
+          <Alert tone="ok" title="Semua alat terhubung." meta={`${counts.online} dari ${devices.length} alat terhubung`}>
+            Pembacaan terbaru tampil di tabel.
+          </Alert>
+        )}
+
+        {telemetryError && (
+          <Alert tone="bad" action={<Button variant="secondary" size="sm" icon="refresh-cw" onClick={retryLatest}>Coba lagi</Button>}>
+            {telemetryError}
+          </Alert>
+        )}
         <p className="sr-only" aria-live="polite">{announcement}</p>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5">
-          <Field label="Cari perangkat">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+          <Field label="Cari alat">
             <Input value={search} onChange={setSearch} placeholder="Nama atau kode" />
           </Field>
           <Field label="Tipe">
@@ -248,59 +313,70 @@ export default function ListIot() {
           <Field label="Area">
             <Select value={areaRef} onChange={setAreaRef} placeholder="Semua area" options={areas} />
           </Field>
-          <Field label="Status">
-            <Select
-              value={status}
-              onChange={setStatus}
-              placeholder="Semua status"
-              options={Object.entries(STATUS).map(([value, item]) => ({ value, label: item.label }))}
-            />
-          </Field>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2" role="group" aria-label="Filter status">
+          {STATUS_FILTERS.map(option => (
+            <FilterChip
+              key={option.value || 'semua'}
+              active={status === option.value}
+              count={option.value ? counts[option.value] : devices.length}
+              onClick={() => setStatus(option.value)}
+            >
+              {option.label}
+            </FilterChip>
+          ))}
         </div>
 
-        {filtered.length === 0 ? (
-          <Empty title="Tidak ada device cocok" hint="Ubah kata kunci atau filter tipe, area, dan status." icon="search_off" />
+        {sorted.length === 0 ? (
+          <Empty
+            title="Tidak ada alat yang cocok."
+            hint="Ubah kata kunci atau filter tipe, area, dan status."
+            icon="search-x"
+            action={hasFilter && <Button variant="secondary" icon="x" onClick={clearFilters}>Hapus filter</Button>}
+          />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map(device => (
-              <Link
-                key={device.id}
-                to={`/iot/${encodeURIComponent(device.id)}`}
-                className="glass-card rounded-2xl p-4 min-w-0 hover:shadow-glass-elevated transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="material-symbols-outlined text-[24px] text-primary dark:text-inverse-primary" aria-hidden="true">sensors</span>
-                  <DeviceStatus status={device.status} />
-                </div>
-                <h2 className="mt-3 font-bold text-on-surface break-words">{device.name}</h2>
-                <p className="mt-1 text-xs text-on-surface-variant break-all font-mono">{device.code}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <Badge icon={device.type?.kind === 'paket' ? 'deployed_code' : 'sensors'}>
-                    {device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {device.type?.name || device.type?.code}
-                  </Badge>
-                </div>
-                <div className="mt-4 rounded-xl panel-inset p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Pembacaan</p>
-                  <DeviceReadings
-                    sensors={device.type?.sensors || device.sensors || []}
-                    latest={latestByDevice[device.id]}
-                    compact
-                    loading={latestLoading}
-                    unavailable={!latestLoading && Boolean(telemetryError) && !Object.hasOwn(latestByDevice, device.id)}
-                  />
-                </div>
-              </Link>
-            ))}
-          </div>
+          <>
+            <Table
+              caption="Daftar alat IoT, alat bermasalah di atas"
+              columns={[
+                { key: 'code', label: 'Kode alat', render: device => <span className="whitespace-nowrap font-mono text-sm">{device.code}</span> },
+                { key: 'name', label: 'Nama', render: device => <div className="min-w-[11rem]">
+                  <Tautan to={`/iot/${encodeURIComponent(device.id)}`} className="break-words">{device.name}</Tautan>
+                  {(device.isSandbox || device.is_sandbox) && <span className="ml-2 inline-flex align-middle"><Badge tone="info" icon="flask-conical">Sandbox</Badge></span>}
+                </div> },
+                { key: 'area', label: 'Area', render: device => <span className="block min-w-[8rem] text-text-2">{device.areaRef?.trim() || 'Area belum diatur'}</span> },
+                { key: 'type', label: 'Tipe', render: device => <span className="block min-w-[7rem] text-text-2">{deviceKindLabel(device)}</span> },
+                { key: 'status', label: 'Status', render: device => <DeviceStatus status={device.status} /> },
+                { key: 'readings', label: 'Pembacaan', render: device => {
+                  const latest = latestByDevice[device.id];
+                  if (latestLoading && !latest) return <span className="text-sm text-text-2">Memuat...</span>;
+                  if (!latest && telemetryError) return <span className="text-sm text-bad-fg">Tidak dapat dimuat</span>;
+                  const values = compactReadings(device, latest);
+                  const shown = values.filter(item => item.text);
+                  if (!shown.length) return <span className="text-sm text-text-2">Belum ada data</span>;
+                  const outOfRange = values.some(item => item.state === 'low' || item.state === 'high');
+                  return <div className="flex flex-col items-start gap-1">
+                    <span className="font-num tabular-nums">{shown.map(item => item.text).join(' · ')}</span>
+                    {outOfRange && <StatusPill tone="warn" icon="triangle-alert">Di luar batas</StatusPill>}
+                  </div>;
+                } },
+                { key: 'measuredAt', label: 'Pengukuran terakhir', render: device => {
+                  const measuredAt = latestByDevice[device.id]?.measuredAt || device.lastMeasuredAt;
+                  return <time className="block min-w-[7rem] text-sm text-text-2" dateTime={measuredAt || undefined}>{formatMeasuredAt(measuredAt)}</time>;
+                } },
+              ]}
+              rows={sorted}
+            />
+            <p className="text-sm text-text-2">Menampilkan {sorted.length} dari {devices.length} alat. Alat yang bermasalah ada di atas.</p>
+          </>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
 
 export function DeviceDetail() {
   const { id } = useParams();
-  const { resolvedMode } = useTampilan();
   const [result, setResult] = useState(null);
   const [state, setState] = useState('loading');
   const [error, setError] = useState('');
@@ -443,11 +519,19 @@ export function DeviceDetail() {
     };
   }, [id, loadedId, result?.device, result?.source]);
 
+  const backLink = <Tautan to="/iot" icon="arrow-left" className="mb-3 text-sm">Kembali ke Daftar alat</Tautan>;
+
   if (state === 'loading' || loadedId !== id) {
-    return <Card><p className="text-sm text-on-surface-variant" role="status">Memuat detail perangkat...</p></Card>;
+    return (
+      <div className="iot-touch-targets min-w-0">
+        {backLink}
+        <PageHeader title="Detail alat" />
+        <Card><p className="text-sm text-text-2" role="status">Memuat detail perangkat...</p></Card>
+      </div>
+    );
   }
 
-  if (state === 'error') return <ErrorState message={error} retry={() => {
+  if (state === 'error') return <ErrorState title="Detail alat" back={backLink} message={error} retry={() => {
     setState('loading');
     setError('');
     setAttempt(value => value + 1);
@@ -458,110 +542,134 @@ export function DeviceDetail() {
   const selected = sensors.find(sensor => sensor.code === selectedSensor) || sensors[0];
   const series = selected ? telemetry.history[selected.code] : null;
   const retryTelemetry = () => { void refreshTelemetryRef.current?.(); };
+  const readingBySensor = new Map((telemetry.latest?.readings || []).map(reading => [reading.sensor, reading]));
+  const measuredAt = telemetry.latest?.measuredAt;
+  const stale = device.status !== 'online' || isMeasurementStale(measuredAt);
+  const readingItems = sensors.map(sensor => {
+    const reading = readingBySensor.get(sensor.code);
+    const value = reading?.value ?? null;
+    const threshold = reading?.threshold ?? sensor.threshold ?? null;
+    const state = reading?.state || getSensorState(value, threshold);
+    return { sensor, value: value == null ? null : Number(value), threshold, state, range: validRange(threshold) };
+  });
+  const outOfRange = readingItems.filter(item => item.state === 'low' || item.state === 'high');
 
   return (
-    <div className="space-y-5 min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link to="/iot" className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-primary dark:text-inverse-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface rounded-lg">
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
-          Kembali ke List IoT
-        </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          {result.label && <p className="text-xs font-bold text-on-surface-variant">{result.label}</p>}
-          <StreamStatus status={streamStatus} />
-        </div>
-      </div>
-
-      <Card>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary dark:text-inverse-primary">
-              {device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {device.type?.name || device.type?.code}
-            </p>
-            {(device.isSandbox || device.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
-            <h2 className="mt-1 text-2xl font-extrabold text-on-surface break-words">{device.name}</h2>
-            <p className="mt-1 font-mono text-sm text-on-surface-variant break-all">{device.code}</p>
-          </div>
+    <div className="iot-touch-targets min-w-0">
+      {backLink}
+      <PageHeader
+        title={device.name}
+        subtitle={<>
+          <span className="break-all font-mono">{device.code}</span>
+          {' · '}{deviceKindLabel(device)}
+          {device.areaRef?.trim() ? ` · ${device.areaRef.trim()}` : ''}
+        </>}
+        sample={result.label || undefined}
+        actions={<>
           <DeviceStatus status={device.status} />
-        </div>
-      </Card>
+          {(device.isSandbox || device.is_sandbox) && <Badge tone="info" icon="flask-conical">Sandbox</Badge>}
+          <StreamStatus status={streamStatus} />
+          <TautanTombol to={`/iot/${encodeURIComponent(device.id)}/log`} variant="secondary" icon="history">Lihat log lengkap</TautanTombol>
+        </>}
+      />
 
-      <Card>
-        <SectionTitle eyebrow="Pembacaan" title="Nilai sensor saat ini" subtitle={telemetry.latest?.measuredAt ? `${formatMeasuredAt(telemetry.latest.measuredAt)}. Ambang mengikuti target efektif.` : 'Ambang mengikuti target efektif jika tersedia.'} />
-        {telemetry.state === 'loading' ? (
-          <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat pembacaan, ambang, dan riwayat perangkat...</p>
-        ) : telemetry.latestError && !telemetry.latest ? (
-          <div role="alert" className="space-y-3"><p className="text-sm text-on-surface">Pembacaan sensor tidak dapat dimuat: {telemetry.latestError}</p><Button icon="refresh" onClick={retryTelemetry}>Coba lagi</Button></div>
-        ) : (
-          <>
-            {telemetry.error && <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"><span>{telemetry.error}</span><Button variant="ghost" size="sm" icon="refresh" onClick={retryTelemetry}>Coba lagi</Button></div>}
-            <DeviceReadings sensors={sensors} latest={telemetry.latest} />
-            <p className="sr-only" aria-live="polite">{announcement}</p>
-          </>
+      <div className="flex min-w-0 flex-col gap-4">
+        {outOfRange.length > 0 && telemetry.state !== 'loading' && (
+          <Alert tone="warn" title={outOfRange.map(item => `${sensorName(item.sensor)} ${item.state === 'high' ? 'di atas' : 'di bawah'} batas.`).join(' ')}>
+            Periksa kondisi air dan nutrisi, lalu pantau pembacaan berikutnya.
+          </Alert>
         )}
-      </Card>
+        {telemetry.error && telemetry.state !== 'loading' && !(telemetry.latestError && !telemetry.latest) && (
+          <Alert tone="bad" action={<Button variant="secondary" size="sm" icon="refresh-cw" onClick={retryTelemetry}>Coba lagi</Button>}>
+            {telemetry.error}
+          </Alert>
+        )}
 
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.85fr)]">
-        <Card>
-          <SectionTitle
-            eyebrow="Riwayat"
-            title={selected ? `${selected.name || selected.label || selected.code}, 24 jam terakhir` : 'Riwayat sensor'}
-            subtitle="Rata-rata per lima menit, dengan rentang minimum sampai maksimum dan ambang efektif."
-            action={(
-              <Link
-                to={`/iot/${encodeURIComponent(device.id)}/log`}
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-outline-variant/60 px-3.5 text-sm font-semibold text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-outline-variant/60 dark:text-inverse-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
+        <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex min-w-0 flex-col gap-4">
+            {telemetry.state === 'loading' ? (
+              <Card><p role="status" className="text-sm text-text-2">Memuat pembacaan, ambang, dan riwayat perangkat...</p></Card>
+            ) : telemetry.latestError && !telemetry.latest ? (
+              <Alert tone="bad" action={<Button variant="secondary" size="sm" icon="refresh-cw" onClick={retryTelemetry}>Coba lagi</Button>}>
+                Pembacaan sensor tidak dapat dimuat: {telemetry.latestError}
+              </Alert>
+            ) : sensors.length === 0 ? (
+              <Empty title="Konfigurasi sensor belum tersedia" icon="radio" />
+            ) : (
+              <AreaSection
+                title="Pembacaan saat ini"
+                meta={measuredAt ? `${formatMeasuredAt(measuredAt)}. Ambang mengikuti target efektif.` : 'Ambang mengikuti target efektif jika tersedia.'}
               >
-                Lihat log lengkap
-              </Link>
+                {readingItems.map(item => (
+                  <SensorReading
+                    key={item.sensor.code}
+                    name={sensorName(item.sensor)}
+                    icon={sensorIcon(item.sensor)}
+                    device={device.code}
+                    value={item.value}
+                    decimals={item.sensor.decimals ?? 2}
+                    unit={item.sensor.unit}
+                    min={item.range?.min}
+                    max={item.range?.max}
+                    status={readingStatus(item.state, stale)}
+                    measuredAt={measuredAt}
+                    emptyText={EMPTY_READING_TEXT}
+                  />
+                ))}
+              </AreaSection>
             )}
-          />
-          {sensors.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Pilih sensor riwayat">
-              {sensors.map(sensor => (
-                <button
-                  key={sensor.code}
-                  type="button"
-                  aria-pressed={selected?.code === sensor.code}
-                  onClick={() => setSelectedSensor(sensor.code)}
-                  className={`min-h-11 rounded-xl border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${selected?.code === sensor.code ? 'border-primary button-primary text-white' : 'border-outline-variant/50 text-on-surface hover:bg-primary/5'}`}
-                >
-                  {sensor.name || sensor.label || sensor.code}
-                </button>
-              ))}
-            </div>
-          )}
-          {telemetry.state === 'loading' ? <p role="status" className="py-5 text-sm text-on-surface-variant">Memuat riwayat sensor...</p>
-            : selected && telemetry.historyErrors[selected.code] && !series ? <p role="alert" className="py-4 text-sm text-on-surface">Riwayat {selected.name || selected.code} tidak dapat dimuat: {telemetry.historyErrors[selected.code]}</p>
-              : selected && series ? <ReadingChart sensor={selected} points={series.points || []} threshold={series.threshold || selected.threshold} theme={resolvedMode} />
-                : <Empty title="Konfigurasi sensor belum tersedia" icon="sensors" />}
-        </Card>
+            <p className="sr-only" aria-live="polite">{announcement}</p>
 
-        <Card>
-          <SectionTitle eyebrow="Kejadian" title="Log kejadian" subtitle="Perubahan ambang dan koneksi yang tercatat server." />
-          {telemetry.state === 'loading' ? <p role="status" className="py-5 text-sm text-on-surface-variant">Memuat kejadian...</p>
-            : telemetry.eventsError && !telemetry.events.length ? <p role="alert" className="py-4 text-sm text-on-surface">Kejadian tidak dapat dimuat: {telemetry.eventsError}</p>
-              : <EventList events={telemetry.events} deviceCode={device.code} sensors={sensors} />}
-        </Card>
+            <Card
+              title={selected ? `${sensorName(selected)}, 24 jam terakhir` : 'Riwayat sensor'}
+              subtitle="Rata-rata per lima menit, dengan rentang minimum sampai maksimum dan ambang efektif."
+            >
+              {sensors.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Pilih sensor riwayat">
+                  {sensors.map(sensor => (
+                    <FilterChip
+                      key={sensor.code}
+                      active={selected?.code === sensor.code}
+                      onClick={() => setSelectedSensor(sensor.code)}
+                    >
+                      {sensorName(sensor)}
+                    </FilterChip>
+                  ))}
+                </div>
+              )}
+              {telemetry.state === 'loading' ? <p role="status" className="py-5 text-sm text-text-2">Memuat riwayat sensor...</p>
+                : selected && telemetry.historyErrors[selected.code] && !series ? <p role="alert" className="py-4 text-sm text-bad-fg">Riwayat {selected.name || selected.code} tidak dapat dimuat: {telemetry.historyErrors[selected.code]}</p>
+                  : selected && series ? <ReadingChart sensor={selected} points={series.points || []} threshold={series.threshold || selected.threshold} />
+                    : <Empty title="Konfigurasi sensor belum tersedia" icon="radio" />}
+            </Card>
+          </div>
+
+          <aside className="flex min-w-0 flex-col gap-4" aria-label="Kejadian dan informasi alat">
+            <Card title="Log kejadian" subtitle="Perubahan ambang dan koneksi yang tercatat server.">
+              {telemetry.state === 'loading' ? <p role="status" className="py-2 text-sm text-text-2">Memuat kejadian...</p>
+                : telemetry.eventsError && !telemetry.events.length ? <p role="alert" className="py-2 text-sm text-bad-fg">Kejadian tidak dapat dimuat: {telemetry.eventsError}</p>
+                  : <EventList events={telemetry.events} deviceCode={device.code} sensors={sensors} />}
+            </Card>
+
+            <Card title="Informasi alat">
+              <dl className="flex flex-col divide-y divide-border">
+                {[
+                  ['Firmware', device.firmware || 'Belum tersedia'],
+                  ['Sinyal RSSI', device.rssi == null ? 'Belum tersedia' : `${device.rssi} dBm`],
+                  ['Kalibrasi terakhir', formatDate(device.calibratedAt)],
+                  ['Pengukuran terakhir', formatDate(telemetry.latest?.measuredAt || device.lastMeasuredAt)],
+                  ['Kiriman terakhir diterima', formatDate(device.lastReceivedAt)],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex min-w-0 flex-wrap justify-between gap-x-3 gap-y-0.5 py-2">
+                    <dt className="text-sm text-text-2">{label}</dt>
+                    <dd className="break-words text-sm font-semibold text-text">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
+          </aside>
+        </div>
       </div>
-
-      <Card>
-        <SectionTitle eyebrow="Kesehatan unit" title="Informasi yang tersedia" />
-        <dl className="grid gap-3 sm:grid-cols-2">
-          {[
-            ['Firmware', device.firmware || 'Belum tersedia'],
-            ['Sinyal RSSI', device.rssi == null ? 'Belum tersedia' : `${device.rssi} dBm`],
-            ['Kalibrasi terakhir', formatDate(device.calibratedAt)],
-            ['Pengukuran terakhir', formatDate(telemetry.latest?.measuredAt || device.lastMeasuredAt)],
-            ['Kiriman terakhir diterima', formatDate(device.lastReceivedAt)],
-          ].map(([label, value]) => (
-            <div key={label} className="min-w-0 rounded-xl panel-inset p-3">
-              <dt className="text-xs text-on-surface-variant">{label}</dt>
-              <dd className="mt-1 text-sm font-semibold text-on-surface break-words">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
     </div>
   );
 }

@@ -21,6 +21,19 @@ export const MIGRATED = [
   'src/chatbot-aquaponik/pages/Chatbot.jsx',
   'src/components/iot/SensorReading.jsx',
   'src/components/iot/TaskList.jsx',
+  'src/list-iot/pages/ListIot.jsx',
+  'src/app/SmartApp.jsx',
+  'src/shared/iot/components/PanelInfoAlat.jsx',
+  'src/kelola-area/pages/DeviceLog.jsx',
+  'src/kelola-area/pages/Monitoring.jsx',
+  'src/detail-information/pages/DetailInformation.jsx',
+  'src/detail-information/components/QrScanner.jsx',
+  'src/shared/qr/components/AksiQr.jsx',
+  'src/shared/qr/components/QrCode.jsx',
+  'src/shared/qr/opsiQr.js',
+  'src/shared/components/ui/tombol.js',
+  'src/shared/components/ui/Button.jsx',
+  'src/shared/components/ui/Tautan.jsx',
 ];
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML

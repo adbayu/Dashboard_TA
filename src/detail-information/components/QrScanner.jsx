@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Field, Input } from '../../shared/components/ui';
+import { Icon } from '../../shared/components/Icon.jsx';
 import {
   canOpenQrCamera,
   decodeQrFrame,
@@ -195,8 +196,6 @@ export default function QrScanner({ onHasil, onBatal }) {
     setCameraFacingMode((current) => nextQrCameraFacingMode(current));
   };
 
-  const bawaan = 'rounded-2xl border border-outline-variant/40 bg-black/80 overflow-hidden';
-
   return (
     <div className="space-y-4">
       {/* <video> SELALU ada di DOM (disembunyikan saat belum siap) supaya ref-nya
@@ -204,26 +203,29 @@ export default function QrScanner({ onHasil, onBatal }) {
           status berubah, srcObject tidak pernah menempel dan tidak ada frame
           yang bisa dibaca. */}
       <div className={status === 'jalan' ? 'relative' : 'hidden'}>
-        <div className={bawaan}>
+        {/* qr-kamera: latar gelap tetap di semua tema agar pratinjau kamera tidak tampak pudar. */}
+        <div className="qr-kamera overflow-hidden rounded-card border border-border">
           <video ref={videoRef} className="w-full aspect-video object-cover" playsInline muted />
         </div>
         {/* Bingkai bantu arahkan QR ke tengah */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="w-44 h-44 border-4 border-white/80 rounded-2xl" />
+          <div className="qr-bidik h-44 w-44 rounded-card" />
         </div>
       </div>
 
       {status === 'jalan' && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p role="status" className="text-center text-[11px] text-on-surface-variant sm:text-left">
+          <p role="status" className="text-center text-sm text-text-2 sm:text-left">
             Kamera {cameraFacingMode === 'environment' ? 'belakang' : 'depan'} aktif. Arahkan ke kode QR alat.
           </p>
           {cameraSwitchAvailable && (
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
+              size="sm"
+              icon="rotate-cw"
               title={`Ganti ke kamera ${cameraFacingMode === 'environment' ? 'depan' : 'belakang'}`}
-              className="min-h-11 w-full shrink-0 sm:w-auto"
+              className="w-full shrink-0 sm:w-auto"
               onClick={gantiKamera}
             >
               {cameraFacingMode === 'environment' ? 'Depan' : 'Belakang'}
@@ -233,9 +235,9 @@ export default function QrScanner({ onHasil, onBatal }) {
       )}
 
       {status === 'menyiapkan' && (
-        <div className="aspect-video rounded-2xl panel-inset flex items-center justify-center" role="status">
-          <span className="flex items-center gap-2 text-sm text-on-surface-variant">
-            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+        <div className="flex aspect-video items-center justify-center rounded-card border border-border bg-surface-2" role="status">
+          <span className="flex items-center gap-2 text-sm text-text-2">
+            <Icon name="loader-circle" className="animate-spin motion-reduce:animate-none" />
             Menyiapkan kamera…
           </span>
         </div>
@@ -245,9 +247,9 @@ export default function QrScanner({ onHasil, onBatal }) {
       <canvas ref={canvasRef} className="hidden" />
 
       {galat && (
-        <p role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 dark:bg-amber-900/25 border border-amber-400/60 px-3 py-2 text-[12px] font-semibold text-amber-900 dark:text-amber-100">
-          <span className="material-symbols-outlined text-[16px]">warning</span>
-          {galat}
+        <p role="alert" className="flex items-start gap-2 rounded-card border border-warn-line bg-warn-bg px-3 py-2.5 text-sm text-text">
+          <Icon name="triangle-alert" className="mt-0.5 shrink-0 text-warn-fg" />
+          <span>{galat}</span>
         </p>
       )}
 
@@ -256,16 +258,16 @@ export default function QrScanner({ onHasil, onBatal }) {
           e.preventDefault();
           if (manual.trim()) onHasil?.(manual.trim());
         }}
-        className="space-y-2 rounded-2xl panel-inset p-3"
+        className="flex flex-col gap-2 rounded-card bg-surface-2 p-3"
       >
         <Field label="Atau ketik / tempel kode alat" hint="cth. AQ-PH-001, berguna bila kamera tidak tersedia.">
           <Input value={manual} onChange={setManual} placeholder="AQ-PH-001" />
         </Field>
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" icon="search" disabled={!manual.trim()}>
+          <Button type="submit" variant="secondary" icon="search" disabled={!manual.trim()}>
             Cari perangkat
           </Button>
-          <Button type="button" variant="ghost" icon="close" onClick={onBatal}>
+          <Button type="button" variant="ghost" icon="x" onClick={onBatal}>
             Batal
           </Button>
         </div>

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -32,4 +33,33 @@ test('loading and error views keep the detail link and announce their state', as
   assert.match(error, /href="\/iot\/123e4567-e89b-12d3-a456-426614174000"/);
   assert.match(error, /role="alert"/);
   assert.match(error, /Backend tidak tersedia\./);
+});
+
+test('loading and error views render the page title as the only h1 via PageHeader', async t => {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+
+  const { DeviceLogState } = await vite.ssrLoadModule('/src/kelola-area/pages/DeviceLog.jsx');
+  for (const props of [{ loading: true }, { error: 'Backend tidak tersedia.' }]) {
+    const markup = renderToStaticMarkup(React.createElement(
+      MemoryRouter,
+      null,
+      React.createElement(DeviceLogState, { id: 'device-1', ...props }),
+    ));
+    assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1);
+    assert.match(markup, /data-ui="page-header"[\s\S]*?<h1[^>]*>Log sensor<\/h1>/);
+    assert.match(markup, /class="[^"]*iot-touch-targets/);
+  }
+
+  // Tampilan setelah data dimuat juga hanya punya judul dari PageHeader.
+  const source = await readFile(new URL('./DeviceLog.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /<h1[\s>]/);
+  assert.match(source, /<PageHeader[\s\S]*?title="Log sensor"/);
 });

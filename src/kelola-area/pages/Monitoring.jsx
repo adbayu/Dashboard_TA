@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Link } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
-import { Badge, Button, Card, Empty, Field, SectionTitle, Select } from '../../shared/components/ui';
+import { Alert, Badge, Button, Card, Checkbox, Empty, Field, PageHeader, Select, StatusPill, Table, Tabs, Tautan } from '../../shared/components/ui';
 import { IOT_SOURCE, iotApi } from '../../services/iotApi.js';
 import { iotMonitoringStore } from '../../services/iotMonitoringStore.js';
 import SensorStateBadge from '../../components/iot/SensorStateBadge.jsx';
@@ -26,6 +25,10 @@ const TABS = [
   { id: 'area', label: 'Per area' },
 ];
 
+// Urutan papan ketik tab. Tabs bersama menjalankan urutan yang sama (panah
+// memutar, Home/End ke ujung); fungsi ini tetap ada sebagai acuan yang dites
+// frontendReview.test.js lewat transform Vite.
+// oxlint-disable-next-line no-unused-vars -- diekspor untuk tes lewat transform Vite
 function nextTabId(currentTabId, key) {
   const currentIndex = TABS.findIndex(tab => tab.id === currentTabId);
   if (currentIndex < 0) return null;
@@ -36,9 +39,9 @@ function nextTabId(currentTabId, key) {
   return null;
 }
 const DEVICE_STATUSES = {
-  online: { label: 'Terhubung', tone: 'ok' },
-  stale: { label: 'Data tertunda', tone: 'warn' },
-  offline: { label: 'Tidak terhubung', tone: 'bad' },
+  online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
+  stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },
+  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi-off' },
 };
 const EVENT_TYPES = [
   { value: 'online', label: 'Terhubung kembali' },
@@ -47,15 +50,19 @@ const EVENT_TYPES = [
   { value: 'threshold_high', label: 'Di atas ambang' },
   { value: 'threshold_clear', label: 'Kembali normal' },
 ];
+// Seri pembanding memakai warna area. Di beberapa palet warnanya sama
+// (Kebun Air: chart-1 = water-fg; Tanah & Lumut: ketiganya sama), jadi tiap
+// seri juga punya pola garis sendiri yang diulang di legenda.
 const COMPARE_SERIES = [
-  { stroke: 'stroke-primary', text: 'text-primary' },
-  { stroke: 'stroke-tertiary', text: 'text-tertiary' },
-  { stroke: 'stroke-secondary', text: 'text-secondary' },
+  { stroke: 'stroke-chart-1', dash: undefined },
+  { stroke: 'stroke-water-fg', dash: '6 4' },
+  { stroke: 'stroke-leaf-fg', dash: '2 3' },
 ];
 const SENSOR_HISTORY_LABEL = '24 jam terakhir';
 const EMPTY_DEVICES = [];
 const EMPTY_SENSORS = [];
 const EMPTY_LATEST = {};
+const SANDBOX_ICON = 'flask-conical';
 
 function deviceSensors(device) {
   return device?.type?.sensors || device?.sensors || [];
@@ -95,42 +102,43 @@ function EventLogPanel({
   const sensorNames = Object.fromEntries(sensorTypes.map(sensor => [sensor.code, sensor.name || sensor.code]));
 
   return (
-    <Card pad="sm" className="space-y-4">
-      <SectionTitle title="Log kejadian" subtitle="Filter kejadian perangkat dan buka halaman sebelumnya." />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-        <Field label="Perangkat"><Select value={eventDeviceId} onChange={onDeviceChange} options={devices.map(device => ({ value: device.id, label: `${device.name} · ${device.code}${device.isSandbox || device.is_sandbox ? ' · Sandbox' : ''}` }))} placeholder="Semua perangkat" /></Field>
-        <Field label="Jenis kejadian"><Select value={eventType} onChange={onTypeChange} options={EVENT_TYPES} placeholder="Semua kejadian" /></Field>
-      </div>
-      <p className="text-xs text-on-surface-variant">Halaman mengikuti ID kejadian menurun. Waktu memakai nilai `at` dari API.</p>
-      {eventState === 'loading' && <p role="status" className="py-2 text-sm text-on-surface-variant">Memuat log kejadian...</p>}
-      {eventState === 'error' && <ErrorPanel message={eventError} onRetry={onRetry} />}
-      {eventState === 'ready' && eventError && <p role="alert" className="text-sm text-red-800 dark:text-red-200">{eventError}</p>}
-      {eventState === 'ready' && events.length === 0 && !eventError && <Empty title="Belum ada kejadian" hint="Kejadian perangkat akan muncul setelah API mencatat perubahan koneksi atau ambang." icon="history" />}
-      {eventState === 'ready' && events.length > 0 && <div className="space-y-2">{events.map(event => <Card key={event.id} pad="sm" className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="break-words font-semibold text-on-surface">{formatEventMessage(event, sensorNames)}</p>
-          <p className="mt-1 flex flex-wrap items-center gap-2 break-all font-mono text-xs text-on-surface-variant">{deviceById.get(event.deviceId)?.code || event.deviceId} · ID {event.id}
-            {(event.isSandbox || event.is_sandbox || deviceById.get(event.deviceId)?.isSandbox || deviceById.get(event.deviceId)?.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
-          </p>
+    <Card pad="sm" title="Log kejadian" subtitle="Filter kejadian alat dan buka halaman sebelumnya.">
+      <div className="flex flex-col gap-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <Field label="Perangkat"><Select value={eventDeviceId} onChange={onDeviceChange} options={devices.map(device => ({ value: device.id, label: `${device.name} · ${device.code}${device.isSandbox || device.is_sandbox ? ' · Sandbox' : ''}` }))} placeholder="Semua perangkat" /></Field>
+          <Field label="Jenis kejadian"><Select value={eventType} onChange={onTypeChange} options={EVENT_TYPES} placeholder="Semua kejadian" /></Field>
         </div>
-        <time className="shrink-0 text-xs text-on-surface-variant" dateTime={event.at}>{dateLabel(event.at)}</time>
-      </Card>)}</div>}
-      {eventState === 'ready' && eventCursor && <div className="flex justify-center"><Button variant="ghost" icon="expand_more" disabled={loadingMoreEvents} onClick={onLoadMore}>{loadingMoreEvents ? 'Memuat kejadian...' : 'Muat kejadian sebelumnya'}</Button></div>}
+        <p className="text-sm text-text-2">Halaman mengikuti ID kejadian menurun. Waktu memakai nilai `at` dari API.</p>
+        {eventState === 'loading' && <p role="status" className="py-2 text-sm text-text-2">Memuat log kejadian...</p>}
+        {eventState === 'error' && <ErrorPanel message={eventError} onRetry={onRetry} />}
+        {eventState === 'ready' && eventError && <p role="alert" className="text-sm font-semibold text-bad-fg">{eventError}</p>}
+        {eventState === 'ready' && events.length === 0 && !eventError && <Empty title="Belum ada kejadian" hint="Kejadian perangkat akan muncul setelah API mencatat perubahan koneksi atau ambang." icon="history" />}
+        {eventState === 'ready' && events.length > 0 && <ul className="divide-y divide-border border-b border-border">{events.map(event => <li key={event.id} className="flex min-w-0 flex-col gap-0.5 py-2.5">
+          <span className="break-words font-semibold text-text">{formatEventMessage(event, sensorNames)}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 break-all font-mono text-xs text-text-2">{deviceById.get(event.deviceId)?.code || event.deviceId} · ID {event.id}
+            {(event.isSandbox || event.is_sandbox || deviceById.get(event.deviceId)?.isSandbox || deviceById.get(event.deviceId)?.is_sandbox) && <Badge tone="info" icon={SANDBOX_ICON}>Sandbox</Badge>}
+          </span>
+          <time className="text-[13px] leading-[18px] text-text-2" dateTime={event.at}>{dateLabel(event.at)}</time>
+        </li>)}</ul>}
+        {eventState === 'ready' && eventCursor && <div className="flex justify-center"><Button variant="ghost" icon="chevron-down" disabled={loadingMoreEvents} onClick={onLoadMore}>{loadingMoreEvents ? 'Memuat kejadian...' : 'Muat kejadian sebelumnya'}</Button></div>}
+      </div>
     </Card>
   );
 }
 
 function DeviceStatus({ status }) {
-  const value = DEVICE_STATUSES[status] || { label: 'Status tidak diketahui', tone: 'muted' };
-  return <Badge tone={value.tone}>{value.label}</Badge>;
+  const value = DEVICE_STATUSES[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'circle-help' };
+  return <Badge tone={value.tone} icon={value.icon}>{value.label}</Badge>;
 }
 
+// Satu peringatan dengan aksi Coba lagi. Tombolnya anak langsung Alert supaya
+// tes bisa menemukannya lewat props.children.
 function ErrorPanel({ message, onRetry }) {
   return (
-    <div role="alert" className="space-y-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">
+    <Alert tone="bad">
       <p>{message}</p>
-      {onRetry && <Button variant="ghost" icon="refresh" onClick={onRetry}>Coba lagi</Button>}
-    </div>
+      {onRetry && <Button variant="secondary" size="sm" icon="refresh-cw" className="mt-2" onClick={onRetry}>Coba lagi</Button>}
+    </Alert>
   );
 }
 
@@ -147,7 +155,7 @@ function historyRange(points = []) {
 function Sparkline({ sensor, history }) {
   const points = history?.points || [];
   const summary = historyRange(points);
-  if (!summary) return <p className="text-xs text-on-surface-variant">Belum ada data untuk {SENSOR_HISTORY_LABEL.toLowerCase()}.</p>;
+  if (!summary) return <p className="text-sm text-text-2">Belum ada data untuk {SENSOR_HISTORY_LABEL.toLowerCase()}.</p>;
 
   const low = Math.min(...summary.values);
   const high = Math.max(...summary.values);
@@ -163,12 +171,12 @@ function Sparkline({ sensor, history }) {
 
   return (
     <figure className="min-w-0" aria-label={`${sensorLabel(sensor)} ${SENSOR_HISTORY_LABEL}. ${accessibleRange}`}>
-      <figcaption className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+      <figcaption className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs text-text-2">
         <span>{SENSOR_HISTORY_LABEL}</span>
-        <span>{accessibleRange}</span>
+        <span className="font-num">{accessibleRange}</span>
       </figcaption>
-      <svg className="mt-1 h-12 w-full overflow-visible text-primary dark:text-inverse-primary" viewBox="0 0 320 48" role="img" aria-label={`${sensorLabel(sensor)} ${SENSOR_HISTORY_LABEL}. ${accessibleRange}`}>
-        <polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <svg className="mt-1 h-12 w-full overflow-visible text-chart-1" viewBox="0 0 320 48" preserveAspectRatio="none" role="img" aria-label={`${sensorLabel(sensor)} ${SENSOR_HISTORY_LABEL}. ${accessibleRange}`}>
+        <polyline points={coordinates} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
     </figure>
   );
@@ -236,36 +244,37 @@ function PackageDeviceCard({ device, latest }) {
 
   return (
     <div ref={cardRef}>
-      <Card pad="sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="break-words text-base font-bold text-on-surface">{device.name}</h3>
-            {(device.isSandbox || device.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
-            <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{device.code} · {device.type?.name || device.type?.code}</p>
-            {device.areaRef && <p className="mt-1 text-xs text-on-surface-variant">Area: {device.areaRef}</p>}
-          </div>
-          <div className="flex flex-wrap gap-2"><DeviceStatus status={device.status} /><Link to={`/iot/${encodeURIComponent(device.id)}`} className="inline-flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">Buka perangkat</Link></div>
+      <Card pad="sm" title={device.name} subtitle={`${device.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · ${device.areaRef ? `Area: ${device.areaRef}` : 'Area belum diatur'}`}>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+          <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="break-all font-mono text-sm text-text">{device.code}</span>
+            <span className="text-sm text-text-2">{device.type?.name || device.type?.code}</span>
+            <DeviceStatus status={device.status} />
+            {(device.isSandbox || device.is_sandbox) && <Badge tone="info" icon={SANDBOX_ICON}>Sandbox</Badge>}
+          </span>
+          <Tautan to={`/iot/${encodeURIComponent(device.id)}`} className="text-sm">Buka alat</Tautan>
         </div>
-        {historyError && <p role="alert" className="mt-3 text-sm text-red-800 dark:text-red-200">{historyError}</p>}
-        {historyError && <div className="mt-2 flex justify-end"><Button variant="ghost" icon="refresh" onClick={retry}>Coba lagi</Button></div>}
-        <div className="mt-4 divide-y divide-outline-variant/30">
+        {historyError && <div className="my-2"><ErrorPanel message={historyError} onRetry={retry} /></div>}
+        <div className="divide-y divide-border">
           {sensors.map(sensor => {
             const reading = latestReadingFor({ [device.id]: latest }, device.id, sensor.code);
             const history = histories[sensor.code];
-            return <div key={sensor.code} className="grid min-w-0 gap-3 py-3 md:grid-cols-[minmax(10rem,0.8fr)_minmax(0,1.4fr)] md:items-start">
+            return <div key={sensor.code} className="grid min-w-0 gap-x-6 gap-y-2.5 py-3 md:grid-cols-[minmax(11rem,0.8fr)_minmax(0,1.4fr)] md:items-center">
               <div className="min-w-0">
-                <p className="font-semibold text-on-surface">{sensorLabel(sensor)}</p>
-                <p className="mt-1 break-words text-xs text-on-surface-variant">{reading?.value == null ? 'Belum ada data' : `${formatSensorNumber(reading.value, sensor.decimals ?? 2)}${sensor.unit ? ` ${sensor.unit}` : ''}`}</p>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-text">{sensorLabel(sensor)}</p>
+                <p className="mt-0.5 break-words">{reading?.value == null
+                  ? <span className="text-text-2">Belum ada data</span>
+                  : <><span className="font-num text-xl font-semibold leading-[26px] text-text">{formatSensorNumber(reading.value, sensor.decimals ?? 2)}</span>{sensor.unit && <span className="text-text-2"> {sensor.unit}</span>}</>}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                   {reading && <SensorStateBadge state={reading.state} />}
-                  <span className="break-words text-xs text-on-surface-variant">{reading?.threshold
+                  <span className="break-words text-[13px] leading-[18px] text-text-2">{reading?.threshold
                     ? formatThreshold(reading.threshold, sensor.unit || '', sensor.decimals ?? 2)
                     : 'Ambang efektif belum dimuat'}</span>
                 </div>
-                <p className="mt-1 text-xs text-on-surface-variant">{formatMeasuredAt(reading?.measuredAt)}</p>
+                <p className="mt-0.5 text-[13px] leading-[18px] text-text-2">{formatMeasuredAt(reading?.measuredAt)}</p>
               </div>
-              {historyState === 'loading' ? <p role="status" className="text-xs text-on-surface-variant">Memuat riwayat sensor...</p>
-                : historyState === 'idle' ? <p className="text-xs text-on-surface-variant">Riwayat sensor akan dimuat saat perangkat terlihat.</p>
+              {historyState === 'loading' ? <p role="status" className="text-sm text-text-2">Memuat riwayat sensor...</p>
+                : historyState === 'idle' ? <p className="text-sm text-text-2">Riwayat sensor akan dimuat saat perangkat terlihat.</p>
                   : <Sparkline sensor={sensor} history={history} />}
             </div>;
           })}
@@ -279,16 +288,16 @@ export function PackageTabEmpty({ hasPackageDevices }) {
   return <Empty
     title={hasPackageDevices ? 'Sensor paket belum tersedia' : 'Belum ada perangkat paket live'}
     hint={hasPackageDevices ? 'Sensor paket akan muncul setelah tersedia pada daftar API.' : 'Perangkat paket yang terpasang akan muncul di sini.'}
-    icon="deployed_code"
+    icon="package"
   />;
 }
 
 export function PackageTabLoading() {
-  return <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat nilai terbaru...</p>;
+  return <p role="status" className="py-4 text-sm text-text-2">Memuat nilai terbaru...</p>;
 }
 
 export function SensorTabLoading() {
-  return <p role="status" className="py-4 text-sm text-on-surface-variant">Memuat ringkasan sensor...</p>;
+  return <p role="status" className="py-4 text-sm text-text-2">Memuat ringkasan sensor...</p>;
 }
 
 export function SensorLatestError({ message, onRetry }) {
@@ -297,26 +306,26 @@ export function SensorLatestError({ message, onRetry }) {
 
 export function AreaTabLoading({ onReload }) {
   return <div className="space-y-3">
-    <div className="flex justify-end"><Button variant="ghost" icon="refresh" onClick={onReload}>Muat ulang</Button></div>
-    <p role="status" className="text-sm text-on-surface-variant">Memuat ringkasan pembacaan hari ini...</p>
-    <p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p>
+    <div className="flex justify-end"><Button variant="ghost" icon="refresh-cw" onClick={onReload}>Muat ulang</Button></div>
+    <p role="status" className="text-sm text-text-2">Memuat ringkasan pembacaan hari ini...</p>
+    <p className="text-sm text-text-2">{AREA_HISTORY_LABEL}</p>
   </div>;
 }
 
 export function AreaEmptyState({ hasArea }) {
   return hasArea
-    ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="query_stats" />
-    : <Empty title="Belum ada area dengan perangkat live" hint="Area terisi akan muncul setelah perangkat memiliki areaRef." icon="water" />;
+    ? <Empty title="Belum ada data sensor hari ini" hint="Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam." icon="chart-line" />
+    : <Empty title="Belum ada area dengan perangkat live" hint="Area terisi akan muncul setelah perangkat memiliki areaRef." icon="waves" />;
 }
 
 export function SensorDeviceEmpty() {
-  return <Empty title="Belum ada perangkat dengan sensor ini" hint="Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang." icon="sensors" />;
+  return <Empty title="Belum ada perangkat dengan sensor ini" hint="Pilih jenis sensor lain atau periksa perangkat yang sudah terpasang." icon="radio" />;
 }
 
 function ComparisonChart({ series, sensor }) {
   const validSeries = series.map(item => ({ ...item, points: item.history?.points || [] }))
     .filter(item => item.points.some(point => Number.isFinite(Number(point.avg))));
-  if (!validSeries.length) return <p className="text-sm text-on-surface-variant">Pilih perangkat untuk membandingkan riwayat sensor.</p>;
+  if (!validSeries.length) return <p className="text-sm text-text-2">Pilih perangkat untuk membandingkan riwayat sensor.</p>;
 
   const values = validSeries.flatMap(item => item.points.map(point => Number(point.avg)).filter(Number.isFinite));
   const low = Math.min(...values);
@@ -330,9 +339,9 @@ function ComparisonChart({ series, sensor }) {
   const description = `Perbandingan ${sensorLabel(sensor)} ${SENSOR_HISTORY_LABEL}: ${summaries.join('; ')}`;
 
   return (
-    <figure className="min-w-0 rounded-xl border border-outline-variant/40 p-3" aria-label={description}>
-      <figcaption className="mb-2 text-sm font-semibold text-on-surface">Riwayat {sensorLabel(sensor).toLowerCase()}, {SENSOR_HISTORY_LABEL.toLowerCase()}</figcaption>
-      <svg className="h-36 w-full" viewBox="0 0 320 120" role="img" aria-label={description}>
+    <figure className="min-w-0" aria-label={description}>
+      <figcaption className="mb-2 font-semibold text-text">Riwayat {sensorLabel(sensor).toLowerCase()}, {SENSOR_HISTORY_LABEL.toLowerCase()}</figcaption>
+      <svg className="h-36 w-full overflow-visible border-b border-border" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label={description}>
         {validSeries.map((item, seriesIndex) => {
           const points = item.points.filter(point => Number.isFinite(Number(point.avg)));
           const coordinates = points.map((point, index) => {
@@ -340,12 +349,16 @@ function ComparisonChart({ series, sensor }) {
             const y = 112 - ((Number(point.avg) - low) / span) * 104;
             return `${x},${y}`;
           }).join(' ');
-          return <polyline key={item.device.id} points={coordinates} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={COMPARE_SERIES[seriesIndex].stroke} />;
+          const style = COMPARE_SERIES[seriesIndex];
+          return <polyline key={item.device.id} points={coordinates} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={style.dash} vectorEffect="non-scaling-stroke" className={style.stroke} />;
         })}
       </svg>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant">
-        {validSeries.map((item, index) => <li key={item.device.id} className={`break-words ${COMPARE_SERIES[index].text}`}>
-          <span className="font-semibold">{item.device.name}</span>: {summaries[index].replace(`${item.device.name} `, '')}
+      <ul className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] leading-[18px] text-text-2">
+        {validSeries.map((item, index) => <li key={item.device.id} className="inline-flex min-w-0 items-center gap-2">
+          <svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true" className="shrink-0">
+            <line x1="0" y1="4" x2="22" y2="4" strokeWidth="2.5" strokeDasharray={COMPARE_SERIES[index].dash} className={COMPARE_SERIES[index].stroke} />
+          </svg>
+          <span className="break-words"><b className="font-semibold text-text">{item.device.name}</b>: {summaries[index].replace(`${item.device.name} `, '')}</span>
         </li>)}
       </ul>
     </figure>
@@ -701,81 +714,89 @@ function MonitoringView({ currentUser }) {
     />)}</div>;
   }
 
+  function sensorFor(item) {
+    return deviceSensors(item.device).find(value => value.code === selectedSensor) || selectedSensorType || {};
+  }
+
+  function sensorValueText(item) {
+    return item.value == null ? 'Belum ada data' : `${formatSensorNumber(item.value, sensorFor(item).decimals ?? 2)}${item.unit ? ` ${item.unit}` : ''}`;
+  }
+
+  const alatPerhatian = displayDevices.filter(device => device.status === 'offline' || device.status === 'stale').length;
+
   function renderSensorTab() {
-    if (!sensorOptions.length) return <Empty title="Jenis sensor belum tersedia" hint="Jenis sensor akan muncul setelah tersedia di daftar API." icon="sensors" />;
-    return <div className="space-y-4">
-      <Card pad="sm"><Field label="Jenis sensor"><Select value={selectedSensor} onChange={value => {
+    if (!sensorOptions.length) return <Empty title="Jenis sensor belum tersedia" hint="Jenis sensor akan muncul setelah tersedia di daftar API." icon="radio" />;
+    return <div className="flex flex-col gap-4">
+      <div className="max-w-xs"><Field label="Jenis sensor"><Select value={selectedSensor} onChange={value => {
         setSelectedSensorChoice(value);
         setSelectedCompareIds([]);
         setComparisonState('idle');
         setComparisonError('');
         setComparisonHistories({});
-      }} options={sensorOptions} /></Field></Card>
+      }} options={sensorOptions} /></Field></div>
       {sensorState === 'loading' || sensorState === 'idle' ? <SensorTabLoading />
          : sensorState === 'error' ? <ErrorPanel message={sensorError} onRetry={retryLatest} />
           : <>
             {sensorError && <SensorLatestError message={sensorError} onRetry={retryLatest} />}
             {currentSensorItems.length === 0 ? <SensorDeviceEmpty /> : (
-              <Card pad="sm">
-                <SectionTitle title={selectedSensorType?.name || selectedSensor} subtitle="Perangkat satuan dan paket ditampilkan bersama. Nilai ambang dan waktu berasal dari API." />
-                <div className="hidden min-w-0 overflow-hidden rounded-xl border border-outline-variant/40 sm:block">
-                  <table className="w-full min-w-0 table-fixed text-sm">
-                    <colgroup><col className="w-[24%]" /><col className="w-[14%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[18%]" /></colgroup>
-                    <thead className="bg-surface-container-high/70 text-left text-xs text-on-surface-variant"><tr>
-                      <th className="break-words px-3 py-2.5">Perangkat</th><th className="break-words px-3 py-2.5">Area</th><th className="break-words px-3 py-2.5">Nilai</th><th className="break-words px-3 py-2.5">Ambang</th><th className="break-words px-3 py-2.5">Waktu ukur</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-outline-variant/30">{currentSensorItems.map(item => {
-                      const sensor = deviceSensors(item.device).find(value => value.code === selectedSensor) || selectedSensorType || {};
-                      return <tr key={item.deviceId}>
-                        <td className="break-words px-3 py-3 [overflow-wrap:anywhere]">
-                          <Link to={`/iot/${encodeURIComponent(item.deviceId)}`} className="break-words font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">{item.device?.name || item.deviceCode}</Link>
-                          {(item.device?.isSandbox || item.device?.is_sandbox) && <Badge tone="info">Sandbox</Badge>}
-                          <span className="mt-1 block break-all font-mono text-[11px] text-on-surface-variant">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</span>
-                        </td>
-                        <td className="break-words px-3 py-3 text-on-surface-variant [overflow-wrap:anywhere]">{item.areaRef || 'Area belum diatur'}</td>
-                        <td className="px-3 py-3 [overflow-wrap:anywhere]">
-                          <span className="block font-bold tabular-nums text-on-surface">{item.value == null ? 'Belum ada data' : `${formatSensorNumber(item.value, sensor.decimals ?? 2)}${item.unit ? ` ${item.unit}` : ''}`}</span>
-                          <span className="mt-1 inline-flex"><SensorStateBadge state={item.state} /></span>
-                        </td>
-                        <td className="break-words px-3 py-3 text-xs text-on-surface-variant [overflow-wrap:anywhere]">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</td>
-                        <td className="break-words px-3 py-3 text-xs text-on-surface-variant [overflow-wrap:anywhere]"><time dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time></td>
-                      </tr>;
-                    })}</tbody>
-                  </table>
+              <Card pad="sm" title={selectedSensorType?.name || selectedSensor} subtitle="Alat satuan dan paket ditampilkan bersama. Nilai, ambang, dan waktu berasal dari API.">
+                <div className="hidden min-w-0 sm:block">
+                  <Table
+                    columns={[
+                      { key: 'device', label: 'Perangkat', render: item => <>
+                        <Tautan to={`/iot/${encodeURIComponent(item.deviceId)}`} className="break-words">{item.device?.name || item.deviceCode}</Tautan>
+                        {(item.device?.isSandbox || item.device?.is_sandbox) && <span className="ml-2 inline-flex align-middle"><Badge tone="info" icon={SANDBOX_ICON}>Sandbox</Badge></span>}
+                        <span className="mt-1 block break-all font-mono text-xs text-text-2">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</span>
+                      </> },
+                      { key: 'area', label: 'Area', render: item => <span className="break-words text-text-2 [overflow-wrap:anywhere]">{item.areaRef || 'Area belum diatur'}</span> },
+                      { key: 'value', label: 'Nilai', render: item => <>
+                        <span className="block font-num font-semibold tabular-nums text-text">{sensorValueText(item)}</span>
+                        <span className="mt-1 inline-flex"><SensorStateBadge state={item.state} /></span>
+                      </> },
+                      { key: 'threshold', label: 'Ambang', render: item => <span className="text-sm text-text-2">{formatThreshold(item.threshold, item.unit || '', sensorFor(item).decimals ?? 2)}</span> },
+                      { key: 'measuredAt', label: 'Waktu ukur', render: item => <time className="text-sm text-text-2" dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time> },
+                    ]}
+                    rows={currentSensorItems.map(item => ({ ...item, id: item.deviceId }))}
+                  />
                 </div>
-                <ul aria-label={`Daftar perangkat dengan sensor ${selectedSensorType?.name || selectedSensor}`} className="space-y-3 sm:hidden">{currentSensorItems.map(item => {
-                  const sensor = deviceSensors(item.device).find(value => value.code === selectedSensor) || selectedSensorType || {};
-                  return <Card as="li" key={item.deviceId} pad="sm" className="[overflow-wrap:anywhere]">
+                <ul aria-label={`Daftar perangkat dengan sensor ${selectedSensorType?.name || selectedSensor}`} className="divide-y divide-border sm:hidden">{currentSensorItems.map(item => {
+                  const sensor = sensorFor(item);
+                  return <li key={item.deviceId} className="min-w-0 py-3 [overflow-wrap:anywhere]">
                     <div className="min-w-0">
-                      <Link to={`/iot/${encodeURIComponent(item.deviceId)}`} className="break-words font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-inverse-primary">{item.device?.name || item.deviceCode}</Link>
-                      {(item.device?.isSandbox || item.device?.is_sandbox) && <span className="ml-2 inline-flex align-middle"><Badge tone="info">Sandbox</Badge></span>}
-                      <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</p>
+                      <Tautan to={`/iot/${encodeURIComponent(item.deviceId)}`} className="break-words">{item.device?.name || item.deviceCode}</Tautan>
+                      {(item.device?.isSandbox || item.device?.is_sandbox) && <span className="ml-2 inline-flex align-middle"><Badge tone="info" icon={SANDBOX_ICON}>Sandbox</Badge></span>}
+                      <p className="mt-1 break-all font-mono text-xs text-text-2">{item.deviceCode} · {item.device?.type?.kind === 'paket' ? 'Paket' : 'Satuan'} · {item.device?.type?.name || item.device?.type?.code}</p>
                     </div>
                     <dl className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 text-sm">
-                      <div><dt className="text-xs text-on-surface-variant">Area</dt><dd className="break-words text-on-surface [overflow-wrap:anywhere]">{item.areaRef || 'Area belum diatur'}</dd></div>
-                      <div><dt className="text-xs text-on-surface-variant">Nilai</dt><dd className="break-words font-bold tabular-nums text-on-surface">{item.value == null ? 'Belum ada data' : `${formatSensorNumber(item.value, sensor.decimals ?? 2)}${item.unit ? ` ${item.unit}` : ''}`}</dd><dd className="mt-1"><SensorStateBadge state={item.state} /></dd></div>
-                      <div><dt className="text-xs text-on-surface-variant">Ambang</dt><dd className="break-words text-on-surface-variant [overflow-wrap:anywhere]">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</dd></div>
-                      <div><dt className="text-xs text-on-surface-variant">Waktu ukur</dt><dd className="break-words text-on-surface-variant [overflow-wrap:anywhere]"><time dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time></dd></div>
+                      <div><dt className="text-text-2">Area</dt><dd className="break-words text-text">{item.areaRef || 'Area belum diatur'}</dd></div>
+                      <div><dt className="text-text-2">Nilai</dt><dd className="break-words font-num font-semibold tabular-nums text-text">{sensorValueText(item)}</dd><dd className="mt-1"><SensorStateBadge state={item.state} /></dd></div>
+                      <div><dt className="text-text-2">Ambang</dt><dd className="break-words text-text-2">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</dd></div>
+                      <div><dt className="text-text-2">Waktu ukur</dt><dd className="break-words text-text-2"><time dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time></dd></div>
                     </dl>
-                  </Card>;
+                  </li>;
                 })}</ul>
               </Card>
             )}
-            {currentSensorItems.length > 0 && <Card pad="sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div><h3 className="font-semibold text-on-surface">Bandingkan riwayat</h3><p className="mt-1 text-xs text-on-surface-variant">Pilih sampai tiga perangkat. Riwayat memakai pembacaan lima menit dalam 24 jam terakhir.</p></div>
-                <span className="text-xs tabular-nums text-on-surface-variant">{selectedCompareIds.length}/3 dipilih</span>
-              </div>
-              <fieldset className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {currentSensorItems.length > 0 && <Card
+              pad="sm"
+              title="Bandingkan riwayat"
+              subtitle="Pilih sampai tiga perangkat. Riwayat memakai pembacaan lima menit dalam 24 jam terakhir."
+              action={<span className="font-num text-sm tabular-nums text-text-2">{selectedCompareIds.length}/3 dipilih</span>}
+            >
+              <fieldset className="grid gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
                 <legend className="sr-only">Perangkat untuk dibandingkan</legend>
-                {currentSensorItems.map(item => <label key={item.deviceId} className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-outline-variant/50 px-3 py-2 text-sm text-on-surface focus-within:ring-2 focus-within:ring-primary">
-                  <input type="checkbox" checked={selectedCompareIds.includes(item.deviceId)} disabled={!selectedCompareIds.includes(item.deviceId) && selectedCompareIds.length >= 3} onChange={() => toggleComparison(item.deviceId)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
-                  <span className="min-w-0"><span className="block truncate font-semibold">{item.device?.name || item.deviceCode}</span><span className="block truncate text-xs text-on-surface-variant">{item.deviceCode}</span></span>
-                </label>)}
+                {currentSensorItems.map(item => <Checkbox
+                  key={item.deviceId}
+                  className="min-h-11 min-w-0 items-center py-1.5"
+                  checked={selectedCompareIds.includes(item.deviceId)}
+                  disabled={!selectedCompareIds.includes(item.deviceId) && selectedCompareIds.length >= 3}
+                  onChange={() => toggleComparison(item.deviceId)}
+                  label={<span className="min-w-0"><span className="block truncate font-semibold">{item.device?.name || item.deviceCode}</span><span className="block truncate font-mono text-xs text-text-2">{item.deviceCode}</span></span>}
+                />)}
               </fieldset>
-              {selectedCompareIds.length > 0 && comparisonState === 'loading' && <p role="status" className="mt-3 text-sm text-on-surface-variant">Memuat riwayat perbandingan...</p>}
-              {selectedCompareIds.length > 0 && comparisonError && <div role="alert" className="mt-3 space-y-2 text-sm text-red-800 dark:text-red-200"><p>{comparisonError}</p><Button variant="ghost" icon="refresh" onClick={retryComparison}>Coba lagi</Button></div>}
-              {selectedCompareIds.length > 0 && comparisonState === 'error' && !comparisonError && <div role="alert" className="mt-3 space-y-2 text-sm text-red-800 dark:text-red-200"><p>Riwayat perbandingan tidak dapat dimuat.</p><Button variant="ghost" icon="refresh" onClick={retryComparison}>Coba lagi</Button></div>}
+              {selectedCompareIds.length > 0 && comparisonState === 'loading' && <p role="status" className="mt-3 text-sm text-text-2">Memuat riwayat perbandingan...</p>}
+              {selectedCompareIds.length > 0 && comparisonError && <Alert tone="bad" className="mt-3" action={<Button variant="secondary" size="sm" icon="refresh-cw" onClick={retryComparison}>Coba lagi</Button>}>{comparisonError}</Alert>}
+              {selectedCompareIds.length > 0 && comparisonState === 'error' && !comparisonError && <Alert tone="bad" className="mt-3" action={<Button variant="secondary" size="sm" icon="refresh-cw" onClick={retryComparison}>Coba lagi</Button>}>Riwayat perbandingan tidak dapat dimuat.</Alert>}
               {selectedCompareIds.length > 0 && comparisonState === 'ready' && <div className="mt-4"><ComparisonChart
                 sensor={selectedSensorType || { code: selectedSensor }}
                 series={selectedCompareIds.map(id => ({ device: deviceById.get(id), history: comparisonHistories[id] })).filter(item => item.device)}
@@ -787,75 +808,57 @@ function MonitoringView({ currentUser }) {
 
   function renderAreaTab() {
     const areas = [...new Set(liveDevices.map(device => device.areaRef?.trim()).filter(Boolean))];
-    const reloadAction = <div className="flex justify-end"><Button variant="ghost" icon="refresh" onClick={() => areaRefreshActionRef.current?.()}>Muat ulang</Button></div>;
+    const reloadAction = <div className="flex justify-end"><Button variant="ghost" icon="refresh-cw" onClick={() => areaRefreshActionRef.current?.()}>Muat ulang</Button></div>;
     if (areaState === 'loading' || areaState === 'idle') return <AreaTabLoading onReload={() => areaRefreshActionRef.current?.()} />;
-    if (areaState === 'waiting') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-on-surface-variant">Menunggu permintaan ringkasan area sebelumnya selesai.</p><p className="text-xs text-on-surface-variant">{AREA_HISTORY_LABEL}</p></div>;
+    if (areaState === 'waiting') return <div className="space-y-3">{reloadAction}<p role="status" className="text-sm text-text-2">Menunggu permintaan ringkasan area sebelumnya selesai.</p><p className="text-sm text-text-2">{AREA_HISTORY_LABEL}</p></div>;
     if (areaState === 'error') return <div className="space-y-3">{reloadAction}<ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} /></div>;
     if (!areas.length) return <div className="space-y-3">{reloadAction}<AreaEmptyState hasArea={false} /></div>;
-    return <div className="space-y-4">
-      {reloadAction}
-      <Card pad="sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><h3 className="font-semibold text-on-surface">Ringkasan pembacaan area</h3><p className="mt-1 text-sm text-on-surface-variant">{AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel.</p></div>
-        </div>
-        <p className="mt-3 text-xs tabular-nums text-on-surface-variant">Request area: {areaCounters.started}/{areaCounters.total}</p>
-      </Card>
+    return <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-text-2">Ringkasan pembacaan area. {AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel. <span className="font-num tabular-nums">Request area: {areaCounters.started}/{areaCounters.total}</span></p>
+        {reloadAction}
+      </div>
       {areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}
       {areaRows.length === 0 ? <AreaEmptyState hasArea />
-        : <div className="overflow-x-auto rounded-2xl border border-outline-variant/50">
-          <table className="w-full min-w-[620px] text-sm">
-            <thead className="bg-surface-container-high/70 text-left text-xs text-on-surface-variant"><tr><th className="px-3 py-3">Area</th><th className="px-3 py-3">Sensor</th><th className="px-3 py-3">Minimum</th><th className="px-3 py-3">Rata-rata</th><th className="px-3 py-3">Maksimum</th><th className="px-3 py-3">Sampel</th></tr></thead>
-            <tbody className="divide-y divide-outline-variant/30">{areaRows.map(row => <tr key={`${row.areaRef}:${row.sensor.code}`}>
-              <td className="px-3 py-3 font-semibold text-on-surface">{row.areaRef}</td>
-              <td className="px-3 py-3 text-on-surface-variant">{sensorLabel(row.sensor)}{row.sensor.unit ? ` (${row.sensor.unit})` : ''}</td>
-              {row.summary ? <>
-                <td className="px-3 py-3 tabular-nums text-on-surface">{formatSensorNumber(row.summary.min, row.sensor.decimals ?? 2)}</td>
-                <td className="px-3 py-3 tabular-nums font-semibold text-on-surface">{formatSensorNumber(row.summary.avg, row.sensor.decimals ?? 2)}</td>
-                <td className="px-3 py-3 tabular-nums text-on-surface">{formatSensorNumber(row.summary.max, row.sensor.decimals ?? 2)}</td>
-                <td className="px-3 py-3 tabular-nums text-on-surface-variant">{row.summary.n}</td>
-              </> : <td colSpan="4" className="px-3 py-3 text-on-surface-variant">Belum ada data sensor hari ini.</td>}
-            </tr>)}</tbody>
-          </table>
-          <p className="border-t border-outline-variant/40 px-3 py-2 text-xs text-on-surface-variant">Jumlah device/sensor diringkas dari seluruh titik 5 menit yang tersedia.</p>
-        </div>}
+        : <>
+          <Table
+            caption="Ringkasan pembacaan per area"
+            columns={[
+              { key: 'areaRef', label: 'Area', render: row => <span className="font-semibold">{row.areaRef}</span> },
+              { key: 'sensor', label: 'Sensor', render: row => <span className="text-text-2">{sensorLabel(row.sensor)}{row.sensor.unit ? ` (${row.sensor.unit})` : ''}</span> },
+              { key: 'min', label: 'Minimum', align: 'end', num: true, render: row => row.summary ? formatSensorNumber(row.summary.min, row.sensor.decimals ?? 2) : <span className="font-body text-text-2">Belum ada data sensor hari ini.</span> },
+              { key: 'avg', label: 'Rata-rata', align: 'end', num: true, render: row => row.summary ? <b className="font-semibold">{formatSensorNumber(row.summary.avg, row.sensor.decimals ?? 2)}</b> : '' },
+              { key: 'max', label: 'Maksimum', align: 'end', num: true, render: row => row.summary ? formatSensorNumber(row.summary.max, row.sensor.decimals ?? 2) : '' },
+              { key: 'n', label: 'Sampel', align: 'end', num: true, render: row => row.summary ? <span className="text-text-2">{row.summary.n}</span> : '' },
+            ]}
+            rows={areaRows.map(row => ({ ...row, id: `${row.areaRef}:${row.sensor.code}` }))}
+          />
+          <p className="text-sm text-text-2">Jumlah device/sensor diringkas dari seluruh titik 5 menit yang tersedia.</p>
+        </>}
     </div>;
   }
 
-  if (catalogState === 'disabled') return <Card><SectionTitle title="Monitoring memerlukan mode API" subtitle="Data contoh tidak ditampilkan sebagai telemetry." /></Card>;
-  if (catalogState === 'loading') return <Card><p role="status" className="text-sm text-on-surface-variant">Memuat perangkat dan jenis sensor...</p></Card>;
-  if (catalogState === 'error') return <ErrorPanel message={catalogError} onRetry={retryCatalog} />;
+  const pageHeader = <PageHeader
+    title="Monitoring"
+    subtitle="Pilih cara membaca kondisi sensor, lalu buka alat untuk tindak lanjut."
+    actions={alatPerhatian > 0 && <StatusPill tone="warn" icon="triangle-alert" solid>{alatPerhatian} alat perlu perhatian</StatusPill>}
+  />;
+
+  if (catalogState === 'disabled') return <div className="iot-touch-targets min-w-0">{pageHeader}<Alert tone="info" title="Monitoring memerlukan mode API.">Data contoh tidak ditampilkan sebagai telemetry.</Alert></div>;
+  if (catalogState === 'loading') return <div className="iot-touch-targets min-w-0">{pageHeader}<Card><p role="status" className="text-sm text-text-2">Memuat perangkat dan jenis sensor...</p></Card></div>;
+  if (catalogState === 'error') return <div className="iot-touch-targets min-w-0">{pageHeader}<ErrorPanel message={catalogError} onRetry={retryCatalog} /></div>;
 
   return (
-    <div className="iot-touch-targets min-w-0 space-y-4">
-      <Card pad="sm">
-        <SectionTitle title="Monitoring" subtitle="Pilih cara membaca kondisi sensor, lalu buka perangkat untuk tindak lanjut." />
-        <div role="tablist" aria-label="Tampilan Monitoring" className="flex min-w-0 flex-wrap gap-2">
-          {TABS.map(tab => <button
-            key={tab.id}
-            id={`monitoring-tab-${tab.id}`}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            aria-controls={`monitoring-panel-${tab.id}`}
-             tabIndex={activeTab === tab.id ? 0 : -1}
-             onClick={() => setActiveTab(tab.id)}
-             onKeyDown={event => {
-               const nextId = nextTabId(tab.id, event.key);
-               if (!nextId) return;
-               event.preventDefault();
-               setActiveTab(nextId);
-               document.getElementById(`monitoring-tab-${nextId}`)?.focus();
-             }}
-            className={`min-h-11 rounded-xl border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:focus-visible:ring-inverse-primary ${activeTab === tab.id ? 'border-primary bg-primary text-white dark:border-inverse-primary dark:bg-inverse-primary dark:text-background' : 'border-outline-variant/60 bg-surface text-on-surface hover:bg-surface-container'}`}
-          >{tab.label}</button>)}
+    <div className="iot-touch-targets min-w-0">
+      {pageHeader}
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0">
+          <Tabs tabs={TABS} value={activeTab} onChange={setActiveTab} label="Tampilan Monitoring">
+            {activeTab === 'package' && renderPackageTab()}
+            {activeTab === 'sensor' && renderSensorTab()}
+            {activeTab === 'area' && renderAreaTab()}
+          </Tabs>
         </div>
-      </Card>
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(19rem,0.85fr)]">
-        <section role="tabpanel" id={`monitoring-panel-${activeTab}`} aria-labelledby={`monitoring-tab-${activeTab}`} className="min-w-0">
-          {activeTab === 'package' && renderPackageTab()}
-          {activeTab === 'sensor' && renderSensorTab()}
-          {activeTab === 'area' && renderAreaTab()}
-        </section>
         <aside className="min-w-0" aria-label="Panel Log kejadian">
           <EventLogPanel
             events={events}
