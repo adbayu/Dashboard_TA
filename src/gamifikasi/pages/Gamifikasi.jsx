@@ -1,8 +1,37 @@
+import clsx from 'clsx';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSmart } from '../../shared/store/SmartStore';
 import { missionActivityDestination } from '../model/missionNavigation.js';
-import { Badge, Bar, Button, Card, Empty, Modal, SectionTitle, StatCard, Table } from '../../shared/components/ui';
+import { Bar, Button, Card, EmptyState, Modal, PageHeader, StatusPill, Table } from '../../shared/components/ui';
+import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
+import { FOKUS } from '../../shared/components/ui/tones.js';
+
+const angka = (value) => Number(value || 0).toLocaleString('id-ID');
+// Dua kartu sejajar yang turun menjadi satu kolom di layar sempit (artboard misi-poin).
+const KISI_DUA = 'grid items-start gap-6 grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))]';
+
+// Status badge selalu teks + ikon.
+function statusBadge(badge, points) {
+  if (badge.claimed) return { tone: 'ok', icon: 'circle-check', text: 'Diklaim' };
+  if (points >= badge.minPoints) return { tone: 'info', icon: 'sparkles', text: 'Siap diklaim' };
+  return { tone: 'muted', icon: 'lock', text: 'Terkunci' };
+}
+
+function KotakIkonBadge({ badge, unlocked, besar = false }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={clsx(
+        'grid shrink-0 place-items-center rounded-control',
+        besar ? 'h-20 w-20' : 'h-10 w-10',
+        unlocked ? 'bg-primary text-on-primary' : 'bg-surface-2 text-text-2',
+      )}
+    >
+      <IkonSlot icon={badge.icon} size={besar ? 36 : 20} />
+    </span>
+  );
+}
 
 export default function Gamifikasi() {
   const { points, badges, missions, leaderboard, ledger, claimBadge, currentUser, areasSaya } = useSmart();
@@ -15,183 +44,160 @@ export default function Gamifikasi() {
   );
   const myRank = leaderboard.findIndex((row) => row.id === currentUser?.id) + 1;
   const doneMissions = missions.filter((m) => m.done).length;
-
-
-  const progressToNext = nextBadge ? Math.min(100, Math.round((points / nextBadge.minPoints) * 100)) : 100;
+  const claimedBadges = badges.filter((b) => b.claimed).length;
 
   const bukaAktivitasMisi = (mission) => {
     const destination = missionActivityDestination(mission, areasSaya);
     navigate(destination.path, destination.state ? { state: destination.state } : undefined);
   };
 
+  const subjudul = myRank
+    ? `Poin Anda ${angka(points)}. Peringkat ${myRank} dari ${leaderboard.length} pengguna.`
+    : `Poin Anda ${angka(points)}. Belum masuk papan peringkat.`;
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
-        <StatCard label="Poin Anda" value={points.toLocaleString('id-ID')} icon="stars" hint="Dari seluruh aktivitas farm" />
-        <StatCard label="Peringkat" value={myRank || '·'} unit={`/ ${leaderboard.length}`} icon="leaderboard" hint="Papan peringkat pengguna" />
-        <StatCard label="Misi Selesai" value={`${doneMissions}/${missions.length}`} icon="task_alt" hint="Status dari aktivitas kolam hari ini" />
-        <StatCard label="Badge Terkumpul" value={badges.filter((b) => b.claimed).length} unit={`/ ${badges.length}`} icon="military_tech" hint="Klaim di bawah" />
-      </div>
+    <div>
+      <PageHeader title="Misi & poin" subtitle={subjudul} />
 
-      <div className="grid gap-4 lg:grid-cols-[2fr,1.4fr]">
-        <Card>
-          <SectionTitle
-            eyebrow="Misi Harian"
-            title="Aktivitas kolam hari ini"
-            subtitle="Klik misi untuk membuka aktivitas terkait. Status selesai setelah aktivitas disimpan; misi tidak memberi bonus poin tambahan."
-          />
-          <ul className="space-y-2">
-            {missions.map((mission) => (
-              <li key={mission.id}>
-                <button
-                  type="button"
-                  onClick={() => bukaAktivitasMisi(mission)}
-                  aria-label={`Buka aktivitas ${mission.title}. Status: ${mission.done ? 'selesai' : 'belum selesai'}.`}
-                  title="Buka aktivitas terkait"
-                  className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                    mission.done ? 'border-emerald-300/60 bg-emerald-50/60 dark:bg-emerald-900/20' : 'border-outline-variant/40'
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center ${
-                      mission.done ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-outline-variant'
-                    }`}
+      <div className="flex flex-col gap-8">
+        <div className={KISI_DUA}>
+          <Card
+            title="Misi harian"
+            subtitle={`${doneMissions} dari ${missions.length} selesai. Klik misi untuk membuka aktivitas terkait. Status selesai setelah aktivitas disimpan; misi tidak memberi bonus poin tambahan.`}
+          >
+            <ul className="m-0 list-none p-0">
+              {missions.map((mission) => (
+                <li key={mission.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border py-3 first:border-t-0 first:pt-0">
+                  <div className="min-w-0 flex-[1_1_220px]">
+                    <p className={clsx('font-semibold', mission.done ? 'text-text-2 line-through' : 'text-text')}>{mission.title}</p>
+                    <p className="text-sm text-text-2">Sasaran: {mission.target.replaceAll('-', ' ')}</p>
+                  </div>
+                  {mission.done
+                    ? <StatusPill tone="ok" icon="circle-check">Selesai</StatusPill>
+                    : <StatusPill tone="muted" icon="circle-minus">Belum</StatusPill>}
+                  <Button
+                    size="sm"
+                    variant={mission.done ? 'ghost' : 'secondary'}
+                    onClick={() => bukaAktivitasMisi(mission)}
+                    aria-label={`Buka aktivitas ${mission.title}. Status: ${mission.done ? 'selesai' : 'belum selesai'}.`}
+                    title="Buka aktivitas terkait"
                   >
-                    {mission.done && <span className="material-symbols-outlined text-[16px]">check</span>}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className={`block text-sm font-bold ${mission.done ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>{mission.title}</span>
-                    <span className="block text-[11px] text-on-surface-variant">Sasaran: {mission.target.replaceAll('-', ' ')}</span>
-                  </span>
-                  <Badge tone={mission.done ? 'ok' : 'brand'}>{mission.done ? 'Selesai' : 'Belum'}</Badge>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center justify-between text-sm font-bold">
-              <span className="text-primary flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px]">trending_up</span>
-                Menuju badge berikutnya
-              </span>
-              <span className="text-on-surface">{nextBadge ? nextBadge.name : 'Semua badge terbuka'}</span>
-            </div>
-            <div className="mt-2">
-              <Bar value={progressToNext} label="Menuju badge berikutnya" />
-            </div>
-            <p className="text-[11px] text-on-surface-variant mt-2">
-              {nextBadge ? `${points.toLocaleString('id-ID')} / ${nextBadge.minPoints.toLocaleString('id-ID')} point` : 'Anda sudah mengumpulkan seluruh badge demo.'}
-            </p>
-          </div>
-        </Card>
-
-        <Card>
-          <SectionTitle eyebrow="Badge" title="Koleksi pencapaian" subtitle="Badge terbuka saat poin Anda mencapai ambangnya." />
-          <div className="space-y-3">
-            {badges.map((badge) => {
-              const unlocked = points >= badge.minPoints;
-              return (
-                <button
-                  key={badge.id}
-                  onClick={() => setOpenBadge(badge)}
-                  className={`w-full text-left rounded-2xl border p-3 transition-all ${
-                    unlocked ? 'border-primary/30 bg-primary/5 hover:shadow-glass' : 'border-outline-variant/40 opacity-70'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        unlocked ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[22px]">{badge.icon}</span>
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-on-surface">{badge.name}</p>
-                      <p className="text-[11px] text-on-surface-variant">
-                        {badge.minPoints.toLocaleString('id-ID')} point · {badge.desc}
-                      </p>
-                    </div>
-                    {badge.claimed ? <Badge tone="ok">Diklaim</Badge> : unlocked ? <Badge tone="brand">Siap</Badge> : <Badge>Belum</Badge>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <SectionTitle eyebrow="Papan Peringkat" title="Pengguna paling aktif" subtitle="Peringkat dihitung dari total poin yang dikumpulkan." />
-          {leaderboard.length === 0 ? (
-            <Empty title="Belum ada data peringkat" icon="leaderboard" />
-          ) : (
-            <Table head={['#', 'Pengguna', 'Area', 'Poin']}>
-              {[...leaderboard]
-                .sort((a, b) => b.points - a.points)
-                .map((row, index) => (
-                  <tr key={row.id} className={row.id === currentUser?.id ? 'bg-primary/5' : 'hover:bg-primary/5'}>
-                    <td className="px-3 py-2 font-extrabold text-on-surface">
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                    </td>
-                    <td className="px-3 py-2 font-semibold text-on-surface">{row.name}</td>
-                    <td className="px-3 py-2 text-on-surface-variant">{row.area}</td>
-                    <td className="px-3 py-2 font-bold text-primary">{row.points.toLocaleString('id-ID')}</td>
-                  </tr>
-                ))}
-            </Table>
-          )}
-        </Card>
-
-        <Card>
-          <SectionTitle eyebrow="Riwayat Poin" title="Aktivitas terakhir" subtitle="Setiap aktivitas farm otomatis memberi poin ke akun Anda." />
-          {ledger.length === 0 ? (
-            <Empty title="Belum ada riwayat poin" icon="history" />
-          ) : (
-            <ul className="space-y-2">
-              {ledger.slice(0, 8).map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-xl border border-outline-variant/40 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-on-surface">{row.activity}</p>
-                    <p className="text-[11px] text-on-surface-variant">{row.at}</p>
-                  </div>
-                  <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">+{row.points}</span>
+                    {mission.done ? 'Lihat aktivitas' : 'Buka aktivitas'}
+                  </Button>
                 </li>
               ))}
             </ul>
-          )}
-          <div className="mt-4 flex items-center gap-3 rounded-xl panel-inset p-3">
-            <span className="material-symbols-outlined text-primary">pets</span>
-            <p className="text-[11px] text-on-surface-variant">
+
+            <div className="mt-2 flex flex-col gap-2 border-t border-border pt-4">
+              <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-sm font-semibold text-text">
+                <span>{nextBadge ? `Menuju badge ${nextBadge.name}` : 'Semua badge terbuka'}</span>
+                {nextBadge && <span className="font-num">{angka(points)} / {angka(nextBadge.minPoints)} poin</span>}
+              </div>
+              <Bar value={nextBadge ? points : 1} max={nextBadge ? nextBadge.minPoints : 1} label="Menuju badge berikutnya" />
+              <p className="text-sm text-text-2">
+                {nextBadge
+                  ? `Kurang ${angka(nextBadge.minPoints - points)} poin lagi.`
+                  : 'Anda sudah mengumpulkan seluruh badge demo.'}
+              </p>
+            </div>
+          </Card>
+
+          <Card title="Badge" subtitle={`${claimedBadges} dari ${badges.length} diklaim. Badge terbuka saat poin Anda mencapai ambangnya.`}>
+            <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
+              {badges.map((badge) => {
+                const unlocked = points >= badge.minPoints;
+                const status = statusBadge(badge, points);
+                return (
+                  <button
+                    key={badge.id}
+                    type="button"
+                    onClick={() => setOpenBadge(badge)}
+                    aria-label={`Detail badge ${badge.name}. Status: ${status.text}.`}
+                    className={clsx(
+                      'flex flex-col gap-2.5 rounded-card border bg-surface p-3.5 text-left text-text hover:bg-surface-2',
+                      unlocked ? 'border-border' : 'border-dashed border-text-2',
+                      FOKUS,
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      <KotakIkonBadge badge={badge} unlocked={unlocked} />
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{badge.name}</span>
+                        <span className="block font-num text-sm text-text-2">{angka(badge.minPoints)} poin</span>
+                      </span>
+                    </span>
+                    <span className="text-sm text-text-2">{badge.desc}.</span>
+                    <StatusPill tone={status.tone} icon={status.icon}>{status.text}</StatusPill>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+
+        <div className={KISI_DUA}>
+          <Card title="Papan peringkat" subtitle="Peringkat dihitung dari total poin yang dikumpulkan.">
+            {leaderboard.length === 0 ? (
+              <EmptyState title="Belum ada data peringkat" icon="trophy" />
+            ) : (
+              <Table head={['Peringkat', 'Pengguna', 'Area', 'Poin']}>
+                {[...leaderboard]
+                  .sort((a, b) => b.points - a.points)
+                  .map((row, index) => {
+                    const saya = row.id === currentUser?.id;
+                    return (
+                      <tr key={row.id} className={saya ? 'bg-surface-2' : 'hover:bg-surface-2'}>
+                        <td className="px-3 py-2 font-num font-semibold tabular-nums">{index + 1}</td>
+                        <td className="px-3 py-2">
+                          <span className="font-semibold">{row.name}</span>
+                          {saya && <StatusPill tone="info" icon="user" className="ml-2">Anda</StatusPill>}
+                        </td>
+                        <td className="px-3 py-2 text-text-2">{row.area}</td>
+                        <td className="px-3 py-2 font-num font-semibold tabular-nums">{angka(row.points)}</td>
+                      </tr>
+                    );
+                  })}
+              </Table>
+            )}
+          </Card>
+
+          <Card title="Riwayat poin" subtitle="Setiap aktivitas farm otomatis memberi poin ke akun Anda.">
+            {ledger.length === 0 ? (
+              <EmptyState title="Belum ada riwayat poin" icon="history" />
+            ) : (
+              <ul className="m-0 list-none p-0">
+                {ledger.slice(0, 8).map((row) => (
+                  <li key={row.id} className="flex items-center justify-between gap-3 border-t border-border py-2.5 first:border-t-0">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-text">{row.activity}</p>
+                      <p className="text-sm text-text-2">{row.at}</p>
+                    </div>
+                    <span className="shrink-0 font-num font-bold text-ok-fg">+{row.points}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 border-t border-border pt-3 text-sm text-text-2">
               Quest kolam memberi EXP kepada pet; poin farm tetap terpisah di saldo akun.
             </p>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
 
       <Modal open={!!openBadge} onClose={() => setOpenBadge(null)} title={openBadge?.name || 'Detail badge'}>
         {openBadge && (
-          <div className="space-y-4 text-center">
-            <span
-              className={`w-20 h-20 rounded-2xl inline-flex items-center justify-center ${
-                points >= openBadge.minPoints ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[40px]">{openBadge.icon}</span>
-            </span>
-            <p className="text-sm text-on-surface-variant">{openBadge.desc}</p>
-            <p className="text-sm">
-              Butuh <strong className="text-on-surface">{openBadge.minPoints.toLocaleString('id-ID')}</strong> point · poin Anda saat ini{' '}
-              <strong className="text-on-surface">{points.toLocaleString('id-ID')}</strong>
+          <div className="flex flex-col items-center gap-4 text-center">
+            <KotakIkonBadge badge={openBadge} unlocked={points >= openBadge.minPoints} besar />
+            <p className="text-sm text-text-2">{openBadge.desc}</p>
+            <p className="text-sm text-text">
+              Butuh <span className="font-num font-semibold">{angka(openBadge.minPoints)}</span> poin · poin Anda saat ini{' '}
+              <span className="font-num font-semibold">{angka(points)}</span>
             </p>
             {openBadge.claimed ? (
-              <Badge tone="ok">Sudah diklaim</Badge>
+              <StatusPill tone="ok" icon="circle-check">Sudah diklaim</StatusPill>
             ) : (
               <Button
-                icon="military_tech"
+                icon="medal"
                 onClick={() => {
                   claimBadge(openBadge);
                   setOpenBadge(null);

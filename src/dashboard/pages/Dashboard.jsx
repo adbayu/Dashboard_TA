@@ -1,433 +1,476 @@
+import clsx from 'clsx';
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
-import { Badge, Bar, Card, Empty, SectionTitle, StatCard, STATUS_LABEL, STATUS_TONE, Table } from '../../shared/components/ui';
+import { Alert, Card, EmptyState, PageHeader, STATUS_LABEL, STATUS_TONE, StatusPill, Table } from '../../shared/components/ui';
+import { Icon } from '../../shared/components/Icon.jsx';
+import { FOKUS } from '../../shared/components/ui/tones.js';
+import AreaSection from '../../components/iot/AreaSection.jsx';
+import ReadingChart from '../../components/iot/ReadingChart.jsx';
+import SensorReading from '../../components/iot/SensorReading.jsx';
+import TaskList from '../../components/iot/TaskList.jsx';
+import { formatSensorNumber } from '../../utils/iotPresentation.js';
+import { missionActivityDestination } from '../../gamifikasi/model/missionNavigation.js';
 
-const WARNA_STATUS = { aman: 'ok', waspada: 'warn', bahaya: 'bad', 'tanpa-ambang': 'muted' };
-const TEKS_STATUS = { aman: 'Aman', waspada: 'Waspada', bahaya: 'Keluar ambang', 'tanpa-ambang': 'Tanpa ambang' };
-const angka = (value, digit) => (value == null ? '·' : Number(value).toFixed(digit));
+// Status rekap harian dari store (aman | waspada | bahaya | tanpa-ambang | tanpa-data):
+// selalu teks + ikon, tidak pernah hanya warna.
+const STATUS_REKAP = {
+  aman: { tone: 'ok', icon: 'circle-check', text: 'Aman' },
+  waspada: { tone: 'warn', icon: 'triangle-alert', text: 'Waspada' },
+  bahaya: { tone: 'bad', icon: 'circle-alert', text: 'Keluar ambang' },
+  'tanpa-ambang': { tone: 'muted', icon: 'circle-minus', text: 'Tanpa ambang' },
+  'tanpa-data': { tone: 'muted', icon: 'circle-minus', text: 'Tanpa data' },
+};
+const IKON_SENSOR = { ph: 'flask-conical', temp: 'thermometer', tds: 'droplet' };
+const STATUS_ALAT_IKON = { online: 'wifi', warning: 'triangle-alert', maintenance: 'wrench', offline: 'wifi-off' };
+
+const angka = (value, digit) => (value == null ? '·' : formatSensorNumber(value, digit));
+const jenisArea = (area) => (area?.type === 'growbed' ? 'leaf' : 'water');
+const labelPendek = (key) => METRIC_META[key].label.replace(' Air', '').replace(' Nutrisi', '');
+
+// Tautan berbentuk tombol: atribut data-ui/data-variant sama dengan Button
+// supaya perlakuan tema (mis. glow Lumina) ikut menempel.
+const TAUTAN_TOMBOL = clsx(
+  'inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-transparent bg-primary px-4 text-[15px] font-semibold text-on-primary hover:bg-primary-hover',
+  FOKUS,
+);
+const TAUTAN = clsx('rounded-sm font-semibold text-primary underline decoration-1 underline-offset-[3px] hover:text-primary-hover', FOKUS);
+
+const tanggalHariIni = () =>
+  new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+
+// Titik 24 jam terakhir dari riwayat pembacaan (satu titik tiap 30 menit).
+// `at` disimpan sebagai waktu lokal "YYYY-MM-DDTHH:MM", jadi batasnya dibuat
+// dengan format yang sama dan dibandingkan sebagai teks.
+function titik24Jam(readings, areaId, key) {
+  const batas = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const mulai = `${batas.getFullYear()}-${pad(batas.getMonth() + 1)}-${pad(batas.getDate())}T${pad(batas.getHours())}:${pad(batas.getMinutes())}`;
+  return (readings || [])
+    .filter((r) => r.areaId === areaId && r.at >= mulai && Number.isFinite(Number(r.readings?.[key])))
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+    .map((r) => {
+      const v = Number(r.readings[key]);
+      return { t: r.at, min: v, max: v, avg: v };
+    });
+}
 
 export default function Dashboard() {
   const {
-    areasSaya, devices, categories, monitoring, hppTotal, pet, points, activeAlerts, missions,
-    statistikArea, totalKematianHariIni, kematianArea, historiArea,
+    areasSaya, devices, categories, monitoring, hppTotal, pet, points, activeAlerts, missions, readings,
+    statistikArea, kematianArea, historiArea,
   } = useSmart();
+  const navigate = useNavigate();
   const areas = areasSaya;
 
-  const metrics = useMemo(() => {
-    // Ambil sensor dari AREA YANG DIAMPU pengguna saja. Sebelumnya diambil dari
-    // seluruh device, sehingga operator bisa melihat pembacaan kolam milik
-    // operator lain di dashboardnya.
-    const byKey = {};
-    for (const key of METRIC_KEYS) {
-      byKey[key] = devices.find((d) => d.metric?.key === key && areas.some((a) => a.id === d.areaId));
-    }
-    return byKey;
-  }, [devices, areas]);
-
-  const totalHpp = areas.reduce((sum, area) => sum + hppTotal(area.id).total, 0);
-  const doneMissions = missions.filter((m) => m.done).length;
-  const waterVolume = areas.reduce((sum, a) => sum + Number(a.volume || 0), 0);
-  const matiHariIni = totalKematianHariIni();
-  const areaBerSensor = areas.filter((a) => devices.some((d) => d.areaId === a.id && d.metric));
-  // Catatan yang tampil hanya dari area yang diampu pengguna ini.
-  const idAreaSaya = new Set(areas.map((a) => a.id));
+  // Catatan dan sensor yang tampil hanya dari area yang diampu pengguna ini.
+  // Sebelumnya sensor diambil dari seluruh device, sehingga operator bisa
+  // melihat pembacaan kolam milik operator lain di dashboardnya.
+  const idAreaSaya = useMemo(() => new Set(areas.map((a) => a.id)), [areas]);
   const monitoringSaya = monitoring.filter((m) => idAreaSaya.has(m.areaId));
+  const areaBerSensor = areas.filter((a) => devices.some((d) => d.areaId === a.id && d.metric));
+  const totalHpp = areas.reduce((sum, area) => sum + hppTotal(area.id).total, 0);
+  const waterVolume = areas.reduce((sum, a) => sum + Number(a.volume || 0), 0);
+  const doneMissions = missions.filter((m) => m.done).length;
 
-  // Ambang memakai helper bersama di store — jangan membuat daftar ambang
-  // sendiri di sini, karena itu membuat halaman ini menilai "Ideal/Keluar
-  // ambang" berbeda dari List IoT dan statistik harian.
-  const nilaiTelemetri = (device) => {
-    if (!device?.metric) return { tone: 'muted', text: 'Belum ada data' };
-    const { value, key } = device.metric;
-    const ambang = ambangUntuk(
-      areas.find((a) => a.id === device.areaId),
-      categories.find((c) => c.id === device.categoryId),
-      key,
-    );
-    if (!ambang) return { tone: 'muted', text: 'Tanpa ambang' };
-    const posisi = nilaiTerhadapAmbang(value, ambang);
-    if (posisi === 'dalam') return { tone: 'ok', text: 'Ideal' };
-    return { tone: 'warn', text: posisi === 'atas' ? 'Di atas ambang' : 'Di bawah ambang' };
+  // Satu bacaan per sensor di area saya. Ambang memakai helper bersama di
+  // store, jangan membuat daftar ambang sendiri di sini, supaya halaman ini
+  // menilai "dalam/luar batas" sama dengan List IoT dan statistik harian.
+  const bacaan = useMemo(
+    () =>
+      devices
+        .filter((d) => d.metric && METRIC_KEYS.includes(d.metric.key) && idAreaSaya.has(d.areaId))
+        .map((device) => {
+          const area = areas.find((a) => a.id === device.areaId);
+          const ambang = ambangUntuk(area, categories.find((c) => c.id === device.categoryId), device.metric.key);
+          const value = Number(device.metric.value);
+          return { device, area, key: device.metric.key, value, ambang, posisi: nilaiTerhadapAmbang(value, ambang) };
+        }),
+    [devices, areas, categories, idAreaSaya],
+  );
+  const diLuarBatas = bacaan.filter((b) => b.posisi === 'atas' || b.posisi === 'bawah');
+
+  // ── Ringkasan: semua angka dihitung dari data, bukan teks tetap ──────────────
+  const alatOnline = devices.filter((d) => d.status === 'online').length;
+  const perStatus = activeAlerts.reduce((acc, d) => ({ ...acc, [d.status]: (acc[d.status] || 0) + 1 }), {});
+  const metaRingkasan = [
+    `${alatOnline} dari ${devices.length} alat mengirim data`,
+    ...Object.entries(perStatus).map(([status, jumlah]) => `${jumlah} ${(STATUS_LABEL[status] || status).toLowerCase()}`),
+  ].join(' · ');
+
+  const kalimatBacaan = (b) => {
+    const meta = METRIC_META[b.key];
+    const batas = b.posisi === 'atas' ? b.ambang[1] : b.ambang[0];
+    return `${meta.label} di ${b.area?.name || b.device.code} ${formatSensorNumber(b.value, meta.precision)} ${meta.unit}, ${b.posisi === 'atas' ? 'di atas' : 'di bawah'} batas ${formatSensorNumber(batas, meta.precision)} ${meta.unit}.`;
+  };
+
+  let ringkasan;
+  if (diLuarBatas.length > 0) {
+    const utama = diLuarBatas[0];
+    ringkasan = {
+      tone: 'warn',
+      title: `${diLuarBatas.length} parameter perlu dicek.`,
+      body: `${kalimatBacaan(utama)}${diLuarBatas.length > 1 ? ` Lainnya: ${diLuarBatas.slice(1).map((b) => `${labelPendek(b.key)} di ${b.area?.name}`).join(', ')}.` : ''}`,
+      action: { to: `/iot/${encodeURIComponent(utama.device.id)}/log`, label: `Lihat log ${labelPendek(utama.key)}` },
+    };
+  } else if (activeAlerts.length > 0) {
+    ringkasan = {
+      tone: 'warn',
+      title: `${activeAlerts.length} alat perlu dicek.`,
+      body: activeAlerts.map((d) => `${d.name} (${(STATUS_LABEL[d.status] || d.status).toLowerCase()})`).join(', ') + '.',
+      action: { to: '/iot', label: 'Lihat alat' },
+    };
+  } else if (bacaan.length > 0) {
+    ringkasan = {
+      tone: 'ok',
+      title: 'Semua parameter dalam batas.',
+      body: `${bacaan.length} sensor di ${areaBerSensor.length} area terbaca di dalam ambang ideal.`,
+      action: { to: '/iot', label: 'Lihat semua alat' },
+    };
+  } else {
+    ringkasan = {
+      tone: 'info',
+      title: 'Belum ada sensor di area Anda.',
+      body: 'Pasang alat pH, suhu, atau TDS di sebuah area agar pantauan terisi.',
+      action: { to: '/iot', label: 'Lihat semua alat' },
+    };
+  }
+
+  // Grafik: parameter yang keluar batas lebih dulu, selain itu sensor pertama.
+  const fokus = diLuarBatas[0] || bacaan[0] || null;
+  const fokusMeta = fokus ? METRIC_META[fokus.key] : null;
+  const titikFokus = fokus ? titik24Jam(readings, fokus.device.areaId, fokus.key) : [];
+
+  const tugas = missions.map((m) => ({ id: m.id, label: m.title, done: m.done, note: m.done ? 'Selesai' : 'Pilih untuk membuka aktivitasnya' }));
+  const bukaAktivitasMisi = (index) => {
+    const destination = missionActivityDestination(missions[index], areas);
+    navigate(destination.path, destination.state ? { state: destination.state } : undefined);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Sambutan + kondisi utama */}
-      <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-        <Card className="bg-gradient-to-br from-primary/10 to-transparent">
-          <SectionTitle
-            eyebrow="Ringkasan Hari Ini"
-            title="Kondisi farm aquaponik Anda"
-            subtitle="Sistem kolam + IoT yang menyatukan budidaya ikan dan sayur dalam satu siklus air."
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Area Aktif" value={areas.filter((a) => a.status === 'aktif').length} unit={`/ ${areas.length}`} icon="water" hint="Kolam, growbed, tandon" />
-            <StatCard label="Device Online" value={devices.filter((d) => d.status === 'online').length} unit={`/ ${devices.length}`} icon="sensors" hint="Telemetri 5 detik" />
-            <StatCard label="Total Poin" value={points.toLocaleString('id-ID')} icon="stars" hint={`${doneMissions}/${missions.length} misi selesai`} />
-            <StatCard
-              label="Ikan Mati Hari Ini"
-              value={matiHariIni}
-              unit="ekor"
-              icon="heart_broken"
-              tone={matiHariIni > 0 ? 'bad' : 'ok'}
-              hint={matiHariIni > 0 ? 'Diisi manual di Kelola Area' : 'Belum ada laporan hari ini'}
-            />
-          </div>
-        </Card>
+    <div>
+      <PageHeader title="Pantauan hari ini" subtitle={tanggalHariIni()} />
 
-        <Card>
-          <SectionTitle eyebrow="Virtual Pet" title={pet.name} subtitle={`${pet.species} · Level ${pet.level} (${pet.stage})`} />
-          <div className="space-y-3">
-            {[
-              { label: 'Kenyang', value: pet.hunger, tone: pet.hunger < 40 ? 'bad' : 'brand' },
-              { label: 'Kebahagiaan', value: pet.happiness, tone: 'info' },
-              { label: 'Kebersihan', value: pet.hygiene, tone: pet.hygiene < 40 ? 'warn' : 'brand' },
-              { label: 'Kesehatan', value: pet.health, tone: pet.health < 50 ? 'bad' : 'brand' },
-            ].map((row) => (
-              <div key={row.label}>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-on-surface-variant">{row.label}</span>
-                  <span className="text-on-surface">{row.value}%</span>
-                </div>
-                <Bar value={row.value} tone={row.tone} label={row.label} />
-              </div>
-            ))}
-          </div>
-          <Link to="/v-pet" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
-            Rawat pet sekarang <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+      <Alert
+        tone={ringkasan.tone}
+        title={ringkasan.title}
+        className="mb-7"
+        meta={(
+          <>
+            <Icon name="clock" size={16} />
+            {metaRingkasan}
+          </>
+        )}
+        action={(
+          <Link to={ringkasan.action.to} data-ui="button" data-variant="primary" className={TAUTAN_TOMBOL}>
+            {ringkasan.action.label}
           </Link>
-        </Card>
-      </div>
+        )}
+      >
+        {ringkasan.body}
+      </Alert>
 
-      {/* Pembacaan sensor kunci — hanya 3 parameter yang benar-benar diukur */}
-      <Card>
-        <SectionTitle
-          eyebrow="Telemetri Kunci"
-          title="Parameter air kolam"
-          subtitle="Tiga sensor terpasang di farm ini: pH, suhu air, dan TDS. Nilai bergerak otomatis tiap 5 detik (simulasi)."
-          action={
-            <Link to="/iot" className="text-sm font-bold text-primary hover:underline">
-              Lihat semua device
-            </Link>
-          }
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {METRIC_KEYS.map((key) => {
-            const device = metrics[key];
-            const meta = METRIC_META[key];
-            const health = nilaiTelemetri(device);
-            const ambang = device
-              ? ambangUntuk(
-                  areas.find((a) => a.id === device.areaId),
-                  categories.find((c) => c.id === device.categoryId),
-                  key,
-                )
-              : null;
-            return (
-              <div key={key} className="rounded-2xl panel-inset p-4">
-                <div className="flex items-center justify-between">
-                  <span className="material-symbols-outlined text-primary text-[22px]">{meta.icon}</span>
-                  <Badge tone={health.tone}>{health.text}</Badge>
-                </div>
-                <p className="mt-2 text-2xl font-extrabold text-on-surface">
-                  {device?.metric?.value ?? '·'} <small className="text-xs font-semibold text-on-surface-variant">{meta.unit}</small>
-                </p>
-                <p className="text-xs font-semibold text-on-surface-variant">{meta.label}</p>
-                <p className="text-[11px] text-outline mt-1">{device ? device.code : 'Belum terpasang'}</p>
-                {/* Ambang ditampilkan supaya label Ideal/Keluar ambang bisa dicek
-                    sendiri oleh pengguna, bukan angka yang muncul tiba-tiba. */}
-                <p className="text-[11px] text-outline mt-1">
-                  {ambang
-                    ? `Ambang ideal ${ambang[0]}–${ambang[1]} ${meta.unit}${device?.areaId ? '' : ' (belum ditempatkan)'}`
-                    : 'Ambang belum diatur'}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Statistik harian kolam */}
-      <Card>
-        <SectionTitle
-          eyebrow="Statistik Harian"
-          title="Rekap kondisi kolam hari ini"
-          subtitle="Nilai terendah, rata-rata, dan tertinggi tiap parameter, dihitung dari pembacaan sensor pH, suhu air, dan TDS hari ini."
-        />
-        {areaBerSensor.length === 0 ? (
-          <Empty
-            title="Belum ada kolam dengan sensor"
-            hint="Statistik harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
-            icon="sensors_off"
-          />
-        ) : (
-          <div className="space-y-4">
-            {areaBerSensor.map((area) => {
+      <div className="grid items-start gap-8 min-[900px]:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="flex min-w-0 flex-col gap-8">
+          {areaBerSensor.length === 0 ? (
+            <EmptyState title="Belum ada kolam dengan sensor" icon="sensors_off">
+              Pembacaan muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area.
+            </EmptyState>
+          ) : (
+            areaBerSensor.map((area) => {
               const stats = statistikArea(area.id);
               const mati = kematianArea(area.id);
               const matiJumlah = mati.reduce((sum, k) => sum + Number(k.jumlah || 0), 0);
+              const metaArea = [
+                `${Number(area.population).toLocaleString('id-ID')} ${area.populationUnit}`,
+                `mati hari ini ${matiJumlah} ekor`,
+                `${stats.jumlah} pembacaan hari ini${stats.jam ? `, terakhir ${stats.jam}` : ''}`,
+              ].join(' · ');
               return (
-                <div key={area.id} className="rounded-2xl border border-outline-variant/40 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-on-surface">{area.name}</h3>
-                      <p className="text-[11px] text-on-surface-variant">
-                        {area.location} · {stats.jumlah} pembacaan hari ini
-                        {stats.jam ? ` · terakhir ${stats.jam}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Badge tone={matiJumlah > 0 ? 'bad' : 'ok'} icon="heart_broken">
-                        Mati hari ini: {matiJumlah} ekor
-                      </Badge>
-                      <Link to={`/area/${area.id}`} className="text-sm font-bold text-primary hover:underline">
-                        Kelola
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid gap-3 sm:grid-cols-3 items-stretch">
-                    {stats.banding.map((row) => {
-                      const meta = METRIC_META[row.key];
-                      const s = row.stats;
+                <div key={area.id} className="min-w-0">
+                  <AreaSection area={jenisArea(area)} title={area.name} meta={metaArea}>
+                    {METRIC_KEYS.map((key) => {
+                      const b = bacaan.find((item) => item.device.areaId === area.id && item.key === key);
+                      if (!b) return null;
+                      const meta = METRIC_META[key];
+                      const status = b.device.status !== 'online'
+                        ? 'stale'
+                        : !b.ambang ? 'no-range' : b.posisi === 'atas' ? 'high' : b.posisi === 'bawah' ? 'low' : 'normal';
                       return (
-                        <div key={row.key} className="rounded-xl border border-outline-variant/40 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                              {meta.label}
-                            </span>
-                            {s && <Badge tone={WARNA_STATUS[row.status]}>{TEKS_STATUS[row.status]}</Badge>}
-                          </div>
-                          {s ? (
-                            <>
-                              <p className="mt-1 text-2xl font-extrabold text-on-surface">
-                                {angka(s.avg, meta.precision)}{' '}
-                                <small className="text-xs font-semibold text-on-surface-variant">{meta.unit} rata-rata</small>
-                              </p>
-                              <p className="text-[11px] text-on-surface-variant">
-                                Terendah {angka(s.min, meta.precision)} · Tertinggi {angka(s.max, meta.precision)}
-                              </p>
-                            </>
-                          ) : (
-                            <p className="mt-1 text-sm text-on-surface-variant">Belum ada pembacaan sensor ini hari ini.</p>
-                          )}
-                          {row.ambang && (
-                            <p className="text-[11px] text-outline mt-1">
-                              Ambang ideal {row.ambang[0]}–{row.ambang[1]} {meta.unit}
-                            </p>
-                          )}
-                        </div>
+                        <SensorReading
+                          key={key}
+                          name={meta.label}
+                          icon={IKON_SENSOR[key]}
+                          device={b.device.code}
+                          value={Number.isFinite(b.value) ? b.value : null}
+                          decimals={meta.precision}
+                          unit={meta.unit}
+                          min={b.ambang?.[0]}
+                          max={b.ambang?.[1]}
+                          status={status}
+                        />
                       );
                     })}
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-on-surface-variant">
-                    <span>
-                      Populasi sekarang:{' '}
-                      <strong className="text-on-surface">
-                        {Number(area.population).toLocaleString('id-ID')} {area.populationUnit}
-                      </strong>
-                    </span>
+                  </AreaSection>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-2">
                     {mati[0]?.catatan && (
                       <span>
-                        Catatan kematian: <strong className="text-on-surface">{mati[0].catatan}</strong>
+                        Catatan kematian: <span className="text-text">{mati[0].catatan}</span>
                       </span>
                     )}
+                    <Link to={`/area/${area.id}`} className={TAUTAN}>
+                      Kelola {area.name}
+                    </Link>
                   </div>
                 </div>
               );
-            })}
-            <p className="text-[11px] text-on-surface-variant">
-              Angka kematian ikan diisi manual melalui Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
-            </p>
-          </div>
-        )}
-      </Card>
+            })
+          )}
 
-      {/* ── Histori harian kolam ── */}
-      <Card>
-        <SectionTitle
-          eyebrow="Histori Harian"
-          title="Riwayat kondisi kolam per tanggal"
-          subtitle="Ringkasan tiap hari: rata-rata, terendah, dan tertinggi dari sensor pH, suhu air, dan TDS, lengkap dengan tanggal, bulan, dan tahunnya."
-        />
-        {areaBerSensor.length === 0 ? (
-          <Empty
-            title="Belum ada kolam dengan sensor"
-            hint="Histori harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
-            icon="sensors_off"
-          />
-        ) : (
-          <div className="space-y-6">
-            {areaBerSensor.map((area) => {
-              const histori = historiArea(area.id, 14);
-              return (
-                <div key={area.id}>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <h3 className="font-bold text-on-surface">{area.name}</h3>
-                    <span className="text-[11px] text-on-surface-variant">
-                      {histori.filter((h) => h.adaData).length} hari tercatat ·{' '}
-                      {angka(histori.reduce((s, h) => s + h.jumlah, 0), 0)} pembacaan tersimpan
-                    </span>
-                  </div>
-                  <Table head={['Tanggal', 'pH rata-rata', 'Suhu rata-rata', 'TDS rata-rata', 'Rentang hari ini', 'Ikan mati']}>
-                    {histori.map((h) => (
-                      <tr
-                        key={h.tanggal}
-                        className={h.hariIni ? 'bg-primary/5' : 'hover:bg-primary/5'}
-                      >
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="font-semibold text-on-surface">{h.label}</span>
-                          {h.hariIni && (
-                            <Badge tone="brand" className="ml-2">
-                              Hari ini
-                            </Badge>
-                          )}
-                        </td>
-                        {h.metrik.map((row) => {
-                          const meta = METRIC_META[row.key];
-                          const s = row.stats;
-                          return (
-                            <td key={row.key} className="px-3 py-2 whitespace-nowrap">
-                              {s ? (
-                                <>
-                                  <span className="font-semibold text-on-surface">
-                                    {angka(s.avg, meta.precision)}
-                                  </span>{' '}
-                                  <span className="text-[11px] text-on-surface-variant">{meta.unit}</span>
-                                  <span className="block text-[11px] text-on-surface-variant">
-                                    {angka(s.min, meta.precision)}–{angka(s.max, meta.precision)}
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-[11px] text-on-surface-variant">·</span>
+          {/* Statistik harian kolam */}
+          <Card
+            title="Rekap kondisi kolam hari ini"
+            subtitle="Nilai terendah, rata-rata, dan tertinggi tiap parameter, dihitung dari pembacaan sensor pH, suhu air, dan TDS hari ini."
+          >
+            {areaBerSensor.length === 0 ? (
+              <EmptyState
+                title="Belum ada kolam dengan sensor"
+                hint="Statistik harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
+                icon="sensors_off"
+              />
+            ) : (
+              <>
+                <Table head={['Area', 'Parameter', 'Rata-rata', 'Rentang', 'Ambang', 'Status']}>
+                  {areaBerSensor.flatMap((area) =>
+                    statistikArea(area.id).banding.map((row) => {
+                      const meta = METRIC_META[row.key];
+                      const s = row.stats;
+                      const status = STATUS_REKAP[s ? row.status : 'tanpa-data'] || STATUS_REKAP['tanpa-data'];
+                      return (
+                        <tr key={`${area.id}-${row.key}`} className="hover:bg-surface-2">
+                          <td className="whitespace-nowrap px-3 py-2 font-semibold">{area.name}</td>
+                          <td className="whitespace-nowrap px-3 py-2">{meta.label}</td>
+                          <td className="whitespace-nowrap px-3 py-2 font-num tabular-nums">
+                            {s ? `${angka(s.avg, meta.precision)} ${meta.unit}` : 'Belum ada pembacaan hari ini'}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 font-num tabular-nums text-text-2">
+                            {s ? `${angka(s.min, meta.precision)}–${angka(s.max, meta.precision)}` : '·'}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 font-num tabular-nums text-text-2">
+                            {row.ambang ? `${row.ambang[0]}–${row.ambang[1]} ${meta.unit}` : 'Belum diatur'}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <StatusPill tone={status.tone} icon={status.icon}>{status.text}</StatusPill>
+                          </td>
+                        </tr>
+                      );
+                    }),
+                  )}
+                </Table>
+                <p className="mt-3 text-sm text-text-2">
+                  Angka kematian ikan diisi manual melalui Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
+                </p>
+              </>
+            )}
+          </Card>
+
+          {/* Histori harian kolam */}
+          <Card
+            title="Riwayat kondisi kolam per tanggal"
+            subtitle="Ringkasan tiap hari: rata-rata, terendah, dan tertinggi dari sensor pH, suhu air, dan TDS, lengkap dengan tanggal, bulan, dan tahunnya."
+          >
+            {areaBerSensor.length === 0 ? (
+              <EmptyState
+                title="Belum ada kolam dengan sensor"
+                hint="Histori harian muncul setelah perangkat pH, suhu, atau TDS dipasang di sebuah area."
+                icon="sensors_off"
+              />
+            ) : (
+              <div className="space-y-6">
+                {areaBerSensor.map((area) => {
+                  const histori = historiArea(area.id, 14);
+                  return (
+                    <div key={area.id}>
+                      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 className="font-head text-base font-bold text-text">{area.name}</h3>
+                        <span className="text-sm text-text-2">
+                          {histori.filter((h) => h.adaData).length} hari tercatat ·{' '}
+                          {angka(histori.reduce((s, h) => s + h.jumlah, 0), 0)} pembacaan tersimpan
+                        </span>
+                      </div>
+                      <Table head={['Tanggal', 'pH rata-rata', 'Suhu rata-rata', 'TDS rata-rata', 'Rentang hari ini', 'Ikan mati']}>
+                        {histori.map((h) => (
+                          <tr key={h.tanggal} className={h.hariIni ? 'bg-surface-2' : 'hover:bg-surface-2'}>
+                            <td className="whitespace-nowrap px-3 py-2">
+                              <span className="font-semibold">{h.label}</span>
+                              {h.hariIni && (
+                                <StatusPill tone="info" icon="calendar-days" className="ml-2">
+                                  Hari ini
+                                </StatusPill>
                               )}
                             </td>
-                          );
-                        })}
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
-                            {h.metrik.map((row) => (
-                              <Badge key={row.key} tone={WARNA_STATUS[row.status] || 'muted'}>
-                                {METRIC_META[row.key].label.replace(' Air', '').replace(' Nutrisi', '')}{' '}
-                                {TEKS_STATUS[row.status] || 'Tanpa data'}
-                              </Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {h.matiEkor > 0 ? (
-                            <span className="font-bold text-amber-600">{h.matiEkor} ekor</span>
-                          ) : (
-                            <span className="text-[11px] text-on-surface-variant">·</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </Table>
-                </div>
-              );
-            })}
-            <p className="text-[11px] text-on-surface-variant">
-              Rentang hari ini = nilai terendah–tertinggi sepanjang hari itu. Statusnya memakai ambang
-              ideal yang sama dengan kartu statistik di atas. Angka kematian diisi manual melalui
-              Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
-            </p>
-          </div>
-        )}
-      </Card>
-
-      {/* Area & HPP */}
-      <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
-        <Card>
-          <SectionTitle
-            eyebrow="Kelola Area"
-            title="Area produksi & HPP"
-            subtitle="Harga pokok dihitung otomatis dari item biaya yang Anda input."
-            action={
-              <Link to="/area" className="text-sm font-bold text-primary hover:underline">
-                Kelola area
-              </Link>
-            }
-          />
-          {areas.length === 0 ? (
-            <Empty title="Belum ada area" hint="Tambahkan kolam atau growbed di menu Kelola Area." icon="water" />
-          ) : (
-            <Table head={['Area', 'Komoditas', 'Sensor', 'HPP', 'Per Unit']}>
-              {areas.map((area) => {
-                const { total, perUnit } = hppTotal(area.id);
-                const sensor = devices.filter((d) => d.areaId === area.id && d.metric);
-                return (
-                  <tr key={area.id} className="hover:bg-primary/5">
-                    <td className="px-3 py-2">
-                      <Link to={`/area/${area.id}`} className="font-bold text-on-surface hover:text-primary">
-                        {area.name}
-                      </Link>
-                      <p className="text-[11px] text-on-surface-variant">{area.location}</p>
-                    </td>
-                    <td className="px-3 py-2 text-on-surface-variant">{area.commodity}</td>
-                    <td className="px-3 py-2">
-                      <Badge tone={sensor.length ? 'info' : 'muted'}>
-                        {sensor.length ? `${sensor.length} sensor` : 'Belum ada'}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 font-semibold">{formatRupiah(total)}</td>
-                    <td className="px-3 py-2 text-on-surface-variant">
-                      {perUnit ? `${formatRupiah(perUnit)} / ${area.populationUnit}` : '·'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </Table>
-          )}
-          <div className="mt-3 flex flex-wrap gap-4 text-xs text-on-surface-variant">
-            <span>
-              Total biaya tercatat: <strong className="text-on-surface">{formatRupiah(totalHpp)}</strong>
-            </span>
-            <span>
-              Volume air dikelola: <strong className="text-on-surface">{waterVolume.toLocaleString('id-ID')} L</strong>
-            </span>
-          </div>
-        </Card>
-
-        <Card>
-          <SectionTitle eyebrow="Catatan Terbaru" title="Pemantauan & kondisi device" />
-          <div className="space-y-3">
-            {activeAlerts.length > 0 && (
-              <div className="space-y-2">
-                {activeAlerts.map((device) => (
-                  <div key={device.id} className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-amber-900/20 p-3">
-                    <span className="material-symbols-outlined text-amber-600 text-[18px]">warning</span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-on-surface">{device.name}</p>
-                      <p className="text-[11px] text-on-surface-variant">
-                        {device.code} · {STATUS_LABEL[device.status]}
-                      </p>
+                            {h.metrik.map((row) => {
+                              const meta = METRIC_META[row.key];
+                              const s = row.stats;
+                              return (
+                                <td key={row.key} className="whitespace-nowrap px-3 py-2 font-num tabular-nums">
+                                  {s ? (
+                                    <>
+                                      <span className="font-semibold">{angka(s.avg, meta.precision)}</span>{' '}
+                                      <span className="text-sm text-text-2">{meta.unit}</span>
+                                      <span className="block text-sm text-text-2">
+                                        {angka(s.min, meta.precision)}–{angka(s.max, meta.precision)}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-text-2">·</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="whitespace-nowrap px-3 py-2">
+                              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                {h.metrik.map((row) => {
+                                  const status = STATUS_REKAP[row.status] || STATUS_REKAP['tanpa-data'];
+                                  return (
+                                    <StatusPill key={row.key} tone={status.tone} icon={status.icon}>
+                                      {labelPendek(row.key)} {status.text}
+                                    </StatusPill>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2">
+                              {h.matiEkor > 0 ? (
+                                <StatusPill tone="warn" icon="heart-crack">{h.matiEkor} ekor</StatusPill>
+                              ) : (
+                                <span className="text-text-2">·</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </Table>
                     </div>
-                    <Badge tone={STATUS_TONE[device.status]} className="ml-auto">
-                      {device.battery}%
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-            {monitoringSaya.slice(0, 4).map((entry) => (
-              <div key={entry.id} className="rounded-xl border border-outline-variant/40 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-on-surface">{entry.note || 'Catatan pemantauan'}</p>
-                  <span className="text-[11px] text-outline">{entry.at}</span>
-                </div>
-                <p className="text-[11px] text-on-surface-variant mt-1">
-                  {entry.ph != null && `pH ${entry.ph}`}
-                  {entry.temp != null && ` · ${entry.temp} °C`}
-                  {entry.tds != null && ` · TDS ${entry.tds} ppm`}
+                  );
+                })}
+                <p className="text-sm text-text-2">
+                  Rentang hari ini = nilai terendah–tertinggi sepanjang hari itu. Statusnya memakai ambang
+                  ideal yang sama dengan rekap di atas. Angka kematian diisi manual melalui
+                  Detail Kolam oleh pengguna atau V-Pet pengelola, bukan dari sensor.
                 </p>
               </div>
-            ))}
-            {monitoringSaya.length === 0 && <Empty title="Belum ada catatan" hint="Catat pemantauan dari menu Kelola Area." icon="history" />}
+            )}
+          </Card>
+
+          {/* Area & HPP */}
+          <Card
+            title="Area produksi dan HPP"
+            subtitle="Harga pokok dihitung otomatis dari item biaya yang Anda input."
+            action={<Link to="/area" className={TAUTAN}>Kelola area</Link>}
+          >
+            {areas.length === 0 ? (
+              <EmptyState title="Belum ada area" hint="Tambahkan kolam atau growbed di menu Kelola Area." icon="waves" />
+            ) : (
+              <Table head={['Area', 'Komoditas', 'Sensor', 'HPP', 'Per unit']}>
+                {areas.map((area) => {
+                  const { total, perUnit } = hppTotal(area.id);
+                  const sensor = devices.filter((d) => d.areaId === area.id && d.metric);
+                  return (
+                    <tr key={area.id} className="hover:bg-surface-2">
+                      <td className="px-3 py-2">
+                        <Link to={`/area/${area.id}`} className={clsx('font-semibold text-text hover:text-primary', FOKUS)}>
+                          {area.name}
+                        </Link>
+                        <p className="text-sm text-text-2">{area.location}</p>
+                      </td>
+                      <td className="px-3 py-2 text-text-2">{area.commodity}</td>
+                      <td className="px-3 py-2">
+                        {sensor.length
+                          ? <StatusPill tone="info" icon="radio">{sensor.length} sensor</StatusPill>
+                          : <StatusPill tone="muted" icon="circle-minus">Belum ada</StatusPill>}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 font-num font-semibold tabular-nums">{formatRupiah(total)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 font-num tabular-nums text-text-2">
+                        {perUnit ? `${formatRupiah(perUnit)} / ${area.populationUnit}` : '·'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </Table>
+            )}
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-2">
+              <span>
+                Total biaya tercatat: <span className="font-num font-semibold text-text">{formatRupiah(totalHpp)}</span>
+              </span>
+              <span>
+                Volume air dikelola: <span className="font-num font-semibold text-text">{waterVolume.toLocaleString('id-ID')} L</span>
+              </span>
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          {fokus && (
+            <Card area={jenisArea(fokus.area)}>
+              <ReadingChart
+                area={jenisArea(fokus.area)}
+                sensor={{ name: `${fokusMeta.label} ${fokus.area?.name || ''}`.trim(), unit: fokusMeta.unit, decimals: fokusMeta.precision }}
+                points={titikFokus}
+                threshold={fokus.ambang ? { low: fokus.ambang[0], high: fokus.ambang[1] } : undefined}
+              />
+            </Card>
+          )}
+
+          <Card title="Tugas hari ini" subtitle={`${doneMissions} dari ${missions.length} selesai · ${points.toLocaleString('id-ID')} poin`}>
+            {tugas.length === 0 ? (
+              <p className="text-sm text-text-2">Belum ada misi hari ini.</p>
+            ) : (
+              <TaskList items={tugas} onToggle={bukaAktivitasMisi} label="Tugas hari ini" />
+            )}
+          </Card>
+
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-t border-border pt-3 text-sm text-text-2">
+            <Icon name="heart" className="text-primary" />
+            <span>
+              <span className="font-semibold text-text">{pet.name}</span> · level {pet.level} · kenyang{' '}
+              <span className="font-num">{pet.hunger}%</span> · bahagia <span className="font-num">{pet.happiness}%</span> · bersih{' '}
+              <span className="font-num">{pet.hygiene}%</span> · sehat <span className="font-num">{pet.health}%</span>
+            </span>
+            <Link to="/v-pet" className={TAUTAN}>Rawat V-Pet</Link>
           </div>
-        </Card>
+
+          <Card title="Pemantauan dan kondisi alat">
+            <div className="space-y-3">
+              {activeAlerts.map((device) => (
+                <div key={device.id} className="flex items-start gap-2.5 border-b border-border pb-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-text">{device.name}</p>
+                    <p className="font-mono text-xs text-text-2">{device.code}</p>
+                  </div>
+                  <StatusPill tone={STATUS_TONE[device.status]} icon={STATUS_ALAT_IKON[device.status] || 'circle-alert'}>
+                    {STATUS_LABEL[device.status]} · {device.battery}%
+                  </StatusPill>
+                </div>
+              ))}
+              {monitoringSaya.slice(0, 4).map((entry) => (
+                <div key={entry.id} className="border-b border-border pb-3 last:border-b-0 last:pb-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-sm font-semibold text-text">{entry.note || 'Catatan pemantauan'}</p>
+                    <span className="shrink-0 text-xs text-text-2">{entry.at}</span>
+                  </div>
+                  <p className="mt-0.5 font-num text-sm text-text-2">
+                    {entry.ph != null && `pH ${entry.ph}`}
+                    {entry.temp != null && ` · ${entry.temp} °C`}
+                    {entry.tds != null && ` · TDS ${entry.tds} ppm`}
+                  </p>
+                </div>
+              ))}
+              {monitoringSaya.length === 0 && (
+                <EmptyState title="Belum ada catatan" hint="Catat pemantauan dari menu Kelola Area." icon="history" />
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,14 @@
+import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useSmart } from '../../shared/store/SmartStore';
 import { askAquaponik, CHAT_GREETING } from '../services/aquaBot';
-import { Badge, Button, Card, Input, SectionTitle } from '../../shared/components/ui';
+import { Button, Card, Field, FilterChip, Input, PageHeader, Select, StatusPill } from '../../shared/components/ui';
+import { Icon } from '../../shared/components/Icon.jsx';
 import { CHAT_SUGGESTIONS } from '../data/knowledge.js';
 
 const uid = () => `MSG-${Math.random().toString(36).slice(2, 8)}`;
+
+const TOPIK = ['pH air', 'Amonia & nitrat', 'Oksigen terlarut', 'Suhu air', 'Pakan ikan', 'Sayur aquaponik', 'EC & TDS', 'HPP kolam', 'Sensor IoT', 'Hama & penyakit', 'Cara kerja aquaponik', 'Virtual pet & poin'];
 
 export default function Chatbot() {
   const { chat, pushChat, clearChat, areasSaya, devices, points } = useSmart();
@@ -13,6 +17,7 @@ export default function Chatbot() {
   const [thinking, setThinking] = useState(false);
   const scroller = useRef(null);
   const areas = areasSaya;
+  const sensorKonteks = devices.filter((d) => d.areaId === areaId).length;
 
   const messages = chat.length ? chat : [{ id: 'greet', role: 'bot', text: CHAT_GREETING.text, sources: [], suggestions: CHAT_SUGGESTIONS }];
 
@@ -36,145 +41,130 @@ export default function Chatbot() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-[3fr,1.2fr]">
-        <Card className="flex flex-col h-[640px]">
-          <SectionTitle
-            eyebrow="Chatbot Aquaponik"
-            title="Tanya seputar ikan & sayur"
-            subtitle="Jawaban diambil dari basis pengetahuan lokal aquaponik JagoFarm dan disertai konteks sensor area yang Anda pilih."
-            action={
-              <Button variant="ghost" icon="delete_sweep" onClick={clearChat}>
-                Bersihkan
-              </Button>
-            }
-          />
+    <div>
+      <PageHeader
+        title="Tanya seputar ikan dan sayur"
+        subtitle="Jawaban diambil dari basis pengetahuan lokal aquaponik JagoFarm dan disertai konteks sensor area yang Anda pilih."
+      />
 
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Konteks area</span>
-            <select
-              value={areaId}
-              onChange={(event) => setAreaId(event.target.value)}
-              className="rounded-xl glass-input px-3 py-1.5 text-sm text-on-surface"
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <Card
+          title="Percakapan"
+          subtitle="Pertanyaan dicocokkan dengan topik di basis pengetahuan, lalu dilengkapi pembacaan sensor area yang Anda pilih."
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <Field label="Konteks area" className="w-full max-w-[280px]">
+                <Select
+                  value={areaId}
+                  onChange={setAreaId}
+                  options={areas.map((area) => ({ value: area.id, label: area.name }))}
+                />
+              </Field>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <StatusPill tone="info" icon="radio">{sensorKonteks} sensor dipakai sebagai konteks</StatusPill>
+                <Button variant="ghost" size="sm" icon="trash-2" onClick={clearChat}>
+                  Bersihkan percakapan
+                </Button>
+              </div>
+            </div>
+
+            <div
+              ref={scroller}
+              role="log"
+              aria-label="Percakapan dengan asisten aquaponik"
+              className="custom-scrollbar flex max-h-[480px] min-h-[240px] flex-col gap-3 overflow-y-auto border-y border-border py-4 pr-1"
             >
-              {areas.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
+              {messages.map((message) => (
+                <div key={message.id} className={clsx('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  <div
+                    className={clsx(
+                      'flex max-w-[85%] flex-col gap-2 whitespace-pre-line rounded-card px-4 py-3 text-[15px] leading-[22px]',
+                      message.role === 'user' ? 'bg-primary text-on-primary' : 'border border-border bg-surface-2 text-text',
+                    )}
+                  >
+                    {message.role === 'bot' && (
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-sm font-semibold text-primary">
+                        <Icon name="bot" size={16} />
+                        Asisten Aquaponik
+                        {message.confidence ? (
+                          <span className="font-normal text-text-2">· keyakinan {Math.round(message.confidence * 100)}%</span>
+                        ) : null}
+                      </p>
+                    )}
+                    <p>{message.text}</p>
+                    {message.sources?.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-text-2">
+                        <span>Sumber di basis pengetahuan:</span>
+                        {message.sources.map((source) => (
+                          <code key={source} className="rounded-control border border-border bg-surface px-1.5 font-mono text-[13px] text-text">
+                            #{source}
+                          </code>
+                        ))}
+                      </div>
+                    )}
+                    {message.suggestions?.length > 0 && (
+                      <div className="flex flex-col gap-2 pt-1">
+                        <p className="text-sm font-semibold text-text-2">Coba tanyakan</p>
+                        <div className="flex flex-wrap gap-2">
+                          {message.suggestions.map((suggestion) => (
+                            <FilterChip key={suggestion} onClick={() => send(suggestion)} className="!h-auto min-h-8 !whitespace-normal py-1 text-left">
+                              {suggestion}
+                            </FilterChip>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
-            </select>
-            <Badge tone="info" icon="sensors">
-              {devices.filter((d) => d.areaId === areaId).length} sensor dipakai sebagai konteks
-            </Badge>
-          </div>
-
-          <div ref={scroller} className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1">
-            {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-line ${
-                    message.role === 'user'
-                      ? 'bg-primary text-white rounded-br-sm'
-                      : 'panel-inset text-on-surface rounded-bl-sm'
-                  }`}
-                >
-                  {message.role === 'bot' && (
-                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary mb-1.5">
-                      <span className="material-symbols-outlined text-[15px]">smart_toy</span>
-                      Asisten Aquaponik
-                      {message.confidence ? <span className="text-on-surface-variant font-semibold normal-case">· keyakinan {Math.round(message.confidence * 100)}%</span> : null}
-                    </p>
-                  )}
-                  <p>{message.text}</p>
-                  {message.sources?.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {message.sources.map((source) => (
-                        <Badge key={source} tone="muted">
-                          #{source}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  {message.suggestions?.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {message.suggestions.map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          onClick={() => send(suggestion)}
-                          className="inline-flex items-center h-8 rounded-full border border-primary/30 bg-primary/5 px-3 text-[12px] font-semibold text-primary hover:bg-primary/15 transition-colors"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {thinking && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-sm panel-inset px-4 py-3">
-                  <span className="flex items-center gap-2 text-sm text-on-surface-variant">
-                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+              {thinking && (
+                <div className="flex justify-start">
+                  <p role="status" className="flex items-center gap-2 rounded-card border border-border bg-surface-2 px-4 py-3 text-sm text-text-2">
+                    <Icon name="loader-circle" className="animate-spin motion-reduce:animate-none" />
                     Menelusuri basis pengetahuan aquaponik…
-                  </span>
+                  </p>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              send();
-            }}
-            className="mt-3 flex gap-2"
-          >
-            <Input
-              placeholder="cth. berapa pH ideal air kolam nila?"
-              value={text}
-              onChange={setText}
-              aria-label="Pertanyaan untuk chatbot aquaponik"
-            />
-            <Button type="submit" icon="send" disabled={thinking || !text.trim()}>
-              Kirim
-            </Button>
-          </form>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                send();
+              }}
+              className="flex flex-wrap items-end gap-2"
+            >
+              <Field label="Pertanyaan Anda" className="min-w-0 flex-[1_1_280px]">
+                <Input placeholder="cth. berapa pH ideal air kolam nila?" value={text} onChange={setText} />
+              </Field>
+              <Button type="submit" icon="send" disabled={thinking || !text.trim()}>
+                Kirim
+              </Button>
+            </form>
+          </div>
         </Card>
 
-        <div className="space-y-4">
-          <Card>
-            <SectionTitle eyebrow="Cakupan" title="Topik yang saya kuasai" />
-            <div className="flex flex-wrap gap-1.5">
-              {['pH air', 'Amonia & nitrat', 'Oksigen terlarut', 'Suhu air', 'Pakan ikan', 'Sayur aquaponik', 'EC & TDS', 'HPP kolam', 'Sensor IoT', 'Hama & penyakit', 'Cara kerja aquaponik', 'Virtual pet & poin'].map((topic) => (
-                <Badge key={topic} tone="brand">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card title="Topik yang saya kuasai" subtitle="Di luar topik ini, saya akan mengatakan tidak tahu daripada mengarang jawaban.">
+            <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+              {TOPIK.map((topic) => (
+                <li key={topic} className="inline-flex min-h-7 items-center rounded-pill border border-border bg-surface px-2.5 text-sm text-text">
                   {topic}
-                </Badge>
+                </li>
               ))}
-            </div>
-            <p className="mt-3 text-[11px] text-on-surface-variant">
-              Di luar topik ini, saya akan mengatakan tidak tahu daripada mengarang jawaban.
-            </p>
+            </ul>
           </Card>
 
-          <Card>
-            <SectionTitle eyebrow="Cara Pakai" title="Tips bertanya" />
-            <ul className="space-y-2 text-sm text-on-surface-variant">
-              <li className="flex gap-2">
-                <span className="material-symbols-outlined text-primary text-[18px]">chevron_right</span>
-                Sebut angkanya bila punya data, misal "pH kolam saya 8,2, apa yang harus dilakukan?"
-              </li>
-              <li className="flex gap-2">
-                <span className="material-symbols-outlined text-primary text-[18px]">chevron_right</span>
-                Pilih konteks area agar jawaban menyertakan pembacaan sensor terkini.
-              </li>
-              <li className="flex gap-2">
-                <span className="material-symbols-outlined text-primary text-[18px]">chevron_right</span>
-                Pertanyaan seputar HPP bisa sekaligus: buka Kelola Area untuk memasukkan item biaya.
-              </li>
+          <Card title="Tips bertanya">
+            <ul className="m-0 flex list-disc flex-col gap-2 pl-[18px] text-sm text-text-2">
+              <li>Sebut angkanya bila punya data, misal &quot;pH kolam saya 8,2, apa yang harus dilakukan?&quot;</li>
+              <li>Pilih konteks area agar jawaban menyertakan pembacaan sensor terkini.</li>
+              <li>Pertanyaan seputar HPP bisa sekaligus: buka Kelola Area untuk memasukkan item biaya.</li>
             </ul>
-            <p className="mt-3 rounded-xl bg-primary/5 border border-primary/15 p-3 text-[11px] text-on-surface-variant">
-              Poin Anda saat ini {points.toLocaleString('id-ID')}. Membaca materi aquaponik juga menambah wawasan untuk pengelolaan kolam.
+            <p className="mt-3 border-t border-border pt-3 text-sm text-text-2">
+              Poin Anda saat ini <span className="font-num font-semibold text-text">{points.toLocaleString('id-ID')}</span>. Membaca materi
+              aquaponik juga menambah wawasan untuk pengelolaan kolam.
             </p>
           </Card>
         </div>

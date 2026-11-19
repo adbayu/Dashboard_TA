@@ -13,6 +13,12 @@ export const MIGRATED = [
   'src/profil-saya/pages/Profil.jsx',
   'src/shared/components/PublicFrame.jsx',
   'src/components/iot/PublicAreaLabel.jsx',
+  'src/dashboard/pages/Dashboard.jsx',
+  'src/v-pet/pages/VPet.jsx',
+  'src/v-pet/styles/pet.css',
+  'src/v-pet/components/PetKarakter.jsx',
+  'src/gamifikasi/pages/Gamifikasi.jsx',
+  'src/chatbot-aquaponik/pages/Chatbot.jsx',
 ];
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML

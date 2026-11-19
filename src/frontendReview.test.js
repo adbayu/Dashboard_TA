@@ -831,3 +831,64 @@ test('Per area empty state distinguishes missing areas from missing readings', a
   assert.match(noReadingsMarkup, /Belum ada data sensor hari ini/);
   assert.match(noReadingsMarkup, /Belum ada titik pembacaan pada rentang waktu perangkatmu sejak tengah malam\./);
 });
+
+// ── Task 10: Pantauan, V-Pet, Misi & poin, Chatbot ─────────────────────────────
+async function renderSmartPage(t, modulePath, path) {
+  const vite = await createServer({
+    root: process.cwd(),
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const [{ default: Page }, { SmartProvider }] = await Promise.all([
+    vite.ssrLoadModule(modulePath),
+    vite.ssrLoadModule('/src/shared/store/SmartStore.jsx'),
+  ]);
+  return { vite, markup: renderToStaticMarkup(React.createElement(
+    MemoryRouter,
+    { initialEntries: [path] },
+    React.createElement(SmartProvider, null, React.createElement(Page)),
+  )) };
+}
+
+test('Pantauan merender Alert ringkasan sebelum AreaSection dan paling banyak satu baris Metric', async t => {
+  // Tanpa sesi, alamat /admin memberi peran pengelola sehingga semua area contoh
+  // (dan sensornya) ikut dirender; halaman pengguna biasa memakai komponen yang sama.
+  const { vite, markup } = await renderSmartPage(t, '/src/dashboard/pages/Dashboard.jsx', '/admin');
+  const { SEED_DEVICES } = await vite.ssrLoadModule('/src/kelola-iot/data/devices.js');
+
+  const alertAt = markup.indexOf('data-ui="alert"');
+  const areaAt = markup.indexOf('data-ui="area-section"');
+  assert.ok(alertAt >= 0, 'Pantauan harus punya Alert ringkasan');
+  assert.ok(areaAt > alertAt, 'Alert ringkasan harus tampil sebelum AreaSection pertama');
+  assert.ok((markup.match(/data-ui="metric"/g) || []).length <= 4, 'paling banyak satu baris Metric (4 kartu)');
+  assert.ok(markup.indexOf('data-ui="sensor-reading"') > areaAt, 'SensorReading berada di dalam AreaSection');
+  assert.match(markup, /data-ui="task-list"/);
+  assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, 'tepat satu h1 lewat PageHeader');
+
+  // Jumlah alat di Alert dihitung dari data, bukan teks tetap.
+  const online = SEED_DEVICES.filter(device => device.status === 'online').length;
+  assert.ok(markup.includes(`${online} dari ${SEED_DEVICES.length} alat mengirim data`));
+});
+
+test('Misi & poin tidak memuat emoji; peringkat memakai nomor', async t => {
+  const source = await readFile(new URL('./gamifikasi/pages/Gamifikasi.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\p{Extended_Pictographic}/u);
+  const { markup } = await renderSmartPage(t, '/src/gamifikasi/pages/Gamifikasi.jsx', '/gamifikasi');
+  assert.doesNotMatch(markup, /\p{Extended_Pictographic}/u);
+  assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, 'tepat satu h1 lewat PageHeader');
+});
+
+test('V-Pet dan Chatbot masing-masing merender tepat satu h1 lewat PageHeader', async t => {
+  for (const [modulePath, path] of [
+    ['/src/v-pet/pages/VPet.jsx', '/v-pet'],
+    ['/src/chatbot-aquaponik/pages/Chatbot.jsx', '/chatbot'],
+  ]) {
+    const { markup } = await renderSmartPage(t, modulePath, path);
+    assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, `${modulePath}: tepat satu h1`);
+    assert.match(markup, /data-ui="page-header"/, `${modulePath}: memakai PageHeader`);
+  }
+});
