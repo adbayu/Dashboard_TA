@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { formatRupiah, METRIC_KEYS, METRIC_META, METRIC_RANGE, useSmart } from '../../shared/store/SmartStore';
-import { IconButton, Badge, Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, Select, StatCard, Table } from '../../shared/components/ui';
+import {
+  Alert, Button, EmptyState, Field, FilterChip, IconButton, Input, Modal, NumberInput, PageHeader, Select, StatusPill, Table,
+} from '../../shared/components/ui';
+import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
+import { areaTone } from '../model/areaTone.js';
+import { formatAngka, ikonJenisArea, LABEL_JENIS_AREA } from '../model/areaTampil.js';
 
-const TYPES = [
-  { value: 'kolam', label: 'Kolam Ikan' },
-  { value: 'growbed', label: 'Growbed Sayur' },
-  { value: 'tandon', label: 'Tandon Nutrisi' },
-];
+const TYPES = Object.entries(LABEL_JENIS_AREA).map(([value, label]) => ({ value, label }));
+const labelAmbang = (key) => METRIC_META[key].label.replace(' Air', '').replace(' Nutrisi', '');
 const empty = { name: '', type: 'kolam', location: '', volume: '', unit: 'liter', commodity: '', population: '', populationUnit: 'ekor', status: 'aktif', note: '', deviceIds: [], targets: {} };
 
 export default function AdminAreas() {
@@ -16,12 +18,13 @@ export default function AdminAreas() {
   const [confirm, setConfirm] = useState(null);
 
   // Pintu modal "tambah" tidak bisa memakai `form !== empty`: saat menambah, form
-// di-set ke objek `empty` itu sendiri, sehingga perbandingannya SELALU false dan
-// modal tidak pernah terbuka. Dipakai state khusus supaya tidak ada ketergantungan
-// pada identitas objek.
+  // di-set ke objek `empty` itu sendiri, sehingga perbandingannya SELALU false dan
+  // modal tidak pernah terbuka. Dipakai state khusus supaya tidak ada ketergantungan
+  // pada identitas objek.
   const [terbuka, setTerbuka] = useState(false);
   const open = terbuka;
   const closeModal = () => { setEditing(null); setForm(empty); setTerbuka(false); };
+  const bukaTambah = () => { setEditing(null); setForm(empty); setTerbuka(true); };
 
   const startEdit = (area) => {
     setEditing(area);
@@ -55,7 +58,7 @@ export default function AdminAreas() {
 
   // Ambang khusus area. Dua sisi (min/max) harus terisi; kalau salah satu
   // dikosongkan, ambang area itu dilepas dan dashboard kembali memakai ambang
-  // bawaan kategori — supaya tidak ada setengah ambang yang membingungkan.
+  // bawaan kategori, supaya tidak ada setengah ambang yang membingungkan.
   const setAmbangArea = (key, sisi, nilai) => {
     setForm((prev) => {
       const kini = prev.targets?.[key] ? [...prev.targets[key]] : ['', ''];
@@ -70,97 +73,112 @@ export default function AdminAreas() {
   const totalVolume = areas.reduce((n, a) => n + Number(a.volume || 0), 0);
   const totalHpp = areas.reduce((n, a) => n + hppTotal(a.id).total, 0);
   const pakaiAmbangKhusus = areas.filter((a) => METRIC_KEYS.some((k) => a.targets?.[k])).length;
+  const sudahBerAlat = areas.filter((a) => a.deviceIds.length > 0).length;
+  const areaTanpaAlat = areas.filter((a) => a.deviceIds.length === 0);
+  const alatBelumDitempatkan = devices.filter((d) => !d.areaId);
+  const adaCatatan = areaTanpaAlat.length > 0 || alatBelumDitempatkan.length > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
-        <StatCard label="Total Area" value={areas.length} icon="water" hint="Kolam, growbed & tandon" />
-        <StatCard label="Sudah Dipasangi IoT" value={areas.filter((a) => a.deviceIds.length > 0).length} unit={`/ ${areas.length}`} icon="sensors" hint="Punya minimal 1 sensor" />
-        <StatCard label="Volume Air Sistem" value={totalVolume.toLocaleString('id-ID')} unit="L" icon="opacity" hint="Kapasitas gabungan" />
-        <StatCard
-          label="Ambang Khusus Area"
-          value={pakaiAmbangKhusus}
-          unit={`/ ${areas.length}`}
-          icon="tune"
-          tone={pakaiAmbangKhusus ? 'brand' : 'ok'}
-          hint={pakaiAmbangKhusus ? 'Menyimpang dari bawaan kategori' : 'Semua pakai bawaan kategori'}
-        />
-        <StatCard label="Nilai HPP" value={formatRupiah(totalHpp)} icon="payments" hint="Diinput pengguna" />
-      </div>
+    <div>
+      <PageHeader
+        title="Kelola area"
+        subtitle="Area menghubungkan kolam, growbed, dan tandon dengan alat sensor. Ambang per area menggantikan ambang bawaan kategori."
+        actions={<Button icon="plus" onClick={bukaTambah}>Tambah area</Button>}
+      />
 
-      <Card>
-        <SectionTitle
-          eyebrow="Kelola Area"
-          title="Area yang sudah dipasangi IoT"
-          subtitle="Area menghubungkan kolam/growbed dengan perangkat sensor. Pengguna mengisi HPP dan mencatat pemantauan di area masing-masing."
-          action={<Button icon="add" onClick={() => { setEditing(null); setForm(empty); setTerbuka(true); }}>Tambah area</Button>}
-        />
+      <div className="flex flex-col gap-4">
+        {adaCatatan && (
+          <Alert
+            tone="warn"
+            title={alatBelumDitempatkan.length > 0
+              ? `${alatBelumDitempatkan.length} alat belum ditempatkan.`
+              : `${areaTanpaAlat.length} area belum punya alat.`}
+            action={areaTanpaAlat.length > 0
+              ? <Button variant="secondary" icon="pencil" onClick={() => startEdit(areaTanpaAlat[0])}>Ubah {areaTanpaAlat[0].name}</Button>
+              : null}
+          >
+            {alatBelumDitempatkan.length > 0 && (
+              <>
+                {alatBelumDitempatkan.map((d, i) => (
+                  <span key={d.id}>{i > 0 && ', '}<span className="font-num">{d.code}</span> {d.name}</span>
+                ))}
+                {' '}sudah terdaftar, tetapi belum dipasang ke area mana pun.{' '}
+              </>
+            )}
+            {areaTanpaAlat.length > 0 && `${areaTanpaAlat.map((a) => a.name).join(', ')} belum punya alat.`}
+          </Alert>
+        )}
+
         {areas.length === 0 ? (
-          <Empty title="Belum ada area" icon="water" hint="Daftarkan kolam pertama beserta perangkatnya." />
+          <EmptyState title="Belum ada area" icon="waves">
+            Daftarkan kolam pertama beserta perangkatnya.
+          </EmptyState>
         ) : (
-          <Table head={['Area', 'Tipe', 'Komoditas', 'Populasi', 'Ambang', 'IoT', 'HPP', 'Penanggung Jawab', '']}>
+          <Table head={['Area', 'Tipe', 'Komoditas dan populasi', 'Ambang per area', 'Alat IoT', 'HPP', 'Penanggung jawab', 'Aksi']}>
             {areas.map((area) => {
               const { total, perUnit } = hppTotal(area.id);
               const owners = users.filter((u) => u.areaIds?.includes(area.id));
+              const kunciAmbang = METRIC_KEYS.filter((k) => area.targets?.[k]);
               return (
-                <tr key={area.id} className="hover:bg-primary/5">
-                  <td className="px-3 py-2">
-                    <p className="font-bold text-on-surface">{area.name}</p>
-                    <p className="text-[11px] text-on-surface-variant">
+                <tr key={area.id} className="align-top hover:bg-surface-2">
+                  <td className="min-w-[11rem] px-3 py-2.5">
+                    <p className="font-semibold">{area.name}</p>
+                    <p className="text-sm text-text-2">
                       {area.location} · {Number(area.volume).toLocaleString('id-ID')} {area.unit}
                     </p>
                   </td>
-                  <td className="px-3 py-2">
-                    <Badge tone={area.type === 'kolam' ? 'info' : area.type === 'growbed' ? 'ok' : 'brand'}>
+                  <td className="px-3 py-2.5">
+                    <span data-area={areaTone(area.type)} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <span data-ui="area-icon" className="inline-flex"><IkonSlot icon={ikonJenisArea(area.type)} size={16} /></span>
                       {TYPES.find((t) => t.value === area.type)?.label || area.type}
-                    </Badge>
+                    </span>
                   </td>
-                  <td className="px-3 py-2 text-on-surface-variant">{area.commodity}</td>
-                  <td className="px-3 py-2 text-on-surface-variant">
-                    {Number(area.population).toLocaleString('id-ID')} {area.populationUnit}
+                  <td className="px-3 py-2.5">
+                    <p>{area.commodity}</p>
+                    <p className="text-text-2">{Number(area.population).toLocaleString('id-ID')} {area.populationUnit}</p>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="min-w-[9rem] px-3 py-2.5">
                     {/* Ambang khusus area terlihat di sini supaya pengelola tahu
                         area mana yang menyimpang dari ambang bawaan kategori. */}
-                    {METRIC_KEYS.some((k) => area.targets?.[k]) ? (
-                      <div className="flex flex-wrap gap-1">
-                        {METRIC_KEYS.filter((k) => area.targets?.[k]).map((k) => (
-                          <Badge key={k} tone="brand">
-                            {METRIC_META[k].label.replace(' Air', '')} {area.targets[k][0]}–{area.targets[k][1]}
-                          </Badge>
+                    {kunciAmbang.length > 0 ? (
+                      <div className="flex flex-col gap-0.5">
+                        {kunciAmbang.map((k) => (
+                          <span key={k}>
+                            {labelAmbang(k)}{' '}
+                            <span className="whitespace-nowrap font-num tabular-nums">{formatAngka(area.targets[k][0])}–{formatAngka(area.targets[k][1])}</span>
+                            {METRIC_META[k].unit !== 'pH' && ` ${METRIC_META[k].unit}`}
+                          </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-on-surface-variant">Bawaan kategori</span>
+                      <span className="text-text-2">Bawaan kategori</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2.5">
                     {area.deviceIds.length === 0 ? (
-                      <Badge tone="warn">Belum ada</Badge>
+                      <StatusPill tone="warn" icon="triangle-alert">Belum ada alat</StatusPill>
                     ) : (
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-x-2.5 gap-y-1">
                         {area.deviceIds.slice(0, 3).map((id) => (
-                          <Badge key={id} tone="info">
-                            {devices.find((d) => d.id === id)?.code || id}
-                          </Badge>
+                          <span key={id} className="font-num text-sm">{devices.find((d) => d.id === id)?.code || id}</span>
                         ))}
-                        {area.deviceIds.length > 3 && <Badge>+{area.deviceIds.length - 3}</Badge>}
+                        {area.deviceIds.length > 3 && <span className="text-sm text-text-2">+{area.deviceIds.length - 3}</span>}
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <p className="font-semibold text-on-surface">{formatRupiah(total)}</p>
-                    <p className="text-[11px] text-on-surface-variant">
+                  <td className="px-3 py-2.5">
+                    <p className="font-num font-semibold tabular-nums">{formatRupiah(total)}</p>
+                    <p className="text-sm text-text-2">
                       {perUnit ? `${formatRupiah(perUnit)} / ${area.populationUnit}` : `${area.hpp.length} item`}
                     </p>
                   </td>
-                  <td className="px-3 py-2 text-on-surface-variant">
-                    {owners.length ? owners.map((o) => o.name).join(', ') : '·'}
+                  <td className="px-3 py-2.5">
+                    {owners.length ? owners.map((o) => o.name).join(', ') : <span className="text-text-2">Belum ada</span>}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2.5">
                     <div className="flex justify-end gap-1">
-                      <IconButton icon="edit" size="sm" onClick={() => startEdit(area)} title="Ubah area" />
-                    <IconButton icon="delete" tone="bad" size="sm" onClick={() => setConfirm(area)} title="Hapus area" />
+                      <IconButton icon="pencil" size="sm" onClick={() => startEdit(area)} label={`Ubah area ${area.name}`} />
+                      <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setConfirm(area)} label={`Hapus area ${area.name}`} />
                     </div>
                   </td>
                 </tr>
@@ -168,22 +186,29 @@ export default function AdminAreas() {
             })}
           </Table>
         )}
-      </Card>
+
+        {areas.length > 0 && (
+          <p className="text-text-2">
+            {pakaiAmbangKhusus} dari {areas.length} area memakai ambang sendiri. Area tanpa ambang sendiri memakai ambang ideal dari Kategori alat.{' '}
+            {sudahBerAlat} dari {areas.length} area sudah dipasangi alat IoT. Volume air sistem {totalVolume.toLocaleString('id-ID')} L, total HPP {formatRupiah(totalHpp)} (diinput pengguna).
+          </p>
+        )}
+      </div>
 
       <Modal open={open} onClose={closeModal} title={editing ? `Ubah area: ${editing.name}` : 'Tambah area baru'} wide>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nama area">
               <Input value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="cth. Kolam Nila C" required />
             </Field>
             <Field label="Tipe area">
               <Select value={form.type} onChange={(v) => setForm({ ...form, type: v })} options={TYPES} />
             </Field>
-            <Field label="Lokasi / blok">
+            <Field label="Lokasi atau blok">
               <Input value={form.location} onChange={(v) => setForm({ ...form, location: v })} placeholder="cth. Blok Barat, Unit 3" />
             </Field>
             <Field label="Komoditas">
-              <Input value={form.commodity} onChange={(v) => setForm({ ...form, commodity: v })} placeholder="cth. Ikan Nila / Kangkung" />
+              <Input value={form.commodity} onChange={(v) => setForm({ ...form, commodity: v })} placeholder="cth. Ikan nila atau kangkung" />
             </Field>
             <Field label="Volume air (liter)">
               <NumberInput step="any" value={form.volume} onChange={(v) => setForm({ ...form, volume: v })} placeholder="12000" />
@@ -194,7 +219,7 @@ export default function AdminAreas() {
                 onChange={(v) => setForm({ ...form, status: v })}
                 options={[
                   { value: 'aktif', label: 'Aktif' },
-                  { value: 'istirahat', label: 'Istirahat / kosong' },
+                  { value: 'istirahat', label: 'Istirahat atau kosong' },
                 ]}
               />
             </Field>
@@ -217,34 +242,34 @@ export default function AdminAreas() {
             </Field>
           </div>
 
-          <div className="rounded-2xl border border-outline-variant/40 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
-              Ambang ideal khusus area ini (opsional)
-            </p>
-            <p className="text-[11px] text-on-surface-variant mb-3">
-              Kosongkan bila area ini cukup memakai ambang bawaan kategori device. Isi bila kolam ini punya
+          <div className="flex flex-col gap-3 rounded-card border border-border p-3">
+            <p className="font-head text-base font-bold leading-[22px]">Ambang khusus area ini (opsional)</p>
+            <p className="text-text-2">
+              Kosongkan bila area ini cukup memakai ambang bawaan kategori alat. Isi bila kolam ini punya
               target sendiri. Nilai di sini yang dipakai dashboard dan statistik harian.
             </p>
-            <div className="grid gap-3 sm:grid-cols-3 items-stretch">
+            <div className="grid items-stretch gap-4 sm:grid-cols-3">
               {METRIC_KEYS.map((key) => {
                 const meta = METRIC_META[key];
                 const nilai = form.targets?.[key];
                 return (
-                  <div key={key}>
-                    <p className="text-[11px] font-bold text-on-surface mb-1">
-                      {meta.label} <span className="font-normal text-on-surface-variant">({meta.unit})</span>
-                    </p>
+                  <div key={key} className="flex min-w-0 flex-col gap-1.5">
+                    <span className="text-sm font-semibold leading-5">
+                      {meta.label} <span className="font-normal text-text-2">({meta.unit})</span>
+                    </span>
                     <div className="flex items-center gap-2">
                       <NumberInput
                         step="any"
                         placeholder={String(METRIC_RANGE[key][0])}
+                        aria-label={`${meta.label} minimum`}
                         value={nilai ? nilai[0] : ''}
                         onChange={(v) => setAmbangArea(key, 0, v)}
                       />
-                      <span className="text-on-surface-variant text-sm">–</span>
+                      <span aria-hidden="true" className="text-text-2">–</span>
                       <NumberInput
                         step="any"
                         placeholder={String(METRIC_RANGE[key][1])}
+                        aria-label={`${meta.label} maksimum`}
                         value={nilai ? nilai[1] : ''}
                         onChange={(v) => setAmbangArea(key, 1, v)}
                       />
@@ -255,31 +280,24 @@ export default function AdminAreas() {
             </div>
           </div>
 
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">
-              Perangkat IoT di area ini ({form.deviceIds?.length || 0} dipilih)
-            </p>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold leading-5">
+              Alat IoT di area ini ({form.deviceIds?.length || 0} dipilih)
+            </span>
             <div className="flex flex-wrap gap-2">
               {devices.map((device) => {
                 const picked = form.deviceIds?.includes(device.id);
                 const others = device.areaId && device.areaId !== form.id;
                 return (
-                  <button
-                    key={device.id}
-                    type="button"
-                    onClick={() => toggleDevice(device.id)}
-                    className={`inline-flex items-center h-7 rounded-full border px-3 text-[11px] font-semibold transition-colors ${
-                      picked ? 'bg-primary text-white border-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/50'
-                    }`}
-                  >
+                  <FilterChip key={device.id} active={Boolean(picked)} onClick={() => toggleDevice(device.id)}>
                     {device.code}
-                    {others && <span className="ml-1 opacity-70">(dipindah)</span>}
-                  </button>
+                    {others && ' (dipindah)'}
+                  </FilterChip>
                 );
               })}
             </div>
-            <p className="mt-2 text-[11px] text-on-surface-variant">
-              Perangkat yang ditandai <strong>(dipindah)</strong> sebelumnya berada di area lain dan akan dipindahkan ke area ini.
+            <p className="text-text-2">
+              Alat yang ditandai <strong className="text-text">(dipindah)</strong> sebelumnya berada di area lain dan akan dipindahkan ke area ini.
             </p>
           </div>
 
@@ -292,14 +310,14 @@ export default function AdminAreas() {
 
       <Modal open={!!confirm} onClose={() => setConfirm(null)} title="Hapus area">
         {confirm && (
-          <div className="space-y-4">
-            <p className="text-sm text-on-surface-variant">
-              Area <strong className="text-on-surface">{confirm.name}</strong> akan dihapus. {confirm.deviceIds.length} perangkat pada area ini akan
-              berstatus <strong>belum ditempatkan</strong> dan dapat dipindahkan ke area lain.
+          <div className="flex flex-col gap-4">
+            <p className="text-text-2">
+              Area <strong className="text-text">{confirm.name}</strong> akan dihapus. {confirm.deviceIds.length} alat pada area ini akan
+              berstatus <strong className="text-text">belum ditempatkan</strong> dan dapat dipindahkan ke area lain.
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setConfirm(null)}>Batal</Button>
-              <Button variant="danger" icon="delete" onClick={() => { removeArea(confirm.id); setConfirm(null); }}>
+              <Button variant="danger" icon="trash-2" onClick={() => { removeArea(confirm.id); setConfirm(null); }}>
                 Hapus area
               </Button>
             </div>

@@ -366,7 +366,9 @@
 }
 
 /* ── TaskList: garis pemisah mengikuti warna area bila ada ───────────────────── */
-[data-ui="task"] {
+/* Dua pemilih atribut (0,2,0) supaya mengalahkan kelas utilitas `border-border`
+   (0,1,0) di <li>; satu pemilih sebelumnya kalah dan tinta area tidak pernah tampil. */
+[data-ui="task-list"] > [data-ui="task"] {
   border-color: rgb(var(--area-line, var(--c-border)));
 }
 

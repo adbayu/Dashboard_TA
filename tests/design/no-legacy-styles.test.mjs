@@ -34,6 +34,10 @@ export const MIGRATED = [
   'src/shared/components/ui/tombol.js',
   'src/shared/components/ui/Button.jsx',
   'src/shared/components/ui/Tautan.jsx',
+  'src/kelola-area/pages/KelolaArea.jsx',
+  'src/kelola-area/pages/AreaDetail.jsx',
+  'src/kelola-area/pages/AdminAreas.jsx',
+  'src/kelola-area/model/areaTone.js',
 ];
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML
