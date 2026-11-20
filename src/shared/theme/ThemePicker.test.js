@@ -71,7 +71,8 @@ test('ThemePicker: roving tabIndex, hanya radio tercentang yang bisa di-Tab', ()
 
 test('ThemePicker: nama dan deskripsi satu baris dari spec §5', () => {
   const markup = renderToStaticMarkup(h(picker.ThemePicker, { value: 'kebun-air', onChange: noop }));
-  assert.deepEqual(radios(markup).map(nameOf), ['Kebun Air', 'Catatan Lapangan', 'Panel Instrumen', 'Tanah &amp; Lumut', 'Lumina']);
+  // Nama aksesibel memuat teks tampak, termasuk catatan "(bawaan)" (label in name).
+  assert.deepEqual(radios(markup).map(nameOf), ['Kebun Air (bawaan)', 'Catatan Lapangan', 'Panel Instrumen', 'Tanah &amp; Lumut', 'Lumina']);
   // Deskripsi tampil dan terhubung lewat aria-describedby.
   for (const radio of radios(markup)) {
     const id = radio.match(/aria-describedby="([^"]+)"/)?.[1];

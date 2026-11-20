@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
-import { ambangUntuk, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
+import { ambangSah, ambangUntuk, METRIC_KEYS, METRIC_META, nilaiMetrik, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
 import { localDateKey, localMonthKey, millisecondsUntilNextLocalMidnight } from '../../shared/model/localDate.js';
 import { Bar, Button, Card, EmptyState, Field, Input, Modal, PageHeader, Select, StatusPill, Table } from '../../shared/components/ui';
 import { FOKUS } from '../../shared/components/ui/tones.js';
@@ -552,11 +552,12 @@ export default function VPet() {
                     <AreaSection area="water" title={`Kondisi air ${kolamPet?.name || area?.name || 'kolam'}`} meta={`Menentukan ekspresi ${pet.name}`}>
                       {readings.map((read) => {
                         const evaluated = reaksi.parameter.find((item) => item.key === read.key);
-                        const assessable = read.value != null && Boolean(read.ambang);
+                        const angkaBaca = nilaiMetrik(read);
+                        const assessable = angkaBaca !== null && Boolean(read.ambang);
                         const level = assessable ? evaluated?.tingkat || (read.ok ? 'aman' : 'waspada') : 'unknown';
-                        const posisi = nilaiTerhadapAmbang(read.value, read.ambang);
-                        const ambangSah = Array.isArray(read.ambang) && Number(read.ambang[0]) <= Number(read.ambang[1]);
-                        const statusBaca = !ambangSah ? 'no-range' : posisi === 'atas' ? 'high' : posisi === 'bawah' ? 'low' : 'normal';
+                        const posisi = nilaiTerhadapAmbang(angkaBaca, read.ambang);
+                        const ambangValid = ambangSah(read.ambang);
+                        const statusBaca = !ambangValid ? 'no-range' : posisi === 'atas' ? 'high' : posisi === 'bawah' ? 'low' : 'normal';
                         const tingkatTeks = level === 'bahaya' ? 'Jauh di luar ambang. ' : level === 'waspada' ? 'Mendekati batas. ' : '';
                         return (
                           <div key={read.key} className="flex min-w-0 flex-col gap-1.5">
@@ -564,11 +565,11 @@ export default function VPet() {
                               name={read.label}
                               icon={IKON_SENSOR[read.key]}
                               device={read.device}
-                              value={read.value == null ? null : Number(read.value)}
+                              value={angkaBaca}
                               decimals={DESIMAL[read.key] ?? 1}
                               unit={read.unit}
-                              min={ambangSah ? Number(read.ambang[0]) : undefined}
-                              max={ambangSah ? Number(read.ambang[1]) : undefined}
+                              min={ambangValid ? Number(read.ambang[0]) : undefined}
+                              max={ambangValid ? Number(read.ambang[1]) : undefined}
                               status={statusBaca}
                             />
                             <p className="text-sm text-text-2">{tingkatTeks}{penjelasanKondisiAir(read)}</p>

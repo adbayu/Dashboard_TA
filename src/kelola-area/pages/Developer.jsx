@@ -253,7 +253,7 @@ export default function Developer() {
       />
 
       <div className="flex min-w-0 flex-col gap-5">
-        {notice && <Alert tone="ok">{notice}</Alert>}
+        {notice && <Alert tone="ok" live="status">{notice}</Alert>}
 
         <Card title="API key" subtitle="Secret hanya tampil sekali saat dibuat. Yang tersimpan hanya prefix.">
           {loadingKeys ? <p role="status" className="py-3 text-sm text-text-2">Memuat API key...</p> : keysError ? (

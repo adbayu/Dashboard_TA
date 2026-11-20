@@ -28,6 +28,17 @@ export function formatSensorNumber(value, decimals = 2) {
   }).format(Number(value));
 }
 
+/**
+ * Rentang ambang ideal "bawah – atas satuan" dengan angka id-ID (koma desimal,
+ * presisi per metrik). Satu-satunya pemformat rentang ambang untuk tabel; tanpa
+ * ambang hasilnya titik tengah '·' seperti sel kosong lain.
+ */
+export function formatRentangAmbang(ambang, unit = '', decimals = 2) {
+  if (!Array.isArray(ambang) || ambang.length < 2) return '·';
+  const bagian = `${formatSensorNumber(ambang[0], decimals)} – ${formatSensorNumber(ambang[1], decimals)}`;
+  return unit ? `${bagian} ${unit}` : bagian;
+}
+
 export function getSensorState(value, threshold) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'unknown';
   if (!threshold || (threshold.low == null && threshold.high == null)) return 'unknown';

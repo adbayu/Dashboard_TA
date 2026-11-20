@@ -174,7 +174,7 @@ export default function SandboxPanel({ apiKeyPrefix = '' }) {
 
   return (
     <Card title="Sandbox Test" subtitle="Uji skenario tanpa mengubah device live. Skenario hanya memengaruhi device sandbox milik akun ini.">
-      {notice && <Alert tone="ok" className="mb-3">{notice}</Alert>}
+      {notice && <Alert tone="ok" live="status" className="mb-3">{notice}</Alert>}
       {error && <SandboxErrorAlert error={error} onRetry={status === 'error' ? () => { setStatus('loading'); setError(''); void refresh(); } : undefined} />}
       {status === 'loading' && <SandboxLoadingState />}
       {status === 'error' && !sandbox && <EmptyState title="Device sandbox tidak tersedia" icon="flask-conical">Periksa koneksi API lalu coba lagi.</EmptyState>}

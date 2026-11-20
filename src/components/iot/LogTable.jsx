@@ -64,9 +64,9 @@ export default function LogTable({ points = [], sensors = [], selectedSensor = '
       <table data-ui="log-table" aria-label="Log pembacaan sensor" className="w-full min-w-0 text-sm min-[720px]:min-w-max">
         <thead className="hidden border-b border-border bg-surface-2 min-[720px]:table-header-group">
           <tr>
-            <th scope="col" className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-text-2">Waktu ukur</th>
+            <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-text-2">Waktu ukur</th>
             {visibleSensors.map(sensor => (
-              <th key={sensor.code} scope="col" className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-text-2 whitespace-nowrap">
+              <th key={sensor.code} scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-text-2 whitespace-nowrap">
                 {sensor.name || sensor.label || sensor.code}
               </th>
             ))}

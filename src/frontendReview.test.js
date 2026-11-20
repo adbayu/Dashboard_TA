@@ -908,10 +908,58 @@ test('Pantauan merender Alert ringkasan sebelum AreaSection dan paling banyak sa
   assert.match(taskList, /<a[^>]*href="\/(area|v-pet)/);
   assert.match(taskList, /Belum|Selesai/);
   assert.equal((markup.match(/<h1[\s>]/g) || []).length, 1, 'tepat satu h1 lewat PageHeader');
+  // Ringkasan memuat nilai sensor yang berubah tiap 5 detik: bukan live region.
+  assert.doesNotMatch(markup.match(/<div[^>]*data-ui="alert"[^>]*>/)[0], /role=/, 'Alert ringkasan Pantauan tanpa role live');
 
   // Jumlah alat di Alert dihitung dari data, bukan teks tetap.
   const online = SEED_DEVICES.filter(device => device.status === 'online').length;
   assert.ok(markup.includes(`${online} dari ${SEED_DEVICES.length} alat mengirim data`));
+});
+
+test('ringkasan ListIot (alat dan batas) tidak menjadi live region', async () => {
+  const sumber = await readFile(new URL('./list-iot/pages/ListIot.jsx', import.meta.url), 'utf8');
+  const pembuka = [...sumber.matchAll(/<Alert\b[^>]*>/g)].map(cocok => cocok[0]).filter(tag => /tone="(warn|ok)"/.test(tag));
+  assert.ok(pembuka.length >= 3, 'ListIot punya Alert ringkasan warn/ok');
+  for (const tag of pembuka) assert.doesNotMatch(tag, /\blive=/, tag);
+});
+
+test('ambang di tabel Dashboard dan Panel info alat memakai format id-ID, bukan angka mentah', async () => {
+  for (const berkas of ['./dashboard/pages/Dashboard.jsx', './shared/iot/components/PanelInfoAlat.jsx']) {
+    const sumber = await readFile(new URL(berkas, import.meta.url), 'utf8');
+    assert.match(sumber, /formatRentangAmbang\(/, berkas);
+    assert.doesNotMatch(sumber, /\$\{(?:ambang|batas|row\.ambang)\[0\]\}/, `${berkas}: tanpa angka ambang mentah`);
+  }
+});
+
+test('bagian sensor V-Pet memakai ambangSah dan nilaiMetrik bersama, bukan versi longgar sendiri', async () => {
+  const sumber = await readFile(new URL('./v-pet/pages/VPet.jsx', import.meta.url), 'utf8');
+  const impor = sumber.match(/import \{([^}]*)\} from '\.\.\/\.\.\/shared\/store\/SmartStore'/)?.[1] || '';
+  assert.match(impor, /\bambangSah\b/);
+  assert.match(impor, /\bnilaiMetrik\b/);
+  assert.doesNotMatch(sumber, /const ambangSah\s*=/, 'tanpa salinan lokal ambangSah');
+  assert.match(sumber, /ambangSah\(read\.ambang\)/);
+  assert.match(sumber, /nilaiMetrik\(read\)/);
+  assert.doesNotMatch(sumber, /Number\(read\.value\)/, 'Number(kosong) menjadi 0');
+});
+
+test('komponen IoT tidak memakai huruf 9-11 px (spec §7: langkah terkecil 12 px)', async () => {
+  for (const berkas of ['LogTable', 'EventList', 'AttentionBadge']) {
+    const sumber = await readFile(new URL(`./components/iot/${berkas}.jsx`, import.meta.url), 'utf8');
+    assert.doesNotMatch(sumber, /text-\[(?:9|10|11)px\]/, berkas);
+    assert.match(sumber, /text-xs/, `${berkas} memakai langkah 12 px`);
+  }
+});
+
+test('toast tidak memakai bayangan di semua tema; bayangan hanya lewat aturan Lumina', async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL('./app/SmartApp.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./app/styles/theme-surfaces.css', import.meta.url), 'utf8'),
+  ]);
+  const toast = app.slice(app.indexOf('function Toast()'), app.indexOf('function Shell()'));
+  assert.match(toast, /data-ui="toast"/);
+  assert.doesNotMatch(toast, /shadow-/);
+  const aturan = css.match(/\[data-theme="lumina"\] :is\(([^)]*)\) \{\s*box-shadow/)?.[1] || '';
+  assert.match(aturan, /\[data-ui="toast"\]/);
 });
 
 test('Misi & poin tidak memuat emoji; peringkat memakai nomor', async t => {

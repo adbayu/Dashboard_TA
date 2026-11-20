@@ -64,7 +64,8 @@ function Toast() {
   return (
     <div className="fixed bottom-5 right-5 z-[70] max-w-sm">
       <div
-        className={`flex items-start gap-2 rounded-card border px-4 py-3 text-sm font-semibold shadow-lg ${
+        data-ui="toast"
+        className={`flex items-start gap-2 rounded-card border px-4 py-3 text-sm font-semibold ${
           warn ? 'border-warn-line bg-warn-bg text-warn-fg' : 'border-ok-fg bg-ok-bg text-ok-fg'
         }`}
         role="status"

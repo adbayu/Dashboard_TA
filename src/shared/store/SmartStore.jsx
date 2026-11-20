@@ -652,7 +652,7 @@ export function SmartProvider({ children }) {
           phone: (data.phone || '').trim(),
           jabatan: (data.jabatan || '').trim(),
           bio: '',
-          // avatar = objek {id, warna, warnaTeks}; lihat komponen <Avatar> di ui.jsx.
+          // avatar = objek {id, keluarga, nama} (pilihan dari AVATAR_PILIHAN); data lama {id, warna} tetap terbaca, lihat <Avatar> di ui.jsx.
           avatar: data.avatar || AVATAR_PILIHAN[0],
         };
         // Akun baru DAN sesinya diset sekaligus. Kalau halaman pendaftaran

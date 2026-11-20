@@ -10,6 +10,7 @@ import {
   migrateLegacyTheme,
   readPreference,
   resolveMode,
+  watchMediaQuery,
   writePreference,
 } from './themePreference.js';
 
@@ -79,10 +80,8 @@ export function TampilanProvider({ children }) {
   // ketika pengguna kembali ke mode sistem; hanya mode sistem yang memakainya.
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const query = window.matchMedia(DARK_QUERY);
     const onChange = (event) => setPrefersDark(event.matches);
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
+    return watchMediaQuery(window.matchMedia(DARK_QUERY), onChange);
   }, []);
 
   // Updater fungsional: dua perubahan di tick yang sama (setTema lalu setMode)

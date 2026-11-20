@@ -73,3 +73,21 @@ export function migrateLegacyTheme(storage, legacyTheme) {
   writePreference(storage, pref);
   return pref;
 }
+
+/**
+ * Berlangganan perubahan MediaQueryList dan mengembalikan fungsi berhenti.
+ * Safari lama (< 14) hanya punya addListener/removeListener; tanpa keduanya
+ * (atau tanpa query) hasilnya no-op, jadi efek pemanggil tidak pernah melempar.
+ */
+export function watchMediaQuery(query, handler) {
+  if (!query) return () => {};
+  if (typeof query.addEventListener === 'function') {
+    query.addEventListener('change', handler);
+    return () => query.removeEventListener?.('change', handler);
+  }
+  if (typeof query.addListener === 'function') {
+    query.addListener(handler);
+    return () => query.removeListener?.(handler);
+  }
+  return () => {};
+}

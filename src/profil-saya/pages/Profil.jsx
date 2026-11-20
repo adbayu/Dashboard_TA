@@ -207,7 +207,7 @@ export default function Profil() {
                 <Input type="password" value={pw.ulang} onChange={(v) => setPw({ ...pw, ulang: v })} autoComplete="new-password" required />
               </Field>
 
-              {pesanPw.text && <Alert tone={pesanPw.tone === 'ok' ? 'ok' : 'bad'}>{pesanPw.text}</Alert>}
+              {pesanPw.text && <Alert tone={pesanPw.tone === 'ok' ? 'ok' : 'bad'} live={pesanPw.tone === 'ok' ? 'status' : undefined}>{pesanPw.text}</Alert>}
 
               <div>
                 <Button type="submit" variant="secondary">Ganti password</Button>

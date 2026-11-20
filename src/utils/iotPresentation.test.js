@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   formatEventMessage,
   formatMeasuredAt,
+  formatRentangAmbang,
   formatSensorNumber,
   formatThreshold,
   getSensorState,
@@ -119,4 +120,13 @@ test('resolveTelemetrySnapshot keeps latest, history, and event errors scoped to
   assert.deepEqual(resolved.history, { ph: { sensor: 'ph', points: [] } });
   assert.deepEqual(resolved.historyErrors, { tds: 'Riwayat TDS gagal.' });
   assert.equal(resolved.error, 'Latest gagal. Riwayat TDS gagal.');
+});
+
+test('formatRentangAmbang prints "bawah – atas satuan" with Indonesian decimals', () => {
+  assert.equal(formatRentangAmbang([6.5, 8.5], 'pH', 2), '6,50 – 8,50 pH');
+  assert.equal(formatRentangAmbang([25, 30], '°C', 1), '25,0 – 30,0 °C');
+  assert.equal(formatRentangAmbang([500, 900], 'ppm', 0), '500 – 900 ppm');
+  assert.equal(formatRentangAmbang([6.5, 8.5], '', 1), '6,5 – 8,5');
+  assert.equal(formatRentangAmbang(null, 'pH', 2), '·');
+  assert.equal(formatRentangAmbang(undefined, 'pH', 2), '·');
 });

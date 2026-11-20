@@ -64,3 +64,6 @@ perlakuan permukaan.
 - `/pilot` (`src/pilot/`) memakai gayanya sendiri dan di luar design system ini.
 - Warna data tersimpan lama (kategori alat, avatar akun) tidak dipakai langsung;
   hanya ronanya yang dibaca untuk memilih nada token terdekat.
+- Tabel (`Table`) di bawah 720 px bergulir mendatar, bukan berubah menjadi tata letak
+  kartu seperti di spec §8. Ini penyimpangan yang disengaja; mode kartu untuk semua
+  tabel adalah pekerjaan lanjutan.

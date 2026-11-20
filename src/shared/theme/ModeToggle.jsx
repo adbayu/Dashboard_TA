@@ -44,7 +44,10 @@ export function ModeToggle({ value, onChange, label = 'Mode warna', className })
             onClick={() => onChange?.(mode.id)}
             className={clsx(
               'inline-flex h-[34px] items-center gap-1.5 whitespace-nowrap rounded-control px-3 text-sm font-semibold leading-5 transition-colors duration-200',
-              on ? 'bg-surface text-text ring-1 ring-border' : 'text-text-2 hover:text-text',
+              // Terpilih: garis primary di bawah label (>= 3:1, WCAG 1.4.11), bukan hanya latar.
+              on
+                ? "relative bg-surface text-text ring-1 ring-border before:absolute before:inset-x-3 before:bottom-[3px] before:h-0.5 before:rounded-full before:bg-primary before:content-['']"
+                : 'text-text-2 hover:text-text',
               FOKUS,
             )}
           >

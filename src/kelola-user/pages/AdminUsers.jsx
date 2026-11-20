@@ -210,7 +210,7 @@ export default function AdminUsers() {
           </Alert>
         ))}
 
-        {message && !open && <Alert tone={message.tone}>{message.text}</Alert>}
+        {message && !open && <Alert tone={message.tone} live={message.tone === 'bad' ? undefined : 'status'}>{message.text}</Alert>}
 
         <section aria-label="Akun pengguna sistem" className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">

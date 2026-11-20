@@ -75,7 +75,19 @@ test('Alert bad is announced as an alert with title, body, and action', () => {
   assert.match(markup, /Coba lagi/);
   assert.match(markup, /<svg/);
   assert.match(markup, /bg-bad-bg/);
-  assert.match(render(ui.Alert, { tone: 'info' }, 'Info'), /role="status"/);
+});
+
+test('Alert has no live region unless the caller opts in with `live`', () => {
+  for (const tone of ['info', 'ok', 'warn']) {
+    const markup = render(ui.Alert, { tone, title: 'Ringkasan' }, 'Nilai berubah tiap 5 detik.');
+    assert.doesNotMatch(markup, /role=/, `${tone} summary must not be a live region`);
+    assert.match(markup, /data-ui="alert"/);
+  }
+  assert.match(render(ui.Alert, { tone: 'info', live: 'status' }, 'Tersimpan'), /role="status"/);
+  assert.match(render(ui.Alert, { tone: 'ok', live: 'status' }, 'Tersimpan'), /role="status"/);
+  assert.match(render(ui.Alert, { tone: 'warn', live: 'alert' }, 'Gagal'), /role="alert"/);
+  // Galat tetap diumumkan tanpa perlu opt-in.
+  assert.match(render(ui.Alert, { tone: 'bad' }, 'Galat'), /role="alert"/);
 });
 
 test('SectionTitle ignores the legacy eyebrow prop', () => {

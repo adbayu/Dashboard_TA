@@ -42,7 +42,9 @@ export const AVATAR_LAMA = [
 ];
 
 // Identitas akun demo = avatar divalidasi (inisial nama + warna), bukan foto orang.
-// Bentuknya objek {id, warna, warnaTeks}; komponen memakai <Avatar> dari ui.jsx.
+// Pilihan baru berbentuk {id, keluarga, nama} (lihat AVATAR_PILIHAN); seed ini masih
+// memakai bentuk lama {id, warna, warnaTeks}, yang tetap diterima: hanya rona warna
+// yang dibaca untuk memilih keluarga token. Komponen memakai <Avatar> dari ui.jsx.
 export const avatarKe = (seed, nama, email, warna) => ({
   id: `${seed}-${(email || nama || 'akun').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8)}`,
   warna,

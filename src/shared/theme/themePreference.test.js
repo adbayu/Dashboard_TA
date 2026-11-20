@@ -11,6 +11,7 @@ import {
   migrateLegacyTheme,
   readPreference,
   resolveMode,
+  watchMediaQuery,
   writePreference,
 } from './themePreference.js';
 
@@ -146,4 +147,35 @@ test('TampilanProvider memakai updater fungsional dan menyimpan nilai gabungan, 
   assert.doesNotMatch(source, /\.\.\.pref,\s*\.\.\.patch/, 'update() tidak boleh menggabung ke pref hasil closure');
   assert.match(source, /writePreference\(browserStorage\(\), pref\)/, 'yang disimpan adalah state terbaru');
   assert.match(source, /const update = useCallback\(\(patch\) => \{[^}]*\}, \[\]\);/, 'update() tidak bergantung pada pref');
+});
+
+// ── Langganan perubahan skema warna OS ─────────────────────────────────────────
+test('watchMediaQuery memakai addEventListener bila ada dan melepasnya saat berhenti', () => {
+  const calls = [];
+  const query = {
+    addEventListener: (type, handler) => calls.push(['add', type, handler]),
+    removeEventListener: (type, handler) => calls.push(['remove', type, handler]),
+  };
+  const handler = () => {};
+  const stop = watchMediaQuery(query, handler);
+  assert.deepEqual(calls, [['add', 'change', handler]]);
+  stop();
+  assert.deepEqual(calls[1], ['remove', 'change', handler]);
+});
+
+test('watchMediaQuery jatuh ke addListener/removeListener di Safari lama tanpa melempar', () => {
+  const calls = [];
+  const query = {
+    addListener: (handler) => calls.push(['add', handler]),
+    removeListener: (handler) => calls.push(['remove', handler]),
+  };
+  const handler = () => {};
+  const stop = watchMediaQuery(query, handler);
+  stop();
+  assert.deepEqual(calls, [['add', handler], ['remove', handler]]);
+});
+
+test('watchMediaQuery tanpa API langganan atau tanpa query menjadi no-op', () => {
+  assert.doesNotThrow(() => watchMediaQuery({}, () => {})());
+  assert.doesNotThrow(() => watchMediaQuery(null, () => {})());
 });

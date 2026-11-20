@@ -114,7 +114,7 @@ export function ThemePicker({ value, onChange, mode, label = 'Tema tampilan', co
             type="button"
             role="radio"
             aria-checked={on}
-            aria-label={tema.nama}
+            aria-label={!compact && tema.catatan ? `${tema.nama} (${tema.catatan})` : tema.nama}
             aria-describedby={compact ? undefined : idDeskripsi}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange?.(tema.id)}

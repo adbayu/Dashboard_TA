@@ -149,8 +149,11 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
                     data-ui="nav-item"
                     className={({ isActive }) =>
                       clsx(
-                        'flex items-center gap-2.5 rounded-control p-2 text-[15px] leading-[22px] transition-colors duration-200',
-                        isActive ? 'bg-side-active text-side-active-text font-semibold' : 'text-side-text hover:bg-side-active',
+                        'relative flex items-center gap-2.5 rounded-control p-2 text-[15px] leading-[22px] transition-colors duration-200',
+                        // Aktif: garis side-active-text di sisi kiri (>= 3:1 atas side-bg, WCAG 1.4.11), bukan hanya latar.
+                        isActive
+                          ? "bg-side-active text-side-active-text font-semibold before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-full before:bg-side-active-text before:content-['']"
+                          : 'text-side-text hover:bg-side-active',
                         FOKUS_SIDEBAR,
                       )
                     }
@@ -172,12 +175,12 @@ export default function SmartSidebar({ role: roleProp, isOpen = false, onClose }
               to="/profil"
               title="Buka profil saya"
               onClick={onClose}
-              className={clsx('flex items-center gap-2.5 rounded-control p-2 transition-colors duration-200 hover:bg-side-active', FOKUS_SIDEBAR)}
+              className={clsx('group flex items-center gap-2.5 rounded-control p-2 transition-colors duration-200 hover:bg-side-active', FOKUS_SIDEBAR)}
             >
               <Avatar avatar={currentUser.avatar} nama={currentUser.name} size="sm" />
               <span className="min-w-0 flex-1 text-sm leading-5">
                 <span className="block truncate font-semibold">{currentUser.name}</span>
-                <span className="block truncate text-[13px] leading-[18px] text-side-text-2">
+                <span className="block truncate text-[13px] leading-[18px] text-side-text-2 group-hover:text-side-text">
                   {PERAN[role] || PERAN.pengguna} · {points.toLocaleString('id-ID')} poin
                 </span>
               </span>

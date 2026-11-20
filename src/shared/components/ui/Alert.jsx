@@ -11,15 +11,19 @@ const NADA = {
 
 /**
  * Ringkasan satu penekanan per layar: apa yang terjadi (title), apa yang
- * harus dilakukan (children), dan satu aksi. `bad` diumumkan sebagai alert,
- * nada lain sebagai status agar pembaca layar tidak disela.
+ * harus dilakukan (children), dan satu aksi. Secara bawaan hanya `bad` yang
+ * diumumkan (role="alert"). Ringkasan halaman memuat nilai yang berubah tiap
+ * beberapa detik, jadi nada lain TIDAK menjadi live region kecuali pemanggil
+ * memilih lewat `live` ('status' | 'alert'), mis. untuk hasil formulir atau
+ * pesan sementara yang baru muncul.
  */
-export function Alert({ tone = 'info', title, children, meta, action, icon, className = '' }) {
+export function Alert({ tone = 'info', title, children, meta, action, icon, live, className = '' }) {
   const nama = NADA[tone] ? tone : 'info';
   const nada = NADA[nama];
+  const role = live === 'status' || live === 'alert' ? live : (nama === 'bad' ? 'alert' : undefined);
   return (
     <div
-      role={nama === 'bad' ? 'alert' : 'status'}
+      role={role}
       data-ui="alert"
       data-tone={nama}
       className={clsx('flex flex-wrap items-center gap-x-5 gap-y-3 rounded-card border px-4 py-3.5 text-text', nada.kotak, className)}

@@ -85,6 +85,18 @@ test('DeviceClaim: judul langkah aktif menjadi satu-satunya h1 di tiap keadaan a
   assert.match(memuat, /role="status"/);
 });
 
+test('DeviceClaim: keadaan memuat dengan pratinjau tidak menambah h1 kedua', async t => {
+  const { readFile } = await import('node:fs/promises');
+  const vite = await muatKlaim(t);
+  const { DeviceClaimLoadingState } = await vite.ssrLoadModule('/src/kelola-area/pages/DeviceClaim.jsx');
+  // Tanpa pratinjau: h1 sr-only. Dengan pratinjau (kartu pratinjau sudah memuat h1): tanpa h1.
+  assert.equal(jumlahH1(renderToStaticMarkup(React.createElement(DeviceClaimLoadingState))), 1);
+  assert.equal(jumlahH1(renderToStaticMarkup(React.createElement(DeviceClaimLoadingState, { adaPratinjau: true }))), 0);
+  assert.match(renderToStaticMarkup(React.createElement(DeviceClaimLoadingState, { adaPratinjau: true })), /role="status"/);
+  const sumber = await readFile(new URL('./DeviceClaim.jsx', import.meta.url), 'utf8');
+  assert.match(sumber, /viewState === 'loading' && <DeviceClaimLoadingState adaPratinjau=\{Boolean\(viewPreview\)\} \/>/);
+});
+
 test('DeviceClaim: langkah hasil memakai h1 hanya saat tidak ada kartu pratinjau (yang sudah memuat h1)', async t => {
   const { readFile } = await import('node:fs/promises');
   const sumber = await readFile(new URL('./DeviceClaim.jsx', import.meta.url), 'utf8');

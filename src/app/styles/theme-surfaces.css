@@ -10,7 +10,7 @@
      data-pad="sm|md|none" padding Card, untuk menghitung kepala selebar kartu
      data-ui="button" + data-variant="primary|secondary|danger|ghost"
      data-ui="pill"        StatusPill/Badge
-     data-ui="alert" | "table" | "metric" | "modal" | "modal-foot"
+     data-ui="alert" | "table" | "metric" | "modal" | "modal-foot" | "toast"
      data-ui="page-title"  h1 PageHeader
      data-ui="tab" | "chip" | "empty"
      Komponen domain IoT (src/components/iot):
@@ -113,12 +113,12 @@
 }
 
 [data-theme="lumina"][data-mode="dark"] body {
-  background-image: radial-gradient(circle at 20% 0%, rgb(var(--c-leaf-line)), rgb(var(--c-bg)) 55%);
+  background-image: radial-gradient(circle at 20% 0%, rgb(var(--c-leaf-line) / 0.55), rgb(var(--c-bg)) 55%);
 }
 
 /* Tanpa dukungan backdrop-filter, kartu tetap `surface` padat (dari kelas
    token komponen) sehingga teks tidak duduk langsung di atas gradien. */
-[data-theme="lumina"] :is([data-ui="card"], [data-ui="metric"], [data-ui="table"], [data-ui="alert"], [data-ui="modal"]) {
+[data-theme="lumina"] :is([data-ui="card"], [data-ui="metric"], [data-ui="table"], [data-ui="alert"], [data-ui="modal"], [data-ui="toast"]) {
   box-shadow: 0 8px 32px -4px rgb(var(--c-primary) / 0.18);
 }
 
@@ -149,6 +149,14 @@
   box-shadow: 0 4px 20px rgb(var(--c-primary) / 0.45);
 }
 
+/* Hover: gradien menghapus warna latar, jadi `primary-hover` dipakai sebagai
+   titik awal gradien dan cahayanya menguat. Label on-primary tetap >= 4,5:1 di
+   atas kedua titik (diuji di uiContrast). */
+[data-theme="lumina"] [data-ui="button"][data-variant="primary"]:not(:disabled):hover {
+  background-image: linear-gradient(135deg, rgb(var(--c-primary-hover)), rgb(var(--c-info-fg)));
+  box-shadow: 0 6px 26px rgb(var(--c-primary-hover) / 0.55);
+}
+
 [data-theme="lumina"] [data-ui="page-title"] {
   background-image: linear-gradient(90deg, rgb(var(--c-primary)), rgb(var(--c-info-fg)));
   -webkit-background-clip: text;
@@ -170,6 +178,7 @@
 }
 
 [data-theme="lumina"] [data-ui="tab"] {
+  position: relative;
   border: 0;
   margin: 0;
   border-radius: var(--radius-pill);
@@ -179,6 +188,20 @@
 [data-theme="lumina"] [data-ui="tab"][aria-selected="true"] {
   background: rgb(var(--c-surface));
   box-shadow: 0 8px 32px -4px rgb(var(--c-primary) / 0.18);
+}
+
+/* Garis primary di bawah label tab terpilih: pengganti garis bawah tab tema lain
+   (aturan di atas menghapus border), supaya keadaan terpilih >= 3:1 (WCAG 1.4.11)
+   dan tidak hanya mengandalkan latar kaca. */
+[data-theme="lumina"] [data-ui="tab"][aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--c-primary));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -459,7 +482,7 @@
 }
 
 [data-pratinjau][data-theme="lumina"][data-mode="dark"] {
-  background-image: radial-gradient(circle at 20% 0%, rgb(var(--c-leaf-line)), rgb(var(--c-bg)) 55%);
+  background-image: radial-gradient(circle at 20% 0%, rgb(var(--c-leaf-line) / 0.55), rgb(var(--c-bg)) 55%);
 }
 
 [data-pratinjau][data-theme="lumina"] [data-ui="pratinjau-side"] {

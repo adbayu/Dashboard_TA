@@ -44,7 +44,7 @@ export default function EventList({ events = [], deviceCode, sensors = [] }) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={style.tone}>{style.label}</Badge>
-                <span className="font-mono text-[11px] text-text-2">{deviceCode}</span>
+                <span className="font-mono text-xs text-text-2">{deviceCode}</span>
               </div>
               <p className="mt-1 break-words text-sm font-semibold text-text">{formatEventMessage(event, sensorNames)}</p>
               <time className="mt-1 block text-xs text-text-2" dateTime={event.at || undefined}>{formatEventTime(event.at)}</time>

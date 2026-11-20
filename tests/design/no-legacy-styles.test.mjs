@@ -43,7 +43,12 @@ export const MIGRATED = [...kumpulkanJsx('src/', 'src/', []), ...EKSTRA].sort();
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML
 // (&#8212;) maupun id/kata yang menempel pada '#'.
 export const LEGACY = [
-  /\b(text|bg|border)-(red|amber|emerald|sky|green|slate|gray)-\d{2,3}\b/,
+  // Palet Tailwind mentah (semua nama berlangkah angka) pada utilitas warna.
+  /\b(?:text|bg|border|ring|from|to|via|fill|stroke)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/,
+  // Varian dark: (mode gelap datang dari token lewat data-mode, bukan kelas).
+  /(?<![\w-])dark:/,
+  // Literal rgb()/rgba() berangka; rgb(var(--c-...)) yang memakai token tetap sah.
+  /\brgba?\((?=\s*[\d.])/,
   /material-symbols-outlined/,
   /\bglass-(card|panel|input)\b/,
   /\bpanel-inset\b/,
@@ -161,6 +166,17 @@ test('stripComments tetap membuang komentar asli dan menjaga nomor baris', () =>
 // komentar rusak lagi, ratchet tidak boleh lulus karena menelan semuanya.
 const CONTOH_PELANGGARAN = [
   ['kelas warna palet', '<p className="bg-red-50" />', 'bg-red-50'],
+  ['palet text-', '<p className="text-blue-600" />', 'text-blue-600'],
+  ['palet ring-', '<input className="focus:ring-indigo-500" />', 'ring-indigo-500'],
+  ['palet from-', '<div className="from-teal-400" />', 'from-teal-400'],
+  ['palet to-', '<div className="to-violet-500" />', 'to-violet-500'],
+  ['palet via-', '<div className="via-orange-300" />', 'via-orange-300'],
+  ['palet fill-', '<svg className="fill-rose-500" />', 'fill-rose-500'],
+  ['palet stroke-', '<svg className="stroke-zinc-300" />', 'stroke-zinc-300'],
+  ['palet border- netral', '<div className="hover:border-slate-200" />', 'border-slate-200'],
+  ['varian dark:', '<div className="dark:bg-surface" />', 'dark:'],
+  ['literal rgb', "const c = 'rgb(15, 82, 56)';", 'rgb('],
+  ['literal rgba', "const c = 'rgba(0,0,0,.5)';", 'rgba('],
   ['material symbols', '<span className="material-symbols-outlined">eco</span>', 'material-symbols-outlined'],
   ['glass', '<div className="glass-card" />', 'glass-card'],
   ['panel-inset', '<div className="panel-inset" />', 'panel-inset'],
@@ -177,6 +193,17 @@ test('setiap pola LEGACY terdeteksi oleh findLegacy (uji diri positif)', () => {
   for (const pola of LEGACY) {
     assert.ok(CONTOH_PELANGGARAN.some(([, sumber]) => pola.test(sumber)), `pola ${pola} punya contoh`);
   }
+});
+
+test('pola baru tidak mengenai token, rgb(var(--c-...)), atau kata biasa', () => {
+  const sah = [
+    '<p className="bg-primary text-text-2 border-border" />',
+    "const w = 'rgb(var(--c-primary) / 0.5)';",
+    '<div data-mode="dark" className="bg-surface" />',
+    '<p>Mode dark aktif</p>',
+    '<p className="from-primary to-info-fg" />',
+  ];
+  for (const sumber of sah) assert.deepEqual(findLegacy('x.jsx', sumber), [], sumber);
 });
 
 test('semua halaman bebas dari gaya lama', async () => {

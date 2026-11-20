@@ -634,7 +634,7 @@ export default function AdminIotPage() {
       <KepalaKelolaIot sample={data?.label === 'Data contoh'} />
       <div className="flex min-w-0 flex-col gap-4">
         {actionError && <Alert tone="bad">{actionError}</Alert>}
-        {notice && <Alert tone="ok">{notice}</Alert>}
+        {notice && <Alert tone="ok" live="status">{notice}</Alert>}
         <Tabs tabs={tabs} value={tab} onChange={setTab} label="Bagian Kelola IoT" />
       </div>
 

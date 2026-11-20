@@ -194,7 +194,7 @@ export default function DeviceClaim() {
       <div className="mx-auto w-full max-w-lg space-y-4">
         <PublicHeader />
 
-        {viewState === 'loading' && <DeviceClaimLoadingState />}
+        {viewState === 'loading' && <DeviceClaimLoadingState adaPratinjau={Boolean(viewPreview)} />}
         {previewCard}
 
         {viewState === 'login-required' && (
@@ -314,10 +314,12 @@ export function ActivationRequiredState({ manualActivationCode, viewError, onMan
   );
 }
 
-export function DeviceClaimLoadingState() {
+// Di mode API, pratinjau sudah tampil saat sesi masih dimuat; kartu pratinjau
+// membawa h1-nya sendiri, jadi h1 tersembunyi hanya untuk keadaan tanpa pratinjau.
+export function DeviceClaimLoadingState({ adaPratinjau = false }) {
   return (
     <Card>
-      <h1 className="sr-only">Klaim perangkat</h1>
+      {!adaPratinjau && <h1 className="sr-only">Klaim perangkat</h1>}
       <p role="status" className="text-[15px] leading-[22px] text-text-2">Memuat informasi QR...</p>
     </Card>
   );

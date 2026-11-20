@@ -9,7 +9,7 @@ import AreaSection from '../../components/iot/AreaSection.jsx';
 import ReadingChart from '../../components/iot/ReadingChart.jsx';
 import SensorReading from '../../components/iot/SensorReading.jsx';
 import TaskList from '../../components/iot/TaskList.jsx';
-import { formatSensorNumber } from '../../utils/iotPresentation.js';
+import { formatRentangAmbang, formatSensorNumber } from '../../utils/iotPresentation.js';
 import { areaTone } from '../../kelola-area/model/areaTone.js';
 import { missionActivityDestination } from '../../gamifikasi/model/missionNavigation.js';
 
@@ -252,7 +252,7 @@ export default function Dashboard() {
                             {s ? `${angka(s.min, meta.precision)}–${angka(s.max, meta.precision)}` : '·'}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 font-num tabular-nums text-text-2">
-                            {row.ambang ? `${row.ambang[0]}–${row.ambang[1]} ${meta.unit}` : 'Belum diatur'}
+                            {row.ambang ? formatRentangAmbang(row.ambang, meta.unit, meta.precision) : 'Belum diatur'}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
                             <StatusPill tone={status.tone} icon={status.icon}>{status.text}</StatusPill>
