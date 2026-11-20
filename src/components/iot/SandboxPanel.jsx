@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSmart } from '../../shared/store/SmartStore';
-import { Badge, Button, Card, Empty, Field, SectionTitle, Select } from '../../shared/components/ui';
+import { Alert, Button, Card, EmptyState, Field, Select, StatusPill } from '../../shared/components/ui';
 import { IOT_SOURCE, iotApi } from '../../services/iotApi.js';
 import { iotStreamClient } from '../../services/iotStream.js';
-import { formatEventMessage, formatMeasuredAt, formatSensorNumber, mergeLatestReading } from '../../utils/iotPresentation.js';
+import { formatEventMessage, formatSensorNumber, mergeLatestReading } from '../../utils/iotPresentation.js';
 import { mergeEventPages, sandboxConnectionStatus, sandboxCurlExample } from '../../utils/monitoring.js';
-import SensorStateBadge from './SensorStateBadge.jsx';
+import SensorReading from './SensorReading.jsx';
+
+// Status pH dari API (normal | low | high | unknown) ke status SensorReading.
+const STATUS_PH = { normal: 'normal', low: 'low', high: 'high', unknown: 'no-range' };
+const angkaSah = value => typeof value === 'number' && Number.isFinite(value);
 
 const SCENARIOS = [
   { value: 'normal', label: 'Normal' },
@@ -15,7 +19,7 @@ const SCENARIOS = [
 ];
 
 export function SandboxLoadingState() {
-  return <p role="status" className="py-3 text-sm text-on-surface-variant">Memuat device sandbox...</p>;
+  return <p role="status" className="py-3 text-sm text-text-2">Memuat device sandbox...</p>;
 }
 
 export function SandboxReadingValue({ reading }) {
@@ -28,10 +32,10 @@ export function SandboxEventMessage({ event }) {
 
 export function SandboxErrorAlert({ error, onRetry }) {
   return (
-    <div role="alert" className="mb-3 space-y-2 rounded-xl border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">
+    <Alert tone="bad" className="mb-3">
       <p>{error}</p>
-      {onRetry && <Button variant="ghost" icon="refresh" onClick={onRetry}>Coba lagi</Button>}
-    </div>
+      {onRetry && <Button variant="secondary" size="sm" icon="refresh-cw" className="mt-2" onClick={onRetry}>Coba lagi</Button>}
+    </Alert>
   );
 }
 
@@ -166,55 +170,67 @@ export default function SandboxPanel({ apiKeyPrefix = '' }) {
   const phReading = sandbox?.latest?.readings?.find(reading => reading.sensor === 'ph');
   const latestEvent = sandbox?.events?.[0];
   const connection = sandboxConnectionStatus(sandbox?.device?.status);
+  const low = phReading?.threshold?.low;
+  const high = phReading?.threshold?.high;
+  // Rentang hanya digambar bila ambangnya lengkap dan tidak terbalik.
+  const rentangSah = angkaSah(low) && angkaSah(high) && low < high;
+  const nilaiPh = phReading?.value == null || phReading.value === '' ? null : Number(phReading.value);
 
   return (
-    <Card pad="sm">
-      <SectionTitle eyebrow="Sandbox Test" title="Uji skenario tanpa mengubah device live" subtitle="Skenario memengaruhi device sandbox milik akun ini saja." />
-      {notice && <p role="status" className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100">{notice}</p>}
+    <Card title="Sandbox Test" subtitle="Uji skenario tanpa mengubah device live. Skenario hanya memengaruhi device sandbox milik akun ini.">
+      {notice && <Alert tone="ok" className="mb-3">{notice}</Alert>}
       {error && <SandboxErrorAlert error={error} onRetry={status === 'error' ? () => { setStatus('loading'); setError(''); void refresh(); } : undefined} />}
       {status === 'loading' && <SandboxLoadingState />}
-      {status === 'error' && !sandbox && <Empty title="Device sandbox tidak tersedia" hint="Periksa koneksi API lalu coba lagi." icon="science" />}
-      {status === 'ready' && !sandbox && <Empty title="Device sandbox belum tersedia" hint="Endpoint Sandbox akan menyiapkan device untuk akun ini." icon="science" />}
-      {sandbox && <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-outline-variant/50 p-3">
+      {status === 'error' && !sandbox && <EmptyState title="Device sandbox tidak tersedia" icon="flask-conical">Periksa koneksi API lalu coba lagi.</EmptyState>}
+      {status === 'ready' && !sandbox && <EmptyState title="Device sandbox belum tersedia" icon="flask-conical">Endpoint Sandbox akan menyiapkan device untuk akun ini.</EmptyState>}
+      {sandbox && <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
           <div className="min-w-0">
-            <h3 className="break-words font-semibold text-on-surface">{sandbox.name}</h3>
-            <p className="mt-1 break-all font-mono text-xs text-on-surface-variant">{sandbox.code}</p>
-            <p className="mt-1 text-xs text-on-surface-variant">Area: {sandbox.areaRef || 'Belum diatur'}</p>
+            <h3 className="break-words font-semibold text-text">{sandbox.name}</h3>
+            <p className="mt-0.5 break-all font-num text-sm text-text-2">{sandbox.code}</p>
+            <p className="mt-0.5 text-sm text-text-2">Area: {sandbox.areaRef || 'Belum diatur'}</p>
           </div>
-          <Badge tone={connection.tone} icon={connection.icon}>{connection.label}</Badge>
+          <StatusPill tone={connection.tone} icon={connection.icon}>{connection.label}</StatusPill>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl bg-surface-container-low p-3">
-            <p className="text-xs font-semibold text-on-surface-variant">pH terakhir</p>
-            <p className="mt-1 font-bold tabular-nums text-on-surface"><SandboxReadingValue reading={phReading} /></p>
-            <div className="mt-2"><SensorStateBadge state={phReading?.state} /></div>
-            <p className="mt-2 text-xs text-on-surface-variant">{formatMeasuredAt(sandbox.latest?.measuredAt)}</p>
-          </div>
-          <div className="rounded-xl bg-surface-container-low p-3">
-            <p className="text-xs font-semibold text-on-surface-variant">Ambang pH efektif</p>
-            <p className="mt-1 text-sm text-on-surface">{phReading?.threshold?.low == null && phReading?.threshold?.high == null ? 'Ambang belum tersedia' : `${phReading.threshold.low ?? 'tanpa batas bawah'} sampai ${phReading.threshold.high ?? 'tanpa batas atas'} pH`}</p>
-          </div>
-          <div className="rounded-xl bg-surface-container-low p-3">
-            <p className="text-xs font-semibold text-on-surface-variant">Kejadian terakhir</p>
-            <p className="mt-1 break-words text-sm font-semibold text-on-surface"><SandboxEventMessage event={latestEvent} /></p>
-            <p className="mt-2 text-xs text-on-surface-variant">{latestEvent?.at ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(latestEvent.at)) : 'Waktu tidak tersedia'}</p>
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SensorReading
+            name="pH terakhir"
+            icon="flask-conical"
+            device={sandbox.code}
+            value={Number.isFinite(nilaiPh) ? nilaiPh : null}
+            decimals={2}
+            unit="pH"
+            min={rentangSah ? low : undefined}
+            max={rentangSah ? high : undefined}
+            status={STATUS_PH[phReading?.state] || 'no-range'}
+            measuredAt={sandbox.latest?.measuredAt}
+            emptyText="Belum ada data"
+          />
+          <dl className="flex min-w-0 flex-col gap-3 text-sm">
+            <div>
+              <dt className="font-semibold text-text-2">Ambang pH efektif</dt>
+              <dd className="mt-0.5 text-text">{low == null && high == null ? 'Ambang belum tersedia' : `${low ?? 'tanpa batas bawah'} sampai ${high ?? 'tanpa batas atas'} pH`}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-text-2">Kejadian terakhir</dt>
+              <dd className="mt-0.5 break-words font-semibold text-text"><SandboxEventMessage event={latestEvent} /></dd>
+              <dd className="mt-0.5 text-text-2">{latestEvent?.at ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(latestEvent.at)) : 'Waktu tidak tersedia'}</dd>
+            </div>
+          </dl>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[minmax(12rem,0.75fr)_minmax(0,1.25fr)] sm:items-end">
-          <Field label="Skenario sandbox"><Select value={sandbox.scenario} onChange={selectScenario} options={SCENARIOS} disabled={saving} /></Field>
-          <p className="text-xs leading-relaxed text-on-surface-variant">Pilih pH turun untuk memeriksa perubahan state pH dan event ambang dari runner sandbox. Tidak ada device live yang diubah.</p>
-        </div>
-        {saving && <p role="status" className="text-sm text-on-surface-variant">Menyimpan skenario...</p>}
-        <div className="rounded-xl border border-outline-variant/50 p-3">
+        <Field label="Skenario sandbox" hint="Pilih pH turun untuk memeriksa perubahan state pH dan event ambang dari runner sandbox. Tidak ada device live yang diubah.">
+          <Select value={sandbox.scenario} onChange={selectScenario} options={SCENARIOS} disabled={saving} />
+        </Field>
+        {saving && <p role="status" className="text-sm text-text-2">Menyimpan skenario...</p>}
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div><h3 className="text-sm font-semibold text-on-surface">Contoh request</h3><p className="mt-1 text-xs text-on-surface-variant">Prefix aman saja. Isi environment key dengan secret Test milikmu.</p></div>
-            <Button variant="ghost" icon={copyState === 'Contoh curl tersalin.' ? 'check' : 'content_copy'} onClick={copyCurl}>Salin curl</Button>
+            <div><h3 className="font-semibold text-text">Contoh request</h3><p className="mt-0.5 text-sm text-text-2">Prefix aman saja. Isi environment key dengan secret Test milikmu.</p></div>
+            <Button variant="ghost" size="sm" icon={copyState === 'Contoh curl tersalin.' ? 'check' : 'copy'} onClick={copyCurl}>Salin curl</Button>
           </div>
-          {copyState && <p role="status" className="mt-2 text-xs text-on-surface-variant">{copyState}</p>}
-          <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-surface-container-low p-3 text-xs leading-relaxed text-on-surface"><code>{sandboxCurlExample({ deviceId: sandbox.id, scenario: sandbox.scenario, apiKeyPrefix })}</code></pre>
+          {copyState && <p role="status" className="text-sm text-text-2">{copyState}</p>}
+          <pre tabIndex={0} aria-label="Contoh curl untuk mengubah skenario sandbox" className="custom-scrollbar max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-control bg-surface-2 p-3 font-num text-xs leading-relaxed text-text"><code>{sandboxCurlExample({ deviceId: sandbox.id, scenario: sandbox.scenario, apiKeyPrefix })}</code></pre>
         </div>
       </div>}
     </Card>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSmart } from '../../shared/store/SmartStore';
-import { AksiBaris, Badge, Button, Card, Empty, Field, Input, Modal, SectionTitle, Select, StatCard, Table } from '../../shared/components/ui';
+import { Alert, Button, Card, Checkbox, EmptyState, Field, Input, Modal, PageHeader, Select, StatusPill, Table } from '../../shared/components/ui';
+import { kelasTombol } from '../../shared/components/ui/tombol.js';
 import { developerApi } from '../../services/developerApi.js';
 import { IOT_SOURCE } from '../../services/iotApi.js';
 import { developerDataEnabled } from '../../utils/frontendReview.js';
@@ -13,6 +14,10 @@ const SCOPES = [
   ['admin', 'Admin'],
 ];
 const EMPTY_FORM = { name: '', environment: 'test', scopes: ['devices:read'] };
+const JUDUL = 'Developer';
+const SUBJUDUL = 'Kelola API key untuk mengirim dan membaca data dari alat Anda sendiri.';
+const GALAT = 'text-sm font-semibold text-bad-fg';
+const ANGKA = 'font-num text-[22px] font-bold leading-7';
 
 function formattedDate(value) {
   if (!value) return 'Belum pernah';
@@ -27,6 +32,15 @@ function shortDate(value) {
 async function copyText(value) {
   if (!navigator.clipboard?.writeText) throw new Error('Fitur salin tidak tersedia di browser ini. Pilih teks lalu salin secara manual.');
   await navigator.clipboard.writeText(value);
+}
+
+function GalatMuat({ pesan, onRetry }) {
+  return (
+    <Alert tone="bad">
+      <p>{pesan}</p>
+      <Button variant="secondary" size="sm" icon="refresh-cw" className="mt-2" onClick={onRetry}>Coba lagi</Button>
+    </Alert>
+  );
 }
 
 export default function Developer() {
@@ -185,111 +199,147 @@ export default function Developer() {
 
   if (!developerDataEnabled(IOT_SOURCE)) {
     return (
-      <Card>
-        <div className="space-y-3">
-          <Badge tone="muted" icon="science">Data contoh</Badge>
-          <SectionTitle
-            eyebrow="Dashboard API"
-            title="Mode API diperlukan"
-            subtitle="Pengelolaan API key dan pemakaian memerlukan mode API."
-          />
-          <p className="text-sm text-on-surface-variant">Data contoh tidak memuat key atau statistik pemakaian.</p>
-        </div>
-      </Card>
+      <div>
+        <PageHeader title={JUDUL} subtitle={SUBJUDUL} sample />
+        <Alert tone="info" title="Mode API diperlukan.">
+          Pengelolaan API key dan pemakaian memerlukan mode API. Data contoh tidak memuat key atau statistik pemakaian.
+        </Alert>
+      </div>
     );
   }
 
+  const kolomKey = [
+    { key: 'name', label: 'Nama', render: key => <span className="break-words font-semibold">{key.name}</span> },
+    {
+      key: 'environment',
+      label: 'Environment',
+      render: key => (key.environment === 'live'
+        ? <StatusPill tone="ok" icon="zap">Live</StatusPill>
+        : <StatusPill tone="info" icon="flask-conical">Test</StatusPill>),
+    },
+    { key: 'prefix', label: 'Prefix', render: key => <span className="font-num text-sm text-text-2">{key.prefix}</span> },
+    { key: 'scopes', label: 'Scope', render: key => <span className="break-words text-sm text-text-2">{key.scopes.join(', ') || 'Tidak ada scope'}</span> },
+    { key: 'lastUsedAt', label: 'Terakhir dipakai', render: key => <span className="whitespace-nowrap text-sm text-text-2">{formattedDate(key.lastUsedAt)}</span> },
+    {
+      key: 'status',
+      label: 'Status',
+      render: key => (key.revokedAt
+        ? <StatusPill tone="bad" icon="ban">Dicabut</StatusPill>
+        : <StatusPill tone="ok" icon="circle-check">Aktif</StatusPill>),
+    },
+    {
+      key: 'aksi',
+      label: 'Aksi',
+      align: 'end',
+      render: key => (key.revokedAt ? null : (
+        <Button size="sm" variant="danger" icon="ban" aria-label={`Cabut key ${key.name}`} onClick={() => { setRevokeError(''); setRevokeTarget(key); }}>
+          Cabut
+        </Button>
+      )),
+    },
+  ];
+
   return (
-    <div className="iot-touch-targets min-w-0 space-y-5">
-      {notice && <p role="status" className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm text-on-surface">{notice}</p>}
-
-      <Card className="min-w-0" pad="sm">
-        <SectionTitle
-          eyebrow="Dashboard API"
-          title="API key"
-          subtitle="Secret hanya tampil sekali saat dibuat. Yang tersimpan hanya prefix."
-          action={<div className="flex flex-wrap items-center gap-2">
-            <a href="/docs/openapi.json" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-outline-variant/50 px-3 text-sm font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">Referensi API</a>
-            <Button icon="add" onClick={openCreate}>Buat key</Button>
-          </div>}
-        />
-        {loadingKeys ? <p role="status" className="py-5 text-sm text-on-surface-variant">Memuat API key...</p> : keysError ? (
-          <div className="space-y-3 py-3" role="alert"><p className="text-sm text-on-surface">{keysError}</p><Button icon="refresh" onClick={() => loadKeys()}>Coba lagi</Button></div>
-        ) : keys.length === 0 ? (
-          <Empty title="Belum ada API key" hint="Buat key untuk mulai menggunakan API." icon="key" action={<Button icon="add" onClick={openCreate}>Buat key</Button>} />
-        ) : (
-          <Table head={['Nama', 'Environment', 'Prefix', 'Scope', 'Terakhir dipakai', 'Status', 'Aksi']}>
-            {keys.map(key => (
-              <tr key={key.id}>
-                <td className="max-w-[14rem] break-words px-3 py-3 font-semibold text-on-surface">{key.name}</td>
-                <td className="px-3 py-3"><Badge tone={key.environment === 'live' ? 'ok' : 'info'} icon={key.environment === 'live' ? 'bolt' : 'science'}>{key.environment === 'live' ? 'Live' : 'Test'}</Badge></td>
-                <td className="px-3 py-3 font-mono text-xs text-on-surface-variant">{key.prefix}</td>
-                <td className="max-w-[14rem] break-words px-3 py-3 text-sm text-on-surface-variant">{key.scopes.join(', ') || 'Tidak ada scope'}</td>
-                <td className="whitespace-nowrap px-3 py-3 text-sm text-on-surface-variant">{formattedDate(key.lastUsedAt)}</td>
-                <td className="px-3 py-3">{key.revokedAt ? <Badge tone="bad" icon="block">Dicabut</Badge> : <Badge tone="ok" icon="check_circle">Aktif</Badge>}</td>
-                <td className="px-3 py-3">
-                  {!key.revokedAt && <AksiBaris><Button size="sm" variant="danger" onClick={() => { setRevokeError(''); setRevokeTarget(key); }}>Cabut</Button></AksiBaris>}
-                </td>
-              </tr>
-            ))}
-          </Table>
+    <div className="iot-touch-targets min-w-0">
+      <PageHeader
+        title={JUDUL}
+        subtitle={SUBJUDUL}
+        actions={(
+          <>
+            <a data-ui="button" href="/docs/openapi.json" target="_blank" rel="noopener noreferrer" className={kelasTombol({ variant: 'secondary', tautan: true })}>Referensi API</a>
+            <Button icon="plus" onClick={openCreate}>Buat key</Button>
+          </>
         )}
-      </Card>
+      />
 
-      <Card className="min-w-0" pad="sm">
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-          <SectionTitle eyebrow="Pemakaian" title="Pemakaian 7 hari" subtitle="Ringkasan dan grafik berasal dari log API untuk key yang dipilih." />
-          <div className="w-full max-w-xs">
-            <Field label="API key">
-              <Select value={effectiveKeyId} onChange={setSelectedKeyId} placeholder="Pilih key" options={keys.map(key => ({ value: key.id, label: `${key.name} · ${key.environment}` }))} disabled={keys.length === 0} />
-            </Field>
-          </div>
-        </div>
-        {loadingUsage ? <p role="status" className="py-5 text-sm text-on-surface-variant">Memuat pemakaian...</p> : usageError ? (
-          <div className="space-y-3 py-3" role="alert"><p className="text-sm text-on-surface">{usageError}</p><Button icon="refresh" onClick={loadUsage}>Coba lagi</Button></div>
-        ) : !selectedKey ? (
-          <Empty title="Pilih API key" hint="Pemakaian akan muncul setelah key tersedia." icon="query_stats" />
-        ) : usageIsEmpty ? (
-          <Empty
-            title={selectedKey?.lastUsedAt ? 'Tidak ada pemakaian dalam 7 hari terakhir' : 'Key belum pernah digunakan'}
-            hint={selectedKey?.lastUsedAt ? 'Tidak ada request yang tercatat dalam rentang ini.' : 'Belum ada request yang tercatat dalam rentang 7 hari.'}
-            icon="query_stats"
-          />
-        ) : usage ? (
-          <div className="space-y-5">
-            <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-              <StatCard label="Request" value={usage.totalRequests} icon="swap_vert" hint="Dalam 7 hari terakhir" />
-              <StatCard label="Error" value={`${usage.errorPercent}%`} icon="error" tone={usage.errorPercent > 0 ? 'warn' : 'brand'} hint="Respons dengan status 400 ke atas" />
-              <StatCard label="Kena 429" value={usage.rateLimitedRequests} icon="speed" tone={usage.rateLimitedRequests > 0 ? 'warn' : 'brand'} hint="Request yang dibatasi" />
+      <div className="flex min-w-0 flex-col gap-5">
+        {notice && <Alert tone="ok">{notice}</Alert>}
+
+        <Card title="API key" subtitle="Secret hanya tampil sekali saat dibuat. Yang tersimpan hanya prefix.">
+          {loadingKeys ? <p role="status" className="py-3 text-sm text-text-2">Memuat API key...</p> : keysError ? (
+            <GalatMuat pesan={keysError} onRetry={() => loadKeys()} />
+          ) : keys.length === 0 ? (
+            <EmptyState title="Belum ada API key" icon="key-round" action={<Button icon="plus" onClick={openCreate}>Buat key</Button>}>
+              Buat key untuk mulai menggunakan API.
+            </EmptyState>
+          ) : (
+            <Table columns={kolomKey} rows={keys} />
+          )}
+        </Card>
+
+        <Card
+          title="Pemakaian 7 hari"
+          subtitle="Ringkasan dan grafik berasal dari log API untuk key yang dipilih."
+          action={(
+            <div className="w-full min-w-[14rem] max-w-xs">
+              <Field label="API key">
+                <Select value={effectiveKeyId} onChange={setSelectedKeyId} placeholder="Pilih key" options={keys.map(key => ({ value: key.id, label: `${key.name} · ${key.environment}` }))} disabled={keys.length === 0} />
+              </Field>
             </div>
-            <figure className="min-w-0 rounded-2xl border border-outline-variant/40 p-3" role="img" aria-label={`Grafik request harian selama 7 hari untuk ${selectedKey.name}`}>
-              <figcaption className="mb-3 text-sm font-semibold text-on-surface">Request per hari</figcaption>
-              <div className="grid min-h-40 grid-cols-7 items-end gap-1 border-b border-outline-variant/50 sm:gap-3">
-                {days.map(day => {
-                  const height = maxRequests ? (day.requests / maxRequests) * 100 : 0;
-                  return <div key={day.date} className="flex h-full min-w-0 flex-col items-center justify-end gap-1">
-                    <span className="text-[10px] tabular-nums text-on-surface-variant">{day.requests}</span>
-                    <div className="w-full max-w-10 rounded-t-md bg-primary dark:bg-inverse-primary" style={{ height: `${height}%`, minHeight: day.requests ? '0.2rem' : 0 }} aria-label={`${shortDate(day.date)}: ${day.requests} request`} />
-                    <span className="pb-1 text-center text-[9px] leading-tight text-on-surface-variant sm:text-[11px]">{shortDate(day.date)}</span>
-                  </div>;
-                })}
+          )}
+        >
+          {loadingUsage ? <p role="status" className="py-3 text-sm text-text-2">Memuat pemakaian...</p> : usageError ? (
+            <GalatMuat pesan={usageError} onRetry={loadUsage} />
+          ) : !selectedKey ? (
+            <EmptyState title="Pilih API key" icon="chart-no-axes-column">Pemakaian akan muncul setelah key tersedia.</EmptyState>
+          ) : usageIsEmpty ? (
+            <EmptyState title={selectedKey?.lastUsedAt ? 'Tidak ada pemakaian dalam 7 hari terakhir' : 'Key belum pernah digunakan'} icon="chart-no-axes-column">
+              {selectedKey?.lastUsedAt ? 'Tidak ada request yang tercatat dalam rentang ini.' : 'Belum ada request yang tercatat dalam rentang 7 hari.'}
+            </EmptyState>
+          ) : usage ? (
+            <div className="flex flex-col gap-5">
+              {/* Ringkasan angka sebagai daftar, bukan deretan kartu statistik. */}
+              <dl className="grid min-w-0 gap-3 sm:grid-cols-3">
+                <div className="min-w-0">
+                  <dt className="text-sm font-semibold text-text-2">Request</dt>
+                  <dd className={`${ANGKA} text-text`}>{usage.totalRequests}</dd>
+                  <dd className="text-sm text-text-2">Dalam 7 hari terakhir</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-sm font-semibold text-text-2">Error</dt>
+                  <dd className={`${ANGKA} ${usage.errorPercent > 0 ? 'text-warn-fg' : 'text-text'}`}>{usage.errorPercent}%</dd>
+                  <dd className="text-sm text-text-2">Respons dengan status 400 ke atas</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-sm font-semibold text-text-2">Kena 429</dt>
+                  <dd className={`${ANGKA} ${usage.rateLimitedRequests > 0 ? 'text-warn-fg' : 'text-text'}`}>{usage.rateLimitedRequests}</dd>
+                  <dd className="text-sm text-text-2">Request yang dibatasi</dd>
+                </div>
+              </dl>
+              <figure className="min-w-0 rounded-card border border-border p-3" role="img" aria-label={`Grafik request harian selama 7 hari untuk ${selectedKey.name}`}>
+                <figcaption className="mb-3 text-sm font-semibold text-text">Request per hari</figcaption>
+                <div className="grid min-h-40 grid-cols-7 items-end gap-1 border-b border-border sm:gap-3">
+                  {days.map(day => {
+                    const height = maxRequests ? (day.requests / maxRequests) * 100 : 0;
+                    return (
+                      <div key={day.date} className="flex h-full min-w-0 flex-col items-center justify-end gap-1">
+                        <span className="font-num text-xs text-text-2">{day.requests}</span>
+                        <div className="w-full max-w-10 rounded-t-md bg-primary" style={{ height: `${height}%`, minHeight: day.requests ? '0.2rem' : 0 }} aria-label={`${shortDate(day.date)}: ${day.requests} request`} />
+                        <span className="pb-1 text-center text-xs leading-tight text-text-2">{shortDate(day.date)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </figure>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-text">Route terbanyak</h3>
+                {usage.topRoutes?.length ? (
+                  <ol className="flex flex-col">
+                    {usage.topRoutes.slice(0, 5).map(item => (
+                      <li key={item.route} className="flex min-w-0 flex-wrap justify-between gap-x-4 gap-y-1 border-b border-border py-2 text-sm">
+                        <code className="min-w-0 break-all font-num text-xs text-text">{item.route}</code>
+                        <span className="font-num text-text-2">{item.requests} request</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="text-sm text-text-2">Belum ada route yang tercatat.</p>}
               </div>
-            </figure>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-on-surface">Route terbanyak</h3>
-              {usage.topRoutes?.length ? (
-                <ol className="space-y-1">
-                  {usage.topRoutes.slice(0, 5).map(item => <li key={item.route} className="flex min-w-0 flex-wrap justify-between gap-x-4 gap-y-1 border-b border-outline-variant/30 py-2 text-sm">
-                    <code className="min-w-0 break-all font-mono text-xs text-on-surface">{item.route}</code><span className="tabular-nums text-on-surface-variant">{item.requests} request</span>
-                  </li>)}
-                </ol>
-              ) : <p className="text-sm text-on-surface-variant">Belum ada route yang tercatat.</p>}
             </div>
-          </div>
-        ) : <p className="py-5 text-sm text-on-surface-variant">Pemakaian belum tersedia.</p>}
-      </Card>
+          ) : <p className="py-3 text-sm text-text-2">Pemakaian belum tersedia.</p>}
+        </Card>
 
-      <SandboxPanel apiKeyPrefix={keys.find(key => key.environment === 'test' && !key.revokedAt)?.prefix || ''} />
+        <SandboxPanel apiKeyPrefix={keys.find(key => key.environment === 'test' && !key.revokedAt)?.prefix || ''} />
+      </div>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Buat API key">
         <form onSubmit={submitCreate} className="space-y-4">
@@ -297,44 +347,54 @@ export default function Developer() {
           <Field label="Environment">
             <Select value={isAdmin ? createForm.environment : 'test'} onChange={value => setCreateForm(current => ({ ...current, environment: value }))} options={isAdmin ? [{ value: 'test', label: 'Test' }, { value: 'live', label: 'Live' }] : [{ value: 'test', label: 'Test' }]} />
           </Field>
-          <fieldset className="space-y-2">
-            <legend className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Scope</legend>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-semibold text-text">Scope</legend>
             {SCOPES.filter(([scope]) => isAdmin || scope !== 'admin').map(([scope, label]) => (
-              <label key={scope} className="flex min-h-10 items-center gap-2 rounded-xl border border-outline-variant/30 px-3 text-sm text-on-surface">
-                <input type="checkbox" checked={createForm.scopes.includes(scope)} onChange={() => toggleScope(scope)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
-                <span>{label}</span><code className="ml-auto font-mono text-xs text-on-surface-variant">{scope}</code>
-              </label>
+              <div key={scope} className="flex min-w-0 items-center gap-2 rounded-control border border-border px-3">
+                <Checkbox className="min-h-11 flex-1 py-2.5" checked={createForm.scopes.includes(scope)} onChange={() => toggleScope(scope)} label={label} />
+                <code className="font-num text-xs text-text-2">{scope}</code>
+              </div>
             ))}
           </fieldset>
-          {!isAdmin && <p className="text-xs text-on-surface-variant">{role === 'mitra' ? 'Akun mitra hanya dapat membuat key Test tanpa scope admin. Sandbox tetap terpisah untuk setiap akun.' : 'Akun pengguna hanya dapat membuat key Test tanpa scope admin.'} Server tetap memeriksa izin.</p>}
-          {createError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{createError}</p>}
-          <div className="flex flex-wrap justify-end gap-2"><Button variant="ghost" onClick={() => setCreateOpen(false)}>Batal</Button><Button type="submit" icon="key" disabled={creating || createForm.scopes.length === 0}>{creating ? 'Membuat...' : 'Buat key'}</Button></div>
+          {!isAdmin && <p className="text-sm text-text-2">{role === 'mitra' ? 'Akun mitra hanya dapat membuat key Test tanpa scope admin. Sandbox tetap terpisah untuk setiap akun.' : 'Akun pengguna hanya dapat membuat key Test tanpa scope admin.'} Server tetap memeriksa izin.</p>}
+          {createError && <p role="alert" className={GALAT}>{createError}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCreateOpen(false)}>Batal</Button>
+            <Button type="submit" icon="key-round" disabled={creating || createForm.scopes.length === 0}>{creating ? 'Membuat...' : 'Buat key'}</Button>
+          </div>
         </form>
       </Modal>
 
       <Modal open={Boolean(secretReveal)} onClose={closeSecret} title="Simpan key ini sekarang" closeDisabled={Boolean(secretReveal && !secretCopied && !secretSaved)}>
-        {secretReveal && <div className="space-y-4">
-          <p className="text-sm text-on-surface-variant">{secretReveal.key.name} · {secretReveal.key.environment === 'live' ? 'Live' : 'Test'} · {secretReveal.key.scopes.join(', ')}</p>
-          <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">Key ini tidak akan ditampilkan lagi. Kalau hilang, cabut lalu buat key baru.</p>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            <code aria-label="Secret API key" className="min-w-0 flex-1 break-all rounded-xl bg-surface-container-high px-3 py-3 font-mono text-xs text-on-surface">{secretReveal.secret}</code>
-            <Button variant="ghost" icon={secretCopied ? 'check' : 'content_copy'} onClick={copySecret}>{secretCopied ? 'Tersalin' : 'Salin'}</Button>
+        {secretReveal && (
+          <div className="space-y-4">
+            <p className="text-sm text-text-2">{secretReveal.key.name} · {secretReveal.key.environment === 'live' ? 'Live' : 'Test'} · {secretReveal.key.scopes.join(', ')}</p>
+            <Alert tone="warn">Key ini tidak akan ditampilkan lagi. Kalau hilang, cabut lalu buat key baru.</Alert>
+            <div className="flex min-w-0 flex-wrap gap-2">
+              <code aria-label="Secret API key" className="min-w-0 flex-1 break-all rounded-control bg-surface-2 px-3 py-3 font-num text-xs text-text">{secretReveal.secret}</code>
+              <Button variant="secondary" icon={secretCopied ? 'check' : 'copy'} onClick={copySecret}>{secretCopied ? 'Tersalin' : 'Salin'}</Button>
+            </div>
+            <Checkbox className="min-h-11 py-2.5" checked={secretSaved} onChange={event => setSecretSaved(event.target.checked)} label="Sudah saya simpan di tempat aman" />
+            {createError && <p role="alert" className={GALAT}>{createError}</p>}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {!secretCopied && !secretSaved && <span className="text-sm text-text-2">Salin atau centang dulu untuk menutup.</span>}
+              <Button disabled={!secretCopied && !secretSaved} onClick={closeSecret}>Tutup</Button>
+            </div>
           </div>
-          <label className="flex min-h-10 items-center gap-2 text-sm text-on-surface"><input type="checkbox" checked={secretSaved} onChange={event => setSecretSaved(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />Sudah saya simpan di tempat aman</label>
-          {createError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{createError}</p>}
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {!secretCopied && !secretSaved && <span className="text-xs text-on-surface-variant">Salin atau centang dulu untuk menutup.</span>}
-            <Button disabled={!secretCopied && !secretSaved} onClick={closeSecret}>Tutup</Button>
-          </div>
-        </div>}
+        )}
       </Modal>
 
       <Modal open={Boolean(revokeTarget)} onClose={() => setRevokeTarget(null)} title="Cabut API key">
-        {revokeTarget && <div className="space-y-4">
-          <p className="text-sm text-on-surface-variant">Cabut key <strong className="text-on-surface">{revokeTarget.name}</strong>? Semua request dengan key ini langsung ditolak.</p>
-          {revokeError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{revokeError}</p>}
-          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setRevokeTarget(null)}>Batal</Button><Button variant="danger" icon="block" disabled={revoking} onClick={confirmRevoke}>{revoking ? 'Mencabut...' : 'Cabut key'}</Button></div>
-        </div>}
+        {revokeTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-text-2">Cabut key <strong className="text-text">{revokeTarget.name}</strong>? Semua request dengan key ini langsung ditolak.</p>
+            {revokeError && <p role="alert" className={GALAT}>{revokeError}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setRevokeTarget(null)}>Batal</Button>
+              <Button variant="danger" icon="ban" disabled={revoking} onClick={confirmRevoke}>{revoking ? 'Mencabut...' : 'Cabut key'}</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useSmart } from '../../shared/store/SmartStore';
-import { IconButton, Button, Card, Empty, Field, Input, Modal, NumberInput, SectionTitle, StatCard, Table } from '../../shared/components/ui';
+import {
+  Button, Checkbox, EmptyState, Field, IconButton, Input, Modal, NumberInput, PageHeader, Select, Switch, Table,
+} from '../../shared/components/ui';
+import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
 
 const emptyRule = { activity: '', points: 10, daily: 1, active: true };
-const emptyBadge = { name: '', icon: 'emoji_events', minPoints: 100, desc: '' };
+const emptyBadge = { name: '', icon: 'trophy', minPoints: 100, desc: '' };
+const JUDUL = 'font-head text-base font-bold leading-[22px] text-text';
 
 export default function AdminPoints() {
   const { pointRules, badges, savePointRule, removePointRule, saveBadge, removeBadge, leaderboard, adjustPoints, ledger, users } = useSmart();
@@ -14,10 +18,14 @@ export default function AdminPoints() {
   const [amount, setAmount] = useState(50);
   const [target, setTarget] = useState('');
 
-  const ruleOpen = editRule !== null || rule !== emptyRule;
-  const badgeOpen = editBadge !== null || badge !== emptyBadge;
-  const closeRule = () => { setEditRule(null); setRule(emptyRule); };
-  const closeBadge = () => { setEditBadge(null); setBadge(emptyBadge); };
+  // Modal dibuka lewat state sendiri: "Tambah" mengisi form dengan objek
+  // kosong yang sama, jadi membandingkan identitas objek tidak pernah membuka modal.
+  const [ruleOpen, setRuleOpen] = useState(false);
+  const [badgeOpen, setBadgeOpen] = useState(false);
+  const openRule = (row) => { setEditRule(row); setRule(row || emptyRule); setRuleOpen(true); };
+  const openBadge = (row) => { setEditBadge(row); setBadge(row || emptyBadge); setBadgeOpen(true); };
+  const closeRule = () => { setEditRule(null); setRule(emptyRule); setRuleOpen(false); };
+  const closeBadge = () => { setEditBadge(null); setBadge(emptyBadge); setBadgeOpen(false); };
 
   const totalPoints = leaderboard.reduce((sum, row) => sum + row.points, 0);
   const activeRules = pointRules.filter((r) => r.active).length;
@@ -37,149 +45,158 @@ export default function AdminPoints() {
     closeBadge();
   };
 
+  const kolomAturan = [
+    { key: 'activity', label: 'Aktivitas', render: (row) => <span className="font-semibold">{row.activity}</span> },
+    { key: 'points', label: 'Poin', align: 'end', num: true, render: (row) => `+${row.points}` },
+    { key: 'daily', label: 'Maks per hari', align: 'end', num: true, render: (row) => `${row.daily}×` },
+    { key: 'max', label: 'Poin maksimal', align: 'end', num: true, render: (row) => (row.points * row.daily).toLocaleString('id-ID') },
+    {
+      key: 'active',
+      label: 'Status',
+      render: (row) => (
+        <Switch label={row.active ? 'Aktif' : 'Nonaktif'} checked={Boolean(row.active)} onChange={(nyala) => savePointRule({ ...row, active: nyala })} />
+      ),
+    },
+    {
+      key: 'aksi',
+      label: 'Aksi',
+      align: 'end',
+      render: (row) => (
+        <div className="flex flex-nowrap items-center justify-end gap-1">
+          <IconButton icon="pencil" size="sm" onClick={() => openRule(row)} label={`Ubah aturan ${row.activity}`} />
+          <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removePointRule(row.id)} label={`Hapus aturan ${row.activity}`} />
+        </div>
+      ),
+    },
+  ];
+
+  const kolomSaldo = [
+    {
+      key: 'name',
+      label: 'Pengguna',
+      render: (row) => (
+        <span className="font-semibold">
+          {row.name}
+          {target === row.id && <span className="font-normal text-text-2"> (dipilih)</span>}
+        </span>
+      ),
+    },
+    { key: 'area', label: 'Area', render: (row) => <span className="text-text-2">{row.area}</span> },
+    { key: 'points', label: 'Poin', align: 'end', num: true, render: (row) => row.points.toLocaleString('id-ID') },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
-        <StatCard label="Poin Beredar" value={totalPoints.toLocaleString('id-ID')} icon="stars" hint="Total saldo semua pengguna" />
-        <StatCard label="Aturan Aktif" value={`${activeRules}/${pointRules.length}`} icon="rule" hint="Aktivitas yang memberi poin" />
-        <StatCard label="Batas Harian" value={dailyCap.toLocaleString('id-ID')} icon="speed" hint="Maksimal poin per pengguna/hari" />
-        <StatCard label="Badge Sistem" value={badges.length} icon="military_tech" hint="Pencapaian yang tersedia" />
-      </div>
+    <div>
+      <PageHeader
+        title="Sistem poin"
+        subtitle="Tentukan aktivitas yang memberi poin, besarannya, dan batas per hari."
+        actions={<Button icon="plus" onClick={() => openRule(null)}>Tambah aturan</Button>}
+      />
 
-      <Card>
-        <SectionTitle
-          eyebrow="Sistem Point"
-          title="Aturan perolehan poin"
-          subtitle="Tentukan aktivitas apa yang memberi poin, berapa besarannya, dan berapa kali boleh dilakukan per hari."
-          action={<Button icon="add" onClick={() => { setEditRule(null); setRule(emptyRule); }}>Tambah aturan</Button>}
-        />
-        {pointRules.length === 0 ? (
-          <Empty title="Belum ada aturan poin" icon="rule" hint="Tambahkan aturan pertama, misalnya mencatat pemantauan." />
-        ) : (
-          <Table head={['Aktivitas', 'Poin', 'Maks/hari', 'Poin maksimal', 'Status', '']}>
-            {pointRules.map((row) => (
-              <tr key={row.id} className="hover:bg-primary/5">
-                <td className="px-3 py-2 font-semibold text-on-surface">{row.activity}</td>
-                <td className="px-3 py-2 font-bold text-primary">+{row.points}</td>
-                <td className="px-3 py-2 text-on-surface-variant">{row.daily}×</td>
-                <td className="px-3 py-2 text-on-surface-variant">{(row.points * row.daily).toLocaleString('id-ID')} point</td>
-                <td className="px-3 py-2">
-                  <button
-                    onClick={() => savePointRule({ ...row, active: !row.active })}
-                    className={`inline-flex items-center h-6 text-[11px] font-bold rounded-full px-2.5 border transition-colors ${
-                      row.active ? 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-surface-container text-on-surface-variant border-outline-variant/40'
-                    }`}
-                  >
-                    {row.active ? 'Aktif' : 'Nonaktif'}
-                  </button>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex justify-end gap-1">
-                    <IconButton icon="edit" size="sm" onClick={() => { setEditRule(row); setRule(row); }} title="Ubah aturan" />
-                    <IconButton icon="delete" tone="bad" size="sm" onClick={() => removePointRule(row.id)} title="Hapus aturan" />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <section aria-labelledby="aturan-judul" className="flex min-w-0 flex-col gap-3">
+            <h2 id="aturan-judul" className={JUDUL}>Aturan perolehan poin</h2>
+            {pointRules.length === 0 ? (
+              <EmptyState title="Belum ada aturan poin" icon="list-checks">Tambahkan aturan pertama, misalnya mencatat pemantauan.</EmptyState>
+            ) : (
+              <Table columns={kolomAturan} rows={pointRules} />
+            )}
+            <p className="text-sm text-text-2">
+              Batas poin harian per pengguna: <span className="font-num">{dailyCap.toLocaleString('id-ID')}</span> poin, dari {activeRules} aturan aktif dari {pointRules.length} aturan.
+            </p>
+          </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <SectionTitle
-            eyebrow="Badge"
-            title="Pencapaian pengguna"
-            subtitle="Badge terbuka otomatis saat saldo poin pengguna melewati ambangnya."
-            action={<Button variant="soft" icon="add" onClick={() => { setEditBadge(null); setBadge(emptyBadge); }}>Tambah badge</Button>}
-          />
-          {badges.length === 0 ? (
-            <Empty title="Belum ada badge" icon="military_tech" />
-          ) : (
-            <div className="space-y-2">
-              {badges.map((row) => (
-                <div key={row.id} className="flex items-center gap-3 rounded-xl border border-outline-variant/40 p-3">
-                  <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[20px]">{row.icon}</span>
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-on-surface">{row.name}</p>
-                    <p className="text-[11px] text-on-surface-variant">
-                      Ambang {row.minPoints.toLocaleString('id-ID')} point · {users.filter((u) => (u.points || 0) >= row.minPoints).length} pengguna tercapai
-                    </p>
-                  </div>
-                  <IconButton icon="edit" size="sm" onClick={() => { setEditBadge(row); setBadge(row); }} title="Ubah badge" />
-                  <IconButton icon="delete" tone="bad" size="sm" onClick={() => removeBadge(row.id)} title="Hapus badge" />
-                </div>
-              ))}
+          <section aria-labelledby="saldo-judul" className="flex min-w-0 flex-col gap-3">
+            <div>
+              <h2 id="saldo-judul" className={JUDUL}>Saldo poin pengguna</h2>
+              <p className="mt-1 text-sm text-text-2">
+                Total poin beredar di seluruh akun: <span className="font-num">{totalPoints.toLocaleString('id-ID')}</span> poin.
+              </p>
             </div>
-          )}
-        </Card>
+            {leaderboard.length === 0 ? (
+              <EmptyState title="Belum ada saldo poin" icon="trophy" />
+            ) : (
+              <Table columns={kolomSaldo} rows={[...leaderboard].sort((a, b) => b.points - a.points)} />
+            )}
+          </section>
 
-        <div className="space-y-4">
-          <Card>
-            <SectionTitle eyebrow="Saldo Pengguna" title="Penyesuaian poin manual" subtitle="Gunakan untuk bonus kegiatan lapangan atau koreksi kesalahan pencatatan." />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Pengguna">
-                <select
-                  value={target}
-                  onChange={(event) => setTarget(event.target.value)}
-                  className="w-full rounded-xl glass-input px-3 py-2 text-sm text-on-surface"
-                >
-                  <option value="">Pilih pengguna…</option>
-                  {leaderboard.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.name}: {row.points.toLocaleString('id-ID')} point
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Jumlah poin" hint="Isi negatif untuk mengurangi.">
-                <NumberInput step="any" value={amount} onChange={setAmount} />
-              </Field>
+          <section aria-labelledby="riwayat-judul" className="flex min-w-0 flex-col gap-3">
+            <div>
+              <h2 id="riwayat-judul" className={JUDUL}>Riwayat poin terakhir</h2>
+              <p className="mt-1 text-sm text-text-2">Jejak pemberian poin yang tercatat sistem pada akun peraga.</p>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button icon="add_circle" disabled={!target} onClick={() => adjustPoints(target, Number(amount) || 0)}>
+            {ledger.length === 0 ? (
+              <EmptyState title="Belum ada riwayat" icon="history" />
+            ) : (
+              <ul className="m-0 list-none divide-y divide-border border-y border-border p-0">
+                {ledger.slice(0, 6).map((row) => (
+                  <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="font-semibold">{row.activity}</p>
+                      <p className="text-sm text-text-2">{row.at}</p>
+                    </div>
+                    <span className="font-num font-semibold tabular-nums">+{row.points}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6">
+          <section aria-labelledby="badge-judul" className="flex min-w-0 flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="badge-judul" className={JUDUL}>Badge</h2>
+              <Button variant="secondary" size="sm" icon="plus" onClick={() => openBadge(null)}>Tambah badge</Button>
+            </div>
+            <p className="text-sm text-text-2">Terbuka otomatis saat saldo poin pengguna melewati ambangnya.</p>
+            {badges.length === 0 ? (
+              <EmptyState title="Belum ada badge" icon="medal" />
+            ) : (
+              <ul className="m-0 flex list-none flex-col p-0">
+                {badges.map((row) => (
+                  <li key={row.id} className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0">
+                    <span className="inline-flex shrink-0 text-primary"><IkonSlot icon={row.icon} size={20} /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{row.name}</p>
+                      <p className="text-sm text-text-2">
+                        Ambang <span className="font-num">{row.minPoints.toLocaleString('id-ID')}</span> poin · <span className="font-num">{users.filter((u) => (u.points || 0) >= row.minPoints).length}</span> pengguna tercapai
+                      </p>
+                    </div>
+                    <IconButton icon="pencil" size="sm" onClick={() => openBadge(row)} label={`Ubah badge ${row.name}`} />
+                    <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removeBadge(row.id)} label={`Hapus badge ${row.name}`} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-labelledby="penyesuaian-judul" className="flex min-w-0 flex-col gap-3">
+            <div>
+              <h2 id="penyesuaian-judul" className={JUDUL}>Penyesuaian poin manual</h2>
+              <p className="mt-1 text-sm text-text-2">Untuk bonus kegiatan lapangan atau koreksi kesalahan pencatatan.</p>
+            </div>
+            <Field label="Pengguna">
+              <Select
+                value={target}
+                onChange={setTarget}
+                placeholder="Pilih pengguna"
+                options={leaderboard.map((row) => ({ value: row.id, label: `${row.name}: ${row.points.toLocaleString('id-ID')} poin` }))}
+              />
+            </Field>
+            <Field label="Jumlah poin" hint="Isi negatif untuk mengurangi.">
+              <NumberInput step="any" value={amount} onChange={setAmount} />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" icon="check" disabled={!target} onClick={() => adjustPoints(target, Number(amount) || 0)}>
                 Terapkan penyesuaian
               </Button>
-              <Button variant="soft" icon="bolt" disabled={!target} onClick={() => adjustPoints(target, 100)}>
+              <Button variant="secondary" size="sm" icon="plus" disabled={!target} onClick={() => adjustPoints(target, 100)}>
                 Bonus cepat +100
               </Button>
             </div>
-            <div className="mt-4">
-              <Table head={['Pengguna', 'Area', 'Poin']}>
-                {[...leaderboard]
-                  .sort((a, b) => b.points - a.points)
-                  .map((row) => (
-                    <tr key={row.id} className={target === row.id ? 'bg-primary/5' : 'hover:bg-primary/5'}>
-                      <td className="px-3 py-2 font-semibold text-on-surface">{row.name}</td>
-                      <td className="px-3 py-2 text-on-surface-variant">{row.area}</td>
-                      <td className="px-3 py-2 font-bold text-primary">{row.points.toLocaleString('id-ID')}</td>
-                    </tr>
-                  ))}
-              </Table>
-            </div>
-          </Card>
-
-          <Card>
-            <SectionTitle eyebrow="Audit" title="Riwayat poin terakhir" subtitle="Jejak pemberian poin yang tercatat sistem pada akun peraga." />
-            <ul className="space-y-2">
-              {ledger.slice(0, 6).map((row) => (
-                <li key={row.id} className="flex items-center justify-between rounded-xl border border-outline-variant/40 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-on-surface">{row.activity}</p>
-                    <p className="text-[11px] text-on-surface-variant">{row.at}</p>
-                  </div>
-                  <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">+{row.points}</span>
-                </li>
-              ))}
-              {ledger.length === 0 && <Empty title="Belum ada riwayat" icon="history" />}
-            </ul>
-            <p className="mt-3 text-[11px] text-on-surface-variant">
-              Total poin beredar di seluruh akun:{' '}
-              <strong className="text-on-surface">{leaderboard.reduce((n, r) => n + r.points, 0).toLocaleString('id-ID')} point</strong>
-            </p>
-          </Card>
+          </section>
         </div>
       </div>
 
@@ -196,10 +213,7 @@ export default function AdminPoints() {
               <NumberInput min="1" step="1" value={rule.daily} onChange={(v) => setRule({ ...rule, daily: v })} />
             </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm text-on-surface">
-            <input type="checkbox" checked={rule.active} onChange={(e) => setRule({ ...rule, active: e.target.checked })} className="w-4 h-4" />
-            Aktifkan aturan ini
-          </label>
+          <Checkbox label="Aktifkan aturan ini" checked={rule.active} onChange={(e) => setRule({ ...rule, active: e.target.checked })} />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={closeRule}>Batal</Button>
             <Button type="submit" icon="save">{editRule ? 'Simpan perubahan' : 'Tambah aturan'}</Button>
@@ -213,10 +227,10 @@ export default function AdminPoints() {
             <Input value={badge.name} onChange={(v) => setBadge({ ...badge, name: v })} placeholder="cth. Ahli Kualitas Air" required />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Ikon Material Symbols">
+            <Field label="Nama ikon" hint="Nama ikon lucide, mis. trophy atau droplet.">
               <div className="flex items-center gap-2">
                 <Input value={badge.icon} onChange={(v) => setBadge({ ...badge, icon: v })} />
-                <span className="material-symbols-outlined text-[24px] text-primary">{badge.icon}</span>
+                <span className="inline-flex shrink-0 text-primary"><IkonSlot icon={badge.icon} size={22} /></span>
               </div>
             </Field>
             <Field label="Ambang poin">
@@ -224,7 +238,7 @@ export default function AdminPoints() {
             </Field>
           </div>
           <Field label="Deskripsi">
-            <Input value={badge.desc} onChange={(v) => setBadge({ ...badge, desc: v })} placeholder="cth. Kumpulkan 750 point" />
+            <Input value={badge.desc} onChange={(v) => setBadge({ ...badge, desc: v })} placeholder="cth. Kumpulkan 750 poin" />
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={closeBadge}>Batal</Button>

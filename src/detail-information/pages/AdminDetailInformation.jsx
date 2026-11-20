@@ -3,7 +3,9 @@ import { useSmart } from '../../shared/store/SmartStore';
 import { cariPerangkat } from '../services/iotInfo';
 import PanelInfoAlat, { LABEL_BENTUK } from '../../shared/iot/components/PanelInfoAlat';
 import QrScanner from '../components/QrScanner';
-import { Badge, Button, Card, Empty, Field, Input, SectionTitle, Table, STATUS_LABEL, STATUS_TONE } from '../../shared/components/ui';
+import {
+  Alert, Button, EmptyState, FilterChip, Input, PageHeader, STATUS_LABEL, STATUS_TONE, StatusPill, Table, Tautan,
+} from '../../shared/components/ui';
 
 // Halaman Detail Information versi PENGELOLA.
 //
@@ -13,6 +15,12 @@ import { Badge, Button, Card, Empty, Field, Input, SectionTitle, Table, STATUS_L
 //   1. Cara memilih alat — pengelola tidak memindai QR (semua alat ada di
 //      tangannya), jadi penelusurannya lewat daftar + pencarian.
 //   2. Tautan aksi cepat ke halaman penyuntingan yang terkait.
+// Halaman ini tetap pratinjau baca-saja; penyuntingan ada di Kelola IoT.
+
+const STATUS_IKON = { online: 'wifi', warning: 'triangle-alert', maintenance: 'wrench', offline: 'wifi-off' };
+const JUDUL = 'font-head text-base font-bold leading-[22px] text-text';
+
+const gulirKeDaftar = () => document.getElementById('pilih-alat')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
 export default function AdminDetailInformation() {
   const { devices, categoryOf, areaOf } = useSmart();
@@ -60,155 +68,133 @@ export default function AdminDetailInformation() {
     .map((id) => categoryOf(id))
     .filter(Boolean);
 
-  return (
-    <div className="space-y-6">
-      <Card className="bg-gradient-to-br from-primary/10 to-transparent">
-        <SectionTitle
-          eyebrow="Detail Information"
-          title="Penjelasan alat yang diterima pengguna"
-          subtitle="Halaman ini menampilkan penjelasan alat yang SAMA dengan yang dilihat pengguna saat mereka memindai QR. Pakai untuk memastikan penjelasan, ambang, dan catatan perawatan yang dibaca pengguna memang benar."
-        />
-        <div className="grid grid-cols-2 gap-2 sm:max-w-md">
-          <Button
-            icon={pindai ? 'close' : 'qr_code_scanner'}
-            className="w-full justify-center"
-            onClick={() => {
-              setPindai((v) => !v);
-              // Kamera hidup di kartu pilih-alat; tanpa menggulir, pengelola
-              // menekan tombol lalu tidak melihat apa pun berubah.
-              requestAnimationFrame(() => {
-                document.getElementById('pilih-alat')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              });
-            }}
-          >
-            {pindai ? 'Tutup kamera' : 'Pindai QR alat'}
-          </Button>
-          <Button
-            variant="ghost"
-            icon="devices"
-            className="w-full justify-center"
-            onClick={() => document.getElementById('pilih-alat')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-          >
-            Pilih dari daftar
-          </Button>
-        </div>
-        <p className="mt-3 text-[11px] text-on-surface-variant">
-          Memindai label yang sudah ditempel di lapangan memastikan label itu benar-benar terbaca pengguna, bukan
-          hanya isi QR yang Anda lihat di layar.
-        </p>
-      </Card>
+  const kolom = [
+    {
+      key: 'name',
+      label: 'Alat',
+      render: (d) => (
+        <span className="font-semibold">
+          {d.name}
+          {d.id === device?.id && <span className="font-normal text-text-2"> (sedang dilihat)</span>}
+        </span>
+      ),
+    },
+    { key: 'code', label: 'Kode', render: (d) => <span className="font-num text-sm">{d.code}</span> },
+    { key: 'kategori', label: 'Kategori', render: (d) => categoryOf(d.categoryId)?.name || '·' },
+    { key: 'area', label: 'Area', render: (d) => areaOf(d.areaId)?.name || <span className="text-text-2">Belum ditempatkan</span> },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (d) => <StatusPill tone={STATUS_TONE[d.status]} icon={STATUS_IKON[d.status] || 'circle-minus'}>{STATUS_LABEL[d.status] || d.status}</StatusPill>,
+    },
+    {
+      key: 'aksi',
+      label: 'Aksi',
+      align: 'end',
+      render: (d) => (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="eye"
+          aria-label={`Lihat penjelasan ${d.name}`}
+          onClick={() => {
+            setPilih(d.id);
+            setHasil(null);
+            setGalat('');
+          }}
+        >
+          Lihat penjelasan
+        </Button>
+      ),
+    },
+  ];
 
-      <div id="pilih-alat" className="scroll-mt-24">
-        <Card>
-          <SectionTitle
-            eyebrow="Pilih Perangkat"
-            title={pindai ? 'Arahkan kamera ke kode QR' : 'Pilih perangkat dari daftar'}
-            subtitle={
-              pindai
-                ? 'Memindai label fisik yang sudah ditempel memastikan label itu benar-benar terbaca. Kamera ada di perangkat yang Anda pakai; daftar alat di bawah tetap tersedia.'
-                : 'Pilih alat langsung dari daftar, atau tekan Pindai QR alat untuk memindai label maupun memasukkan kode secara manual.'
-            }
-          />
+  return (
+    <div>
+      <PageHeader
+        title="Detail informasi alat"
+        subtitle="Penjelasan alat yang sama dengan yang dibaca pengguna setelah memindai QR. Pakai untuk memastikan penjelasan, ambang, dan catatan perawatan yang dibaca pengguna memang benar."
+        actions={(
+          <>
+            <Button
+              icon={pindai ? 'x' : 'scan-qr-code'}
+              onClick={() => {
+                setPindai((v) => !v);
+                // Kamera hidup di bagian pilih-alat; tanpa menggulir, pengelola
+                // menekan tombol lalu tidak melihat apa pun berubah.
+                requestAnimationFrame(gulirKeDaftar);
+              }}
+            >
+              {pindai ? 'Tutup kamera' : 'Pindai QR alat'}
+            </Button>
+            <Button variant="secondary" icon="list-checks" onClick={gulirKeDaftar}>Pilih dari daftar</Button>
+          </>
+        )}
+      />
+
+      <div className="flex flex-col gap-6">
+        <section id="pilih-alat" aria-labelledby="pilih-alat-judul" className="flex min-w-0 scroll-mt-24 flex-col gap-3">
+          <div>
+            <h2 id="pilih-alat-judul" className={JUDUL}>{pindai ? 'Arahkan kamera ke kode QR' : 'Pilih alat'}</h2>
+            <p className="mt-1 text-sm text-text-2">
+              {pindai
+                ? 'Memindai label fisik yang sudah ditempel memastikan label itu benar-benar terbaca. Daftar alat di bawah tetap tersedia.'
+                : 'Pilih alat langsung dari daftar, atau tekan Pindai QR alat untuk memindai label maupun memasukkan kode secara manual.'}
+            </p>
+          </div>
 
           {/* Pemindai menyediakan kamera dan satu kolom kode manual. */}
-          {pindai && (
-            <div className="mb-6">
-              <QrScanner onHasil={proses} onBatal={() => setPindai(false)} />
+          {pindai && <QrScanner onHasil={proses} onBatal={() => setPindai(false)} />}
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="w-full sm:w-[320px]">
+              <Input type="search" value={cari} onChange={setCari} placeholder="Nama, kode, atau model" aria-label="Cari alat" />
             </div>
-          )}
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-[1fr,220px]">
-            <Field label="Cari alat">
-              <Input value={cari} onChange={setCari} placeholder="nama, kode, atau model" />
-            </Field>
-            <Field label="Kategori">
-              <select
-                value={filterKategori}
-                onChange={(e) => setFilterKategori(e.target.value)}
-                className="w-full min-w-0 rounded-xl glass-input px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                <option value="semua">Semua kategori</option>
-                {kategoriAda.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          {galat && (
-            <p
-              role="alert"
-              className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 dark:bg-amber-900/25 border border-amber-400/60 px-3 py-2 text-sm font-semibold text-amber-900 dark:text-amber-100"
-            >
-              <span className="material-symbols-outlined text-[18px]">error</span>
-              {galat}
-            </p>
-          )}
-
-          <div className="mt-4">
-            <Table head={['Alat', 'Kode', 'Kategori', 'Area', 'Status', '']}>
-              {daftar.map((d) => (
-                <tr key={d.id} className={d.id === device?.id ? 'bg-primary/5' : ''}>
-                  <td className="px-3 py-2 font-semibold text-on-surface">{d.name}</td>
-                  <td className="px-3 py-2 font-mono text-[12px] text-on-surface-variant">{d.code}</td>
-                  <td className="px-3 py-2 text-on-surface-variant">{categoryOf(d.categoryId)?.name || '·'}</td>
-                  <td className="px-3 py-2 text-on-surface-variant">{areaOf(d.areaId)?.name || 'belum ditempatkan'}</td>
-                  <td className="px-3 py-2">
-                    <Badge tone={STATUS_TONE[d.status]}>{STATUS_LABEL[d.status]}</Badge>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Button
-                      variant="soft"
-                      icon="visibility"
-                      onClick={() => {
-                        setPilih(d.id);
-                        setHasil(null);
-                        setGalat('');
-                      }}
-                    >
-                      Lihat penjelasan
-                    </Button>
-                  </td>
-                </tr>
+            <div role="group" aria-label="Filter kategori" className="flex flex-wrap items-center gap-2">
+              <FilterChip active={filterKategori === 'semua'} onClick={() => setFilterKategori('semua')}>Semua kategori</FilterChip>
+              {kategoriAda.map((k) => (
+                <FilterChip key={k.id} active={filterKategori === k.id} onClick={() => setFilterKategori(k.id)}>{k.name}</FilterChip>
               ))}
-            </Table>
-            {!daftar.length && (
-              <Empty
-                title="Tidak ada alat yang cocok"
-                hint="Ubah kata pencarian atau pilih kategori lain."
-                icon="devices"
-              />
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {device ? (
-        <PanelInfoAlat
-          device={device}
-          cari={hasil}
-          kategori={kategori}
-          area={area}
-          aksi={
-            <div className="flex flex-col gap-2">
-              <Badge tone="info" icon="edit">
-                Sunting di Kelola IoT
-              </Badge>
-              <Badge tone="muted">Isi QR: {LABEL_BENTUK[hasil?.bentuk] || 'dipilih dari daftar'}</Badge>
             </div>
-          }
-        />
-      ) : (
-        <Card>
-          <Empty
-            title="Belum ada alat yang dipilih"
-            hint="Pilih alat dari daftar di atas untuk melihat penjelasan yang diterima pengguna."
-            icon="qr_code_2"
-          />
-        </Card>
-      )}
+          </div>
+
+          {galat && <Alert tone="bad">{galat}</Alert>}
+
+          {daftar.length ? (
+            <Table columns={kolom} rows={daftar} />
+          ) : (
+            <EmptyState title="Tidak ada alat yang cocok" icon="search-x">Ubah kata pencarian atau pilih kategori lain.</EmptyState>
+          )}
+          <p className="text-sm text-text-2">
+            Memindai label yang sudah ditempel di lapangan memastikan label itu benar-benar terbaca pengguna, bukan hanya isi QR yang Anda lihat di layar.
+          </p>
+        </section>
+
+        <section aria-labelledby="pratinjau-judul" className="flex min-w-0 flex-col gap-3">
+          <div>
+            <h2 id="pratinjau-judul" className={JUDUL}>Pratinjau untuk pengguna</h2>
+            <p className="mt-1 text-sm text-text-2">Seperti yang tampil setelah memindai QR. Penjelasan disunting di Kelola IoT.</p>
+          </div>
+          {device ? (
+            <PanelInfoAlat
+              device={device}
+              cari={hasil}
+              kategori={kategori}
+              area={area}
+              aksi={
+                <div className="flex flex-col gap-2">
+                  <Tautan to="/admin/iot" icon="pencil">Sunting di Kelola IoT</Tautan>
+                  <StatusPill tone="muted" icon="qr-code">Isi QR: {LABEL_BENTUK[hasil?.bentuk] || 'dipilih dari daftar'}</StatusPill>
+                </div>
+              }
+            />
+          ) : (
+            <EmptyState title="Belum ada alat yang dipilih" icon="qr-code">
+              Pilih alat dari daftar di atas untuk melihat penjelasan yang diterima pengguna.
+            </EmptyState>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

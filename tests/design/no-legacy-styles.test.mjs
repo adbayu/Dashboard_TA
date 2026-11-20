@@ -38,6 +38,17 @@ export const MIGRATED = [
   'src/kelola-area/pages/AreaDetail.jsx',
   'src/kelola-area/pages/AdminAreas.jsx',
   'src/kelola-area/model/areaTone.js',
+  'src/dashboard-pengelola/pages/AdminDashboard.jsx',
+  'src/kelola-user/pages/AdminUsers.jsx',
+  'src/kelola-area/pages/admin/AdminIotPage.jsx',
+  'src/kategori-device/pages/AdminCategories.jsx',
+  'src/kategori-device/model/nadaKategori.js',
+  'src/kelola-user/model/statusAkun.js',
+  'src/detail-information/pages/AdminDetailInformation.jsx',
+  'src/kelola-virtual-pet/pages/AdminVPet.jsx',
+  'src/sistem-point/pages/AdminPoints.jsx',
+  'src/kelola-area/pages/Developer.jsx',
+  'src/components/iot/SandboxPanel.jsx',
 ];
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML
