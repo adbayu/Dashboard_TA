@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
+import { ambangSah, ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiMetrik, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
 import { Alert, Card, EmptyState, PageHeader, STATUS_LABEL, STATUS_TONE, StatusPill, Table, TautanTombol } from '../../shared/components/ui';
 import { Icon } from '../../shared/components/Icon.jsx';
 import { FOKUS } from '../../shared/components/ui/tones.js';
@@ -10,6 +10,7 @@ import ReadingChart from '../../components/iot/ReadingChart.jsx';
 import SensorReading from '../../components/iot/SensorReading.jsx';
 import TaskList from '../../components/iot/TaskList.jsx';
 import { formatSensorNumber } from '../../utils/iotPresentation.js';
+import { areaTone } from '../../kelola-area/model/areaTone.js';
 import { missionActivityDestination } from '../../gamifikasi/model/missionNavigation.js';
 
 // Status rekap harian dari store (aman | waspada | bahaya | tanpa-ambang | tanpa-data):
@@ -17,7 +18,7 @@ import { missionActivityDestination } from '../../gamifikasi/model/missionNaviga
 const STATUS_REKAP = {
   aman: { tone: 'ok', icon: 'circle-check', text: 'Aman' },
   waspada: { tone: 'warn', icon: 'triangle-alert', text: 'Waspada' },
-  bahaya: { tone: 'bad', icon: 'circle-alert', text: 'Keluar ambang' },
+  bahaya: { tone: 'bad', icon: 'circle-alert', text: 'Di luar batas' },
   'tanpa-ambang': { tone: 'muted', icon: 'circle-minus', text: 'Tanpa ambang' },
   'tanpa-data': { tone: 'muted', icon: 'circle-minus', text: 'Tanpa data' },
 };
@@ -25,7 +26,6 @@ const IKON_SENSOR = { ph: 'flask-conical', temp: 'thermometer', tds: 'droplet' }
 const STATUS_ALAT_IKON = { online: 'wifi', warning: 'triangle-alert', maintenance: 'wrench', offline: 'wifi-off' };
 
 const angka = (value, digit) => (value == null ? '·' : formatSensorNumber(value, digit));
-const jenisArea = (area) => (area?.type === 'growbed' ? 'leaf' : 'water');
 const labelPendek = (key) => METRIC_META[key].label.replace(' Air', '').replace(' Nutrisi', '');
 
 const TAUTAN = clsx('rounded-sm font-semibold text-primary underline decoration-1 underline-offset-[3px] hover:text-primary-hover', FOKUS);
@@ -75,8 +75,9 @@ export default function Dashboard() {
         .filter((d) => d.metric && METRIC_KEYS.includes(d.metric.key) && idAreaSaya.has(d.areaId))
         .map((device) => {
           const area = areas.find((a) => a.id === device.areaId);
-          const ambang = ambangUntuk(area, categories.find((c) => c.id === device.categoryId), device.metric.key);
-          const value = Number(device.metric.value);
+          const mentah = ambangUntuk(area, categories.find((c) => c.id === device.categoryId), device.metric.key);
+          const ambang = ambangSah(mentah) ? mentah : null;
+          const value = nilaiMetrik(device.metric);
           return { device, area, key: device.metric.key, value, ambang, posisi: nilaiTerhadapAmbang(value, ambang) };
         }),
     [devices, areas, categories, idAreaSaya],
@@ -182,7 +183,7 @@ export default function Dashboard() {
               ].join(' · ');
               return (
                 <div key={area.id} className="min-w-0">
-                  <AreaSection area={jenisArea(area)} title={area.name} meta={metaArea}>
+                  <AreaSection area={areaTone(area?.type)} title={area.name} meta={metaArea}>
                     {METRIC_KEYS.map((key) => {
                       const b = bacaan.find((item) => item.device.areaId === area.id && item.key === key);
                       if (!b) return null;
@@ -196,11 +197,11 @@ export default function Dashboard() {
                           name={meta.label}
                           icon={IKON_SENSOR[key]}
                           device={b.device.code}
-                          value={Number.isFinite(b.value) ? b.value : null}
+                          value={b.value}
                           decimals={meta.precision}
                           unit={meta.unit}
-                          min={b.ambang?.[0]}
-                          max={b.ambang?.[1]}
+                          min={b.ambang ? b.ambang[0] : undefined}
+                          max={b.ambang ? b.ambang[1] : undefined}
                           status={status}
                         />
                       );
@@ -405,9 +406,9 @@ export default function Dashboard() {
 
         <div className="flex min-w-0 flex-col gap-4">
           {fokus && (
-            <Card area={jenisArea(fokus.area)}>
+            <Card area={areaTone(fokus.area?.type)}>
               <ReadingChart
-                area={jenisArea(fokus.area)}
+                area={areaTone(fokus.area?.type)}
                 sensor={{ name: `${fokusMeta.label} ${fokus.area?.name || ''}`.trim(), unit: fokusMeta.unit, decimals: fokusMeta.precision }}
                 points={titikFokus}
                 threshold={fokus.ambang ? { low: fokus.ambang[0], high: fokus.ambang[1] } : undefined}

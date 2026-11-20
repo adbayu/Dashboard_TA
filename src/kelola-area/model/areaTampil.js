@@ -1,11 +1,23 @@
 // Label, ikon, dan ringkasan tampilan area yang dipakai bersama halaman
 // pengguna dan pengelola.
 
+import { formatSensorNumber } from '../../utils/iotPresentation.js';
+
 export const LABEL_JENIS_AREA = { kolam: 'Kolam ikan', growbed: 'Growbed sayur', tandon: 'Tandon nutrisi' };
 const IKON_JENIS_AREA = { kolam: 'fish', growbed: 'sprout', tandon: 'droplet' };
 
 export const labelJenisArea = (jenis) => LABEL_JENIS_AREA[jenis] || jenis || 'Area';
 export const ikonJenisArea = (jenis) => IKON_JENIS_AREA[jenis] || 'waves';
+
+/**
+ * Nilai pembacaan atau ambang sensor dengan jumlah desimal tetap milik sensornya
+ * (METRIC_META.precision: pH 6,80, suhu 25,0, TDS 780), sama dengan SensorReading.
+ * Kosong (null, undefined, '') menjadi titik tengah, bukan 0.
+ */
+export function formatNilaiSensor(nilai, desimal) {
+  if (nilai === null || nilai === undefined || nilai === '') return '·';
+  return formatSensorNumber(nilai, desimal);
+}
 
 /** Angka gaya Indonesia tanpa nol berlebih (6,5 bukan 6,50); kosong menjadi titik tengah. */
 export function formatAngka(nilai, maksDesimal = 3) {

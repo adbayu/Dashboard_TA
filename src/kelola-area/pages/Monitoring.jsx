@@ -25,19 +25,6 @@ const TABS = [
   { id: 'area', label: 'Per area' },
 ];
 
-// Urutan papan ketik tab. Tabs bersama menjalankan urutan yang sama (panah
-// memutar, Home/End ke ujung); fungsi ini tetap ada sebagai acuan yang dites
-// frontendReview.test.js lewat transform Vite.
-// oxlint-disable-next-line no-unused-vars -- diekspor untuk tes lewat transform Vite
-function nextTabId(currentTabId, key) {
-  const currentIndex = TABS.findIndex(tab => tab.id === currentTabId);
-  if (currentIndex < 0) return null;
-  if (key === 'Home') return TABS[0].id;
-  if (key === 'End') return TABS[TABS.length - 1].id;
-  if (key === 'ArrowRight') return TABS[(currentIndex + 1) % TABS.length].id;
-  if (key === 'ArrowLeft') return TABS[(currentIndex - 1 + TABS.length) % TABS.length].id;
-  return null;
-}
 const DEVICE_STATUSES = {
   online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
   stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },

@@ -133,8 +133,12 @@ export function Checkbox({ label, invalid, className = '', ...rest }) {
   );
 }
 
-/** Saklar nyala/mati. `onChange(checked)` menerima nilai boolean baru. */
-export function Switch({ label, checked, defaultChecked = false, onChange, disabled }) {
+/**
+ * Saklar nyala/mati. `onChange(checked)` menerima nilai boolean baru. `aria-label`
+ * (opsional) menggantikan nama aksesibel dari teks `label`, mis. saat beberapa
+ * saklar berteks sama ada dalam satu tabel.
+ */
+export function Switch({ label, checked, defaultChecked = false, onChange, disabled, 'aria-label': ariaLabel }) {
   const [lokal, setLokal] = useState(defaultChecked);
   const nyala = checked ?? lokal;
   return (
@@ -142,6 +146,7 @@ export function Switch({ label, checked, defaultChecked = false, onChange, disab
       type="button"
       role="switch"
       aria-checked={nyala}
+      aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => {
         if (checked === undefined) setLokal(!nyala);

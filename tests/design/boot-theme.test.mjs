@@ -51,15 +51,13 @@ function runBoot({ stored, throwing = false, prefersDark = false, noMatchMedia =
   return documentElement
 }
 
-test('index.html tidak lagi memuat huruf Google Fonts (Hanken Grotesk/Manrope)', () => {
+test('index.html tidak memuat huruf atau ikon dari Google Fonts', () => {
   assert.ok(!/Hanken/i.test(html), 'Hanken Grotesk masih dimuat')
   assert.ok(!/Manrope/i.test(html), 'Manrope masih dimuat')
-  // Stylesheet fonts.googleapis.com yang tersisa hanya boleh Material Symbols (dihapus di Task 14).
-  // Preconnect untuk host yang sama boleh selama ikon masih memakainya.
-  const stylesheets = html.match(/<link[^>]*rel="stylesheet"[^>]*>/g) ?? []
-  for (const tag of stylesheets.filter((t) => t.includes('fonts.googleapis.com'))) {
-    assert.ok(tag.includes('Material+Symbols'), `Google Fonts selain ikon: ${tag}`)
-  }
+  assert.ok(!/Material\+Symbols/i.test(html), 'Material Symbols masih dimuat')
+  assert.ok(!/Material\s*Symbols/i.test(html), 'Material Symbols masih disebut')
+  assert.ok(!/fonts\.(googleapis|gstatic)\.com/.test(html), 'masih ada permintaan ke Google Fonts')
+  assert.equal((html.match(/<link[^>]*rel="stylesheet"/g) ?? []).length, 0, 'tidak ada stylesheet eksternal')
 })
 
 test('skrip boot inline ada di <head>, sebelum modul main.jsx', () => {
@@ -85,21 +83,19 @@ test('localStorage melempar error: bawaan kebun-air/light, tanpa crash', () => {
   const el = runBoot({ throwing: true })
   assert.equal(el.dataset.theme, 'kebun-air')
   assert.equal(el.dataset.mode, 'light')
-  assert.equal(el.classList.contains('dark'), false)
 })
 
-test('preferensi valid terpakai: lumina + gelap menyalakan data-mode dan kelas dark', () => {
+test('preferensi valid terpakai: lumina + gelap menyalakan data-mode saja, tanpa kelas dark', () => {
   const el = runBoot({ stored: JSON.stringify({ tema: 'lumina', mode: 'gelap' }) })
   assert.equal(el.dataset.theme, 'lumina')
   assert.equal(el.dataset.mode, 'dark')
-  assert.equal(el.classList.contains('dark'), true)
+  assert.equal(el.classList.contains('dark'), false, 'jembatan kelas dark sudah dihapus')
 })
 
 test('mode terang mengabaikan preferensi gelap OS', () => {
   const el = runBoot({ stored: JSON.stringify({ tema: 'tanah-lumut', mode: 'terang' }), prefersDark: true })
   assert.equal(el.dataset.theme, 'tanah-lumut')
   assert.equal(el.dataset.mode, 'light')
-  assert.equal(el.classList.contains('dark'), false)
 })
 
 test('mode sistem mengikuti prefers-color-scheme, bawaan bila tidak ada simpanan', () => {

@@ -109,7 +109,7 @@ export default function AdminUsers() {
       label: 'Nama',
       render: (user) => (
         <span className="flex items-center gap-3">
-          <Avatar nama={user.name} size="sm" />
+          <Avatar avatar={user.avatar} nama={user.name} size="sm" />
           <span className="font-semibold">{user.name}</span>
         </span>
       ),

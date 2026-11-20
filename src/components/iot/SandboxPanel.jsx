@@ -22,10 +22,6 @@ export function SandboxLoadingState() {
   return <p role="status" className="py-3 text-sm text-text-2">Memuat device sandbox...</p>;
 }
 
-export function SandboxReadingValue({ reading }) {
-  return reading?.value == null ? 'Belum ada data' : `${formatSensorNumber(reading.value, 2)} pH`;
-}
-
 export function SandboxEventMessage({ event }) {
   return event ? formatEventMessage(event, { ph: 'pH Air' }) : 'Belum ada kejadian';
 }
@@ -210,7 +206,7 @@ export default function SandboxPanel({ apiKeyPrefix = '' }) {
           <dl className="flex min-w-0 flex-col gap-3 text-sm">
             <div>
               <dt className="font-semibold text-text-2">Ambang pH efektif</dt>
-              <dd className="mt-0.5 text-text">{low == null && high == null ? 'Ambang belum tersedia' : `${low ?? 'tanpa batas bawah'} sampai ${high ?? 'tanpa batas atas'} pH`}</dd>
+              <dd className="mt-0.5 text-text">{low == null && high == null ? 'Ambang belum tersedia' : `${low == null ? 'tanpa batas bawah' : formatSensorNumber(low, 2)} sampai ${high == null ? 'tanpa batas atas' : formatSensorNumber(high, 2)} pH`}</dd>
             </div>
             <div>
               <dt className="font-semibold text-text-2">Kejadian terakhir</dt>

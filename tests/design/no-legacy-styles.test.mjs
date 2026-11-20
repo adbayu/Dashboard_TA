@@ -1,55 +1,28 @@
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-// Ratchet migrasi tema (Fase B). Setiap halaman yang sudah dimigrasi
-// ditambahkan ke MIGRATED dan sejak itu tidak boleh memuat gaya lama lagi:
-// kelas warna palet mentah, Material Symbols, kelas kaca, hex, gradien Tailwind,
-// atau eyebrow. Task berikutnya cukup menambah path ke MIGRATED.
-export const MIGRATED = [
-  'src/masuk/pages/Login.jsx',
-  'src/daftar/pages/Daftar.jsx',
-  'src/kelola-area/pages/DeviceClaim.jsx',
-  'src/profil-saya/pages/Profil.jsx',
-  'src/shared/components/PublicFrame.jsx',
-  'src/components/iot/PublicAreaLabel.jsx',
-  'src/dashboard/pages/Dashboard.jsx',
-  'src/v-pet/pages/VPet.jsx',
-  'src/v-pet/styles/pet.css',
-  'src/v-pet/components/PetKarakter.jsx',
-  'src/gamifikasi/pages/Gamifikasi.jsx',
-  'src/chatbot-aquaponik/pages/Chatbot.jsx',
-  'src/components/iot/SensorReading.jsx',
-  'src/components/iot/TaskList.jsx',
-  'src/list-iot/pages/ListIot.jsx',
-  'src/app/SmartApp.jsx',
-  'src/shared/iot/components/PanelInfoAlat.jsx',
-  'src/kelola-area/pages/DeviceLog.jsx',
-  'src/kelola-area/pages/Monitoring.jsx',
-  'src/detail-information/pages/DetailInformation.jsx',
-  'src/detail-information/components/QrScanner.jsx',
-  'src/shared/qr/components/AksiQr.jsx',
-  'src/shared/qr/components/QrCode.jsx',
-  'src/shared/qr/opsiQr.js',
-  'src/shared/components/ui/tombol.js',
-  'src/shared/components/ui/Button.jsx',
-  'src/shared/components/ui/Tautan.jsx',
-  'src/kelola-area/pages/KelolaArea.jsx',
-  'src/kelola-area/pages/AreaDetail.jsx',
-  'src/kelola-area/pages/AdminAreas.jsx',
-  'src/kelola-area/model/areaTone.js',
-  'src/dashboard-pengelola/pages/AdminDashboard.jsx',
-  'src/kelola-user/pages/AdminUsers.jsx',
-  'src/kelola-area/pages/admin/AdminIotPage.jsx',
-  'src/kategori-device/pages/AdminCategories.jsx',
-  'src/kategori-device/model/nadaKategori.js',
-  'src/kelola-user/model/statusAkun.js',
-  'src/detail-information/pages/AdminDetailInformation.jsx',
-  'src/kelola-virtual-pet/pages/AdminVPet.jsx',
-  'src/sistem-point/pages/AdminPoints.jsx',
-  'src/kelola-area/pages/Developer.jsx',
-  'src/components/iot/SandboxPanel.jsx',
-];
+// Ratchet migrasi tema. Semua berkas JSX di src/ (kecuali /pilot, di luar
+// cakupan desain ini) tidak boleh memuat gaya lama: kelas warna palet mentah,
+// Material Symbols, kelas kaca, hex, gradien Tailwind, atau eyebrow. Halaman
+// baru otomatis ikut dipindai; tidak ada daftar yang perlu dirawat.
+const AKAR = new URL('../../', import.meta.url);
+
+function kumpulkanJsx(dir, prefiks, hasil) {
+  for (const entri of readdirSync(new URL(dir, AKAR), { withFileTypes: true })) {
+    const jalur = `${prefiks}${entri.name}`;
+    if (entri.isDirectory()) {
+      if (jalur === 'src/pilot') continue;
+      kumpulkanJsx(`${jalur}/`, `${jalur}/`, hasil);
+    } else if (entri.name.endsWith('.jsx')) {
+      hasil.push(jalur);
+    }
+  }
+  return hasil;
+}
+
+export const MIGRATED = kumpulkanJsx('src/', 'src/', []).sort();
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML
 // (&#8212;) maupun id/kata yang menempel pada '#'.
@@ -190,7 +163,9 @@ test('setiap pola LEGACY terdeteksi oleh findLegacy (uji diri positif)', () => {
   }
 });
 
-test('halaman yang sudah dimigrasi bebas dari gaya lama', async () => {
+test('semua halaman bebas dari gaya lama', async () => {
+  assert.ok(MIGRATED.length >= 60, 'pemindaian menemukan berkas JSX');
+  assert.ok(!MIGRATED.some((path) => path.startsWith('src/pilot/')), 'pilot dikecualikan');
   const pelanggaran = [];
   for (const path of MIGRATED) {
     const sumber = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');

@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import react from '@vitejs/plugin-react';
 import { createServer } from 'vite';
+import { namaIkonTidakDikenal } from '../tests/helpers/ikon.mjs';
 import viteConfig from '../vite.config.js';
 
 test('SmartTopBar subtitle wraps instead of truncating', async t => {
@@ -119,7 +120,7 @@ function exposeMonitoringForTests() {
     name: 'expose-monitoring-presentation-for-tests',
     transform(source, id) {
       if (id.replaceAll('\\', '/').endsWith('/src/kelola-area/pages/Monitoring.jsx')) {
-        return `${source}\nexport { TABS, nextTabId, Sparkline, ComparisonChart, EventLogPanel, ErrorPanel };`;
+        return `${source}\nexport { TABS, Sparkline, ComparisonChart, EventLogPanel, ErrorPanel };`;
       }
       return null;
     },
@@ -387,17 +388,25 @@ test('Monitoring menus share the route and has exactly three category tabs', asy
   });
   t.after(() => vite.close());
 
-  const [{ TITLES }, { MENUS }, { TABS, nextTabId }] = await Promise.all([
+  const [{ TITLES }, { MENUS }, { TABS }, { tujuanTab }] = await Promise.all([
     vite.ssrLoadModule('/src/app/SmartApp.jsx'),
     vite.ssrLoadModule('/src/app/layout/SmartSidebar.jsx'),
     vite.ssrLoadModule('/src/kelola-area/pages/Monitoring.jsx'),
+    vite.ssrLoadModule('/src/shared/components/ui/tujuanTab.js'),
   ]);
   assert.deepEqual(TABS.map(tab => tab.label), ['Per paket', 'Per sensor', 'Per area']);
-  assert.equal(nextTabId('package', 'ArrowLeft'), 'area');
-  assert.equal(nextTabId('package', 'ArrowRight'), 'sensor');
-  assert.equal(nextTabId('sensor', 'Home'), 'package');
-  assert.equal(nextTabId('sensor', 'End'), 'area');
-  assert.equal(nextTabId('package', 'Enter'), null);
+  // Papan ketik tab Monitoring dijalankan Tabs bersama: tab dipilih lewat
+  // indeks di TABS, jadi urutan TABS dan tujuanTab menentukan hasilnya.
+  const pindah = (dari, key) => {
+    const tujuan = tujuanTab(key, TABS.findIndex(tab => tab.id === dari), TABS.length);
+    return tujuan == null ? null : TABS[tujuan].id;
+  };
+  assert.equal(pindah('package', 'ArrowLeft'), 'area');
+  assert.equal(pindah('package', 'ArrowRight'), 'sensor');
+  assert.equal(pindah('area', 'ArrowRight'), 'package');
+  assert.equal(pindah('sensor', 'Home'), 'package');
+  assert.equal(pindah('sensor', 'End'), 'area');
+  assert.equal(pindah('package', 'Enter'), null);
   assert.equal(TITLES.find(item => item.path === '/monitoring')?.title, 'Monitoring');
   for (const role of ['pengguna', 'pengelola']) {
     assert.ok(MENUS[role].some(section => section.items.some(item => item.to === '/monitoring' && item.attention)));
@@ -732,10 +741,10 @@ test('state sensor selalu menampilkan ikon sesuai arah dan teks yang bermakna', 
   t.after(() => vite.close());
   const { default: SensorStateBadge } = await vite.ssrLoadModule('/src/components/iot/SensorStateBadge.jsx');
   for (const [state, icon, label] of [
-    ['normal', 'check_circle', 'Normal'],
-    ['low', 'arrow_downward', 'Di bawah ambang'],
-    ['high', 'arrow_upward', 'Di atas ambang'],
-    ['unknown', 'remove', 'Tanpa ambang'],
+    ['normal', 'circle-check', 'Normal'],
+    ['low', 'arrow-down', 'Di bawah ambang'],
+    ['high', 'arrow-up', 'Di atas ambang'],
+    ['unknown', 'minus', 'Tanpa ambang'],
   ]) {
     const markup = renderToStaticMarkup(React.createElement(SensorStateBadge, { state }));
     assert.ok(markup.includes(icon));
@@ -1033,20 +1042,11 @@ test('halaman IoT pengguna hanya memakai nama ikon lucide', async t => {
   const vite = await createServer({ root: process.cwd(), configFile: false, plugins: [react()], server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
   t.after(() => vite.close());
   const { ICON_MAP } = await vite.ssrLoadModule('/src/shared/components/Icon.jsx');
-  const iconSource = await readFile(new URL('./shared/components/Icon.jsx', import.meta.url), 'utf8');
-  const legacyBlock = iconSource.slice(iconSource.indexOf('const NAMA_LAMA = {'), iconSource.indexOf('};', iconSource.indexOf('const NAMA_LAMA = {')));
-  // Nama lama yang dipetakan ke nama lain; `check: 'check'` dan sejenisnya sudah nama lucide.
-  const legacyNames = new Set([...legacyBlock.matchAll(/^\s*'?([a-z0-9_-]+)'?:\s*'([a-z0-9-]+)'/gm)]
-    .filter(match => match[1] !== match[2]).map(match => match[1]));
-  const literal = /\b(?:icon|name)(?:=\{?|:\s*)["']([a-z0-9_-]+)["']/g;
   for (const name of Object.keys(IOT_PAGE_FILES)) {
     const source = await readIotPage(name);
-    const inBraces = [...source.matchAll(/\bicon=\{([^}]*)\}/g)].flatMap(match => [...match[1].matchAll(/["']([a-z0-9_-]+)["']/g)].map(inner => inner[1]));
-    const names = [...[...source.matchAll(literal)].map(match => match[1]), ...inBraces];
-    // Setiap literal ikon harus nama lucide yang ada di ICON_MAP: nama lama
-    // maupun salah ketik (mis. 'wifi-of') sama-sama gagal.
-    const salah = names.filter(value => legacyNames.has(value) || !Object.hasOwn(ICON_MAP, value));
-    assert.deepEqual(salah, [], `${name} memakai nama ikon lama atau tidak dikenal`);
+    // Setiap literal ikon harus nama lucide yang ada di ICON_MAP: nama Material
+    // lama maupun salah ketik (mis. 'wifi-of') sama-sama gagal.
+    assert.deepEqual(namaIkonTidakDikenal(source, ICON_MAP), [], `${name} memakai nama ikon lama atau tidak dikenal`);
   }
 });
 
@@ -1074,4 +1074,22 @@ test('Dashboard memakai TautanTombol bersama, bukan salinan kelas tombol', async
   const source = await readFile(new URL('./dashboard/pages/Dashboard.jsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /TAUTAN_TOMBOL/);
   assert.match(source, /<TautanTombol\s/);
+});
+
+test('saran Chatbot mengirim pesan, jadi berupa tombol (bukan FilterChip yang bisa dinyalakan)', async () => {
+  const sumber = await readFile(new URL('./chatbot-aquaponik/pages/Chatbot.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(sumber, /FilterChip/);
+  assert.doesNotMatch(sumber, /aria-pressed=/);
+  assert.match(sumber, /message\.suggestions\.map[\s\S]*?<Button key=\{suggestion\} size="sm" variant="secondary" onClick=\{\(\) => send\(suggestion\)\}/);
+});
+
+test('Dashboard memakai areaTone dan nilaiMetrik, tidak lagi punya jenisArea sendiri', async () => {
+  const sumber = await readFile(new URL('./dashboard/pages/Dashboard.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(sumber, /jenisArea/);
+  assert.match(sumber, /areaTone\(area\?\.type\)/);
+  assert.match(sumber, /nilaiMetrik\(device\.metric\)/);
+  assert.doesNotMatch(sumber, /Number\(device\.metric\.value\)/);
+  const detail = await readFile(new URL('./kelola-area/pages/AreaDetail.jsx', import.meta.url), 'utf8');
+  assert.match(detail, /nilaiMetrik\(device\.metric\)/);
+  assert.doesNotMatch(detail, /Number\(device\.metric\.value\)/);
 });

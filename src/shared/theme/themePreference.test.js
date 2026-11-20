@@ -80,12 +80,12 @@ test('resolveMode menerjemahkan mode tersimpan ke light atau dark', () => {
   assert.equal(resolveMode('gelap', false), 'dark');
 });
 
-test('applyToRoot menulis data-theme dan data-mode serta jembatan kelas dark', () => {
+test('applyToRoot menulis data-theme dan data-mode tanpa kelas dark', () => {
   const el = fakeRoot();
   applyToRoot(el, { tema: 'lumina', mode: 'gelap' }, false);
   assert.equal(el.dataset.theme, 'lumina');
   assert.equal(el.dataset.mode, 'dark');
-  assert.equal(el.classList.contains('dark'), true);
+  assert.equal(el.classList.contains('dark'), false);
 
   applyToRoot(el, { tema: 'lumina', mode: 'sistem' }, false);
   assert.equal(el.dataset.mode, 'light');

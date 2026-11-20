@@ -14,13 +14,11 @@ const VARIAN = {
   ghost: 'bg-transparent text-text border-transparent enabled:hover:bg-surface-2',
 };
 
-// Tautan tidak punya :enabled, jadi hover-nya ditulis langsung.
-const VARIAN_TAUTAN = {
-  primary: 'bg-primary text-on-primary border-transparent hover:bg-primary-hover',
-  secondary: 'bg-surface text-text border-text-2 hover:bg-surface-2',
-  danger: 'bg-surface text-bad-fg border-bad-fg hover:bg-bad-bg',
-  ghost: 'bg-transparent text-text border-transparent hover:bg-surface-2',
-};
+// Tautan tidak punya :enabled, jadi hover-nya ditulis langsung. Diturunkan dari
+// VARIAN supaya kedua daftar tidak bisa menyimpang.
+const VARIAN_TAUTAN = Object.fromEntries(
+  Object.entries(VARIAN).map(([nama, kelas]) => [nama, kelas.replaceAll('enabled:hover:', 'hover:')]),
+);
 
 // Nama varian lama dari halaman yang belum dimigrasi.
 const ALIAS_VARIAN = { soft: 'secondary' };

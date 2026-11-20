@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { useId, useRef, useState } from 'react';
 import { FOKUS } from './tones.js';
+import { tujuanTab } from './tujuanTab.js';
 
 /**
  * Tab dengan pola ARIA tablist: panah kiri/kanan, Home, End berpindah tab.
@@ -20,13 +21,8 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, label, children
   };
 
   const onKeyDown = (event) => {
-    if (!tabs.length) return;
-    const geser = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
-    let tujuan;
-    if (geser) tujuan = (indeksAktif + geser + tabs.length) % tabs.length;
-    else if (event.key === 'Home') tujuan = 0;
-    else if (event.key === 'End') tujuan = tabs.length - 1;
-    else return;
+    const tujuan = tujuanTab(event.key, indeksAktif, tabs.length);
+    if (tujuan == null) return;
     event.preventDefault();
     pilih(tabs[tujuan].id);
     daftar.current?.querySelectorAll('[role="tab"]')[tujuan]?.focus();

@@ -61,8 +61,6 @@ export function applyToRoot(rootEl, pref, prefersDark) {
   const resolved = resolveMode(mode, Boolean(prefersDark));
   rootEl.dataset.theme = tema;
   rootEl.dataset.mode = resolved;
-  // Jembatan sementara untuk kelas dark: lama, hapus di Task 14.
-  rootEl.classList?.toggle('dark', resolved === 'dark');
 }
 
 // Pengguna lama menyimpan `theme` di state SmartStore. Hanya 'dark' dipindahkan:

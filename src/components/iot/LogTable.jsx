@@ -2,10 +2,10 @@ import { Badge } from '../../shared/components/ui.jsx';
 import { formatSensorNumber } from '../../utils/iotPresentation.js';
 
 const READING_STATES = {
-  normal: { label: 'Normal', tone: 'ok', icon: 'check_circle' },
-  low: { label: 'Di bawah ambang', tone: 'warn', icon: 'arrow_downward' },
-  high: { label: 'Di atas ambang', tone: 'warn', icon: 'arrow_upward' },
-  unknown: { label: 'Tanpa ambang', tone: 'muted', icon: 'remove' },
+  normal: { label: 'Normal', tone: 'ok', icon: 'circle-check' },
+  low: { label: 'Di bawah ambang', tone: 'warn', icon: 'arrow-down' },
+  high: { label: 'Di atas ambang', tone: 'warn', icon: 'arrow-up' },
+  unknown: { label: 'Tanpa ambang', tone: 'muted', icon: 'minus' },
 };
 
 function formatTimestamp(value) {

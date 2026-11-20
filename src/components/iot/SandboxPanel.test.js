@@ -34,8 +34,9 @@ test('Sandbox empty telemetry shows empty reading and event messages', async t =
   });
   t.after(() => vite.close());
 
-  const { SandboxReadingValue, SandboxEventMessage } = await vite.ssrLoadModule('/src/components/iot/SandboxPanel.jsx');
-  const readingMarkup = renderToStaticMarkup(React.createElement(SandboxReadingValue, { reading: null }));
+  const { SandboxEventMessage } = await vite.ssrLoadModule('/src/components/iot/SandboxPanel.jsx');
+  const { default: SensorReading } = await vite.ssrLoadModule('/src/components/iot/SensorReading.jsx');
+  const readingMarkup = renderToStaticMarkup(React.createElement(SensorReading, { name: 'pH Air', value: null, unit: 'pH', status: 'unknown' }));
   const eventMarkup = renderToStaticMarkup(React.createElement(SandboxEventMessage, { event: null }));
 
   assert.match(readingMarkup, /Belum ada data/);
@@ -72,4 +73,12 @@ test('SandboxErrorAlert exposes the error and retries when requested', async t =
   const children = React.Children.toArray(alertTree.props.children);
   children.find(child => child?.props?.children === 'Coba lagi')?.props.onClick();
   assert.equal(retryCalled, true);
+});
+
+test('ambang pH efektif di panel sandbox memakai presisi pH (2 desimal)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const sumber = await readFile(new URL('./SandboxPanel.jsx', import.meta.url), 'utf8');
+  assert.match(sumber, /formatSensorNumber\(low, 2\)/);
+  assert.match(sumber, /formatSensorNumber\(high, 2\)/);
+  assert.doesNotMatch(sumber, /\$\{low \?\? /, 'ambang mentah tidak dicetak apa adanya');
 });

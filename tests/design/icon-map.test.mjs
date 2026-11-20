@@ -145,7 +145,7 @@ test('seed server tidak memuat nama ikon yang dirender UI', () => {
   assert.deepEqual(adaIkonDiServer(), [], 'ada kolom ikon di server; tambahkan ke pemindai dan peta')
 })
 
-test('ICON_MAP memuat setiap nama ikon lama yang dipakai di src', async (t) => {
+test('ICON_MAP memuat setiap nama ikon yang dipakai di src', async (t) => {
   const { ICON_MAP } = await muatIcon(t)
   const hilang = [...pindaiSemua()]
     .filter(([nama]) => !(nama in ICON_MAP))
@@ -160,22 +160,25 @@ test('setiap nilai ICON_MAP adalah komponen lucide yang valid', async (t) => {
   assert.equal(FALLBACK_ICON, CircleHelp)
 })
 
-test('peta mempertahankan pemetaan acuan dan menerima nama lucide kebab-case', async (t) => {
+test('peta berisi nama lucide kebab-case dan tidak lagi mengenal nama Material lama', async (t) => {
   const { ICON_MAP } = await muatIcon(t)
   const { Radio, Waves, Moon, TriangleAlert, FlaskConical, Thermometer, Droplet, ScanQrCode, PawPrint } =
     await import('lucide-react')
-  assert.equal(ICON_MAP.sensors, Radio)
-  assert.equal(ICON_MAP.water, Waves)
-  assert.equal(ICON_MAP.dark_mode, Moon)
-  assert.equal(ICON_MAP.check_circle, CircleCheck)
-  assert.equal(ICON_MAP.warning, TriangleAlert)
-  assert.equal(ICON_MAP.science, FlaskConical)
-  assert.equal(ICON_MAP.device_thermostat, Thermometer)
-  assert.equal(ICON_MAP.water_ec, Droplet)
-  assert.equal(ICON_MAP.qr_code_scanner, ScanQrCode)
-  assert.equal(ICON_MAP.pets, PawPrint)
+  assert.equal(ICON_MAP.radio, Radio)
+  assert.equal(ICON_MAP.waves, Waves)
+  assert.equal(ICON_MAP.moon, Moon)
   assert.equal(ICON_MAP['circle-check'], CircleCheck)
   assert.equal(ICON_MAP['triangle-alert'], TriangleAlert)
+  assert.equal(ICON_MAP['flask-conical'], FlaskConical)
+  assert.equal(ICON_MAP.thermometer, Thermometer)
+  assert.equal(ICON_MAP.droplet, Droplet)
+  assert.equal(ICON_MAP['scan-qr-code'], ScanQrCode)
+  assert.equal(ICON_MAP['paw-print'], PawPrint)
+  // Nama Material lama sudah dihapus (R15): tidak ada alias snake_case.
+  for (const lama of ['sensors', 'check_circle', 'water_ec', 'device_thermostat', 'qr_code_scanner', 'pets']) {
+    assert.equal(lama in ICON_MAP, false, `${lama} seharusnya tidak lagi ada di ICON_MAP`)
+  }
+  assert.equal(Object.keys(ICON_MAP).some((nama) => nama.includes('_')), false, 'tidak ada kunci snake_case')
 })
 
 test('Icon: bawaan 18 px, stroke 1.75, dekoratif tanpa label', async (t) => {
@@ -220,4 +223,30 @@ test('Icon: nama tak dikenal memakai ikon cadangan, tidak melempar, satu peringa
   assert.doesNotThrow(() => render(''))
   assert.doesNotThrow(() => render(42))
   assert.equal(warn.mock.calls.filter((c) => String(c.arguments[0]).includes('tidak-ada')).length, 1)
+})
+
+test('nama Material lama dari data tersimpan jatuh ke ikon cadangan lewat IkonSlot', async (t) => {
+  const vite = await createServer({
+    root,
+    configFile: false,
+    plugins: [react()],
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  })
+  t.after(() => vite.close())
+  const { IkonSlot } = await vite.ssrLoadModule('/src/shared/components/ui/IkonSlot.jsx')
+  const { FALLBACK_ICON } = await vite.ssrLoadModule('/src/shared/components/Icon.jsx')
+  const warn = mock.method(console, 'warn', () => {})
+  t.after(() => warn.mock.restore())
+  const cadangan = renderToStaticMarkup(
+    React.createElement(FALLBACK_ICON, { size: 18, strokeWidth: 1.75, 'aria-hidden': 'true', focusable: 'false', 'data-icon': 'water_ec' }),
+  )
+  for (const nama of ['water_ec', 'potted_plant', 'ikon-yang-tidak-ada']) {
+    const html = renderToStaticMarkup(React.createElement(IkonSlot, { icon: nama }))
+    assert.match(html, /^<svg\b/, `${nama} tetap menggambar ikon`)
+    assert.match(html, new RegExp(`data-icon="${nama}"`))
+  }
+  const html = renderToStaticMarkup(React.createElement(IkonSlot, { icon: 'water_ec' }))
+  assert.equal(html.replace(/ data-icon="[^"]*"/, ''), cadangan.replace(/ data-icon="[^"]*"/, ''))
 })

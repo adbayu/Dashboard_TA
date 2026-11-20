@@ -6,6 +6,7 @@ import { IkonSlot } from '../../../shared/components/ui/IkonSlot.jsx';
 import { FOKUS } from '../../../shared/components/ui/tones.js';
 import { kelasTombol } from '../../../shared/components/ui/tombol.js';
 import { iotApi } from '../../../services/iotApi.js';
+import { STATUS_KONEKSI } from '../../../utils/monitoring.js';
 import { canRotateDeviceCredential, credentialRevealCanClose, performActivationLabelAction } from '../../../utils/adminIotActions.js';
 
 const EMPTY_DEVICE = { typeCode: '', name: '', areaRef: '', firmware: '' };
@@ -16,12 +17,6 @@ export const DEVICE_TYPE_CODE_PATTERN = '[A-Z0-9\\x2D]{3,32}';
 export function RotationBusyState() {
   return <p role="status" className="text-sm text-text-2">Merotasi credential</p>;
 }
-
-const STATUS = {
-  online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
-  stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },
-  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi-off' },
-};
 
 // Kotak centang dan radio bawaan tetap jadi anak langsung <label> supaya
 // aturan 44 px .iot-touch-targets (label:has(> input)) berlaku.
@@ -499,7 +494,7 @@ export default function AdminIotPage() {
       key: 'status',
       label: 'Status',
       render: device => {
-        const status = STATUS[device.status] || STATUS.offline;
+        const status = STATUS_KONEKSI[device.status] || STATUS_KONEKSI.offline;
         return <StatusPill tone={status.tone} icon={status.icon}>{status.label}</StatusPill>;
       },
     },

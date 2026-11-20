@@ -49,15 +49,15 @@ test('Button maps legacy variant "soft" to secondary and keeps the size scale', 
 });
 
 test('StatusPill renders an icon and text', () => {
-  const markup = render(ui.StatusPill, { tone: 'warn', icon: 'warning' }, 'Di atas batas');
+  const markup = render(ui.StatusPill, { tone: 'warn', icon: 'triangle-alert' }, 'Di atas batas');
   assert.match(markup, /<svg/);
   assert.match(markup, /Di atas batas/);
   assert.match(markup, /text-warn-fg/);
   assert.match(markup, /data-ui="pill"/);
 });
 
-test('Badge accepts legacy tone names and Material icon names', () => {
-  const brand = render(ui.Badge, { tone: 'brand', icon: 'shield_person' }, 'Pengelola');
+test('Badge accepts legacy tone names and lucide icon names', () => {
+  const brand = render(ui.Badge, { tone: 'brand', icon: 'shield-user' }, 'Pengelola');
   assert.match(brand, /<svg/);
   assert.match(brand, /Pengelola/);
   assert.match(brand, /text-info-fg/);
@@ -125,18 +125,16 @@ test('theme-surfaces.css holds the per-theme treatments and is imported', () => 
   assert.doesNotMatch(surfaces, /#[0-9a-f]{3,8}\b/i, 'colours come from tokens only');
 });
 
-test('index.css drops the old glass, gradient, and dark hacks', () => {
+test('index.css drops the old glass, gradient, dark hacks, and legacy shims', () => {
   const css = read('../../app/styles/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.doesNotMatch(css, /\.dark\s+\.text-/);
-  assert.doesNotMatch(css, /\.dark\s+\.kat-icon/);
+  assert.doesNotMatch(css, /\.dark/);
   assert.doesNotMatch(css, /backdrop-filter:\s*blur/);
   assert.doesNotMatch(css, /gradient\(/);
-  for (const shim of ['.glass-card', '.glass-panel', '.glass-input', '.panel-inset', '.button-primary', '.button-ghost', '.button-danger']) {
-    // Selektor boleh berbagi aturan (mis. `.glass-card, .glass-panel { ... }`).
-    const rule = css.match(new RegExp(`${shim.replace('.', '\\.')}\\s*(?:,[^{]*)?\\{([^}]*)\\}`))?.[1];
-    assert.ok(rule, `${shim} shim stays until Task 14`);
-    assert.match(rule, /var\(--c-/, `${shim} shim is token based`);
+  for (const lama of ['.glass-card', '.glass-panel', '.glass-input', '.panel-inset', '.button-primary', '.button-ghost', '.button-danger', '.material-symbols-outlined', '.kat-icon']) {
+    assert.ok(!css.includes(lama), `${lama} sudah dihapus dari index.css`);
   }
+  assert.doesNotMatch(css, /--c-outline-variant|--c-on-surface-variant/, 'alias variabel warna lama sudah dihapus');
 });
 
 test('shared component sources contain no raw colours', () => {
@@ -153,18 +151,18 @@ test('shared component sources contain no raw colours', () => {
 test('legacy exports keep rendering with their current call-site props', () => {
   const noop = () => {};
   const cases = {
-    Badge: () => render(ui.Badge, { tone: 'ok', icon: 'check_circle', className: 'ml-2' }, 'Terhubung'),
+    Badge: () => render(ui.Badge, { tone: 'ok', icon: 'circle-check', className: 'ml-2' }, 'Terhubung'),
     Empty: () => render(ui.Empty, { icon: 'inbox', title: 'Belum ada data', hint: 'Tambahkan alat.', action: h('button', null, 'Tambah') }),
     Card: () => render(ui.Card, { pad: 'sm', className: 'flex' }, 'isi'),
-    Button: () => render(ui.Button, { variant: 'ghost', size: 'sm', icon: 'edit', onClick: noop, disabled: true, type: 'submit', title: 'Ubah' }, 'Ubah'),
+    Button: () => render(ui.Button, { variant: 'ghost', size: 'sm', icon: 'pencil', onClick: noop, disabled: true, type: 'submit', title: 'Ubah' }, 'Ubah'),
     SectionTitle: () => render(ui.SectionTitle, { eyebrow: 'E', title: 'Judul', subtitle: 'Sub', action: h('button', null, 'Aksi') }),
     Field: () => render(ui.Field, { label: 'Label', hint: 'Petunjuk', className: 'col-span-2' }, h(ui.Input, { value: 'x', onChange: noop })),
     Input: () => render(ui.Input, { value: undefined, onChange: noop, placeholder: 'Cari', type: 'search', className: 'w-40' }),
     Table: () => render(ui.Table, { head: ['Nama', 'Status'] }, h('tr', null, h('td', null, 'A'), h('td', null, 'B'))),
-    StatCard: () => render(ui.StatCard, { label: 'Alat', value: 3, unit: 'unit', icon: 'sensors', hint: 'Terhubung', tone: 'warn' }),
+    StatCard: () => render(ui.StatCard, { label: 'Alat', value: 3, unit: 'unit', icon: 'radio', hint: 'Terhubung', tone: 'warn' }),
     Select: () => render(ui.Select, { value: 'a', onChange: noop, options: [{ value: 'a', label: 'A' }], placeholder: 'Pilih' }),
     Modal: () => render(ui.Modal, { open: true, onClose: noop, title: 'Tambah', wide: true }, 'isi'),
-    IconButton: () => render(ui.IconButton, { icon: 'delete', onClick: noop, title: 'Hapus', tone: 'bad', size: 'sm' }),
+    IconButton: () => render(ui.IconButton, { icon: 'trash-2', onClick: noop, title: 'Hapus', tone: 'bad', size: 'sm' }),
     NumberInput: () => render(ui.NumberInput, { value: 4, onChange: noop, min: 0 }),
     Bar: () => render(ui.Bar, { value: 40, max: 80, tone: 'warn', label: 'Kenyang' }),
     Avatar: () => render(ui.Avatar, { avatar: { id: 'a', warna: 'var(--x)', warnaTeks: 'var(--y)' }, nama: 'Budi Santoso', size: 40, className: 'x' }),
@@ -241,4 +239,74 @@ test('new design-system components are exported', () => {
   const sw = render(ui.Switch, { label: 'Notifikasi', checked: true, onChange: noop });
   assert.match(sw, /role="switch"/);
   assert.match(sw, /aria-checked="true"/);
+});
+
+test('Tabs keyboard: panah memutar, Home/End ke ujung, tombol lain diabaikan', async () => {
+  const { tujuanTab } = await vite.ssrLoadModule('/src/shared/components/ui/tujuanTab.js');
+  assert.equal(tujuanTab('ArrowRight', 0, 3), 1);
+  assert.equal(tujuanTab('ArrowRight', 2, 3), 0, 'ArrowRight dari tab terakhir kembali ke awal');
+  assert.equal(tujuanTab('ArrowLeft', 0, 3), 2, 'ArrowLeft dari tab pertama ke akhir');
+  assert.equal(tujuanTab('ArrowLeft', 2, 3), 1);
+  assert.equal(tujuanTab('Home', 2, 3), 0);
+  assert.equal(tujuanTab('End', 0, 3), 2);
+  assert.equal(tujuanTab('Enter', 1, 3), null);
+  assert.equal(tujuanTab('ArrowRight', 0, 0), null, 'tanpa tab tidak ada tujuan');
+  // Tabs memakai fungsi yang sama untuk onKeyDown, bukan salinan sendiri.
+  assert.match(read('./ui/Tabs.jsx'), /tujuanTab\(event\.key, indeksAktif, tabs\.length\)/);
+});
+
+test('Avatar memetakan warna tersimpan ke keluarga token tanpa warna inline', () => {
+  const pilihan = [
+    ['#0f5238', 'leaf', /bg-leaf-bg text-leaf-fg/],
+    ['#0f766e', 'water', /bg-water-bg text-water-fg/],
+    ['#1e40af', 'water', /bg-water-bg text-water-fg/],
+    ['#6d28d9', 'info', /bg-info-bg text-info-fg/],
+    ['#b45309', 'warn', /bg-warn-bg text-warn-fg/],
+    ['#9f1239', 'primary', /bg-primary text-on-primary/],
+  ];
+  for (const [warna, keluarga, kelas] of pilihan) {
+    const markup = render(ui.Avatar, { avatar: { id: 'x', warna, warnaTeks: '#ffffff' }, nama: 'Budi Santoso', size: 'sm' });
+    assert.match(markup, new RegExp(`data-family="${keluarga}"`), warna);
+    assert.match(classOf(markup, 'span'), kelas, warna);
+    assert.match(markup, />BS</);
+    assert.doesNotMatch(markup, /background-color|[^-]color:|#[0-9a-f]{3,8}\b/i, `${warna}: tanpa warna inline`);
+  }
+  // Tanpa avatar, warna tak terbaca, atau abu-abu: keluarga bawaan primary.
+  for (const avatar of [undefined, null, {}, { warna: 'var(--x)' }, { warna: '#808080' }]) {
+    const markup = render(ui.Avatar, { avatar, nama: 'Budi' });
+    assert.match(markup, /data-family="primary"/);
+    assert.match(classOf(markup, 'span'), /\bbg-primary\b/);
+  }
+});
+
+test('Avatar pengguna yang sama berwarna sama di semua tempat memakai prop avatar', () => {
+  const dipakai = ['../../app/layout/SmartSidebar.jsx', '../../kelola-user/pages/AdminUsers.jsx', '../../profil-saya/pages/Profil.jsx', '../../masuk/pages/Login.jsx'];
+  for (const berkas of dipakai) {
+    const sumber = read(berkas);
+    const tag = sumber.match(/<Avatar\b[^>]*>/)?.[0] || '';
+    assert.match(tag, /avatar=\{/, `${berkas} meneruskan prop avatar`);
+  }
+});
+
+test('Switch: aria-label opsional menggantikan nama aksesibel, teks tampak tetap', () => {
+  const noop = () => {};
+  const tanpa = render(ui.Switch, { label: 'Aktif', checked: true, onChange: noop });
+  assert.doesNotMatch(tanpa, /aria-label=/);
+  const dengan = render(ui.Switch, { label: 'Aktif', 'aria-label': 'Aktifkan aturan Isi data HPP area', checked: true, onChange: noop });
+  assert.match(dengan, /aria-label="Aktifkan aturan Isi data HPP area"/);
+  assert.match(dengan, /role="switch"/);
+  assert.match(dengan, />Aktif<\/button>/, 'teks status tampak tetap');
+});
+
+test('kelas tautan-tombol diturunkan dari varian tombol (hanya :enabled yang berbeda)', async () => {
+  const { kelasTombol } = await vite.ssrLoadModule('/src/shared/components/ui/tombol.js');
+  for (const variant of ['primary', 'secondary', 'danger', 'ghost']) {
+    const tombol = kelasTombol({ variant }).split(' ');
+    const tautan = kelasTombol({ variant, tautan: true }).split(' ');
+    const hoverTombol = tombol.filter(kelas => kelas.startsWith('enabled:hover:')).map(kelas => kelas.replace('enabled:hover:', 'hover:'));
+    assert.ok(hoverTombol.length > 0, `${variant}: tombol punya hover`);
+    for (const kelas of hoverTombol) assert.ok(tautan.includes(kelas), `${variant}: tautan memakai ${kelas}`);
+    assert.ok(!tautan.some(kelas => kelas.startsWith('enabled:')), `${variant}: tautan tanpa :enabled`);
+    assert.ok(!tautan.some(kelas => kelas.startsWith('disabled:')), `${variant}: tautan tanpa gaya nonaktif`);
+  }
 });

@@ -1,91 +1,66 @@
-# DESIGN.md — JagoFarm SmartDashboard (AquaSmartponik)
+# DESIGN.md: JagoFarm SmartDashboard (AquaSmartponik)
 
-> Berkas ini ditulis untuk memenuhi R-37 antislop: arah desain harus tertulis,
-> bukan hanya tersirat di dalam kode. Isinya **ditranskrip dari keputusan yang
-> sudah ada** di proyek ini (tema, palet, tipografi, dan perilaku yang sudah
-> dijalankan) supaya ada satu tempat rujukan. Tiga baris yang bertanda
-> **[PERLU KONFIRMASI PEMILIK]** adalah tebakan saya dari apa yang terlihat;
-> ganti dengan kalimat Anda sendiri.
+Berkas ini hanya penunjuk. Arah, token, dan aturan desain ada di tempat berikut,
+supaya tidak ada dua sumber kebenaran.
 
-## Identitas
+## Sumber kebenaran
 
-- Produk: SmartDashboard Aquaponik untuk peternakan aquaponik skala kecil.
-- Pemilik arah: JagoFarm (proyek TA). Tema yang dipakai: "Lumina Aqua".
-- Sifat yang dituju: tenang, rapi, dan mudah dipindai cepat di lapangan.
-  Bukan produk yang ingin terlihat "teknologi masa depan".
-  **[PERLU KONFIRMASI PEMILIK]**
+| Apa | Di mana |
+| --- | --- |
+| Spec design system (lima tema, mode terang dan gelap, aturan) | `docs/superpowers/specs/2026-11-18-design-system-tema-design.md` |
+| Token warna (39 nama x 10 palet) | `design/tokens.json` |
+| Pembangkit `themes.css` dari token | `scripts/design/gen-themes.mjs`, jalankan `npm run design:themes` |
+| CSS tema hasil bangkitan (jangan disunting tangan) | `src/app/styles/themes.css` |
+| Perlakuan permukaan per tema (kaca Lumina, tepi Catatan Lapangan, dan lain-lain) | `src/app/styles/theme-surfaces.css` |
+| Komponen bersama | `src/shared/components/ui.jsx` (barrel), `src/shared/components/ui/*` |
+| Komponen IoT | `src/components/iot/*` (SensorReading, RangeBar, AreaSection, TaskList, ReadingChart) |
+| Ikon | `src/shared/components/Icon.jsx` (lucide, peta nama di `ICON_MAP`) |
+| Artifact Design System (acuan visual dan dokumentasi tiap komponen) | artifact "JagoFarm Design System" di Claude Design |
 
-## Pengguna dan konteks pakai
+Artifact hanya acuan visual. Fitur dan alur halaman mengikuti aplikasi ini.
 
-- Dua peran: pengguna lapangan (operator kolam/growbed/tandon) dan pengelola
-  (pemilik seluruh farm). Satu aplikasi, dua menu.
-- Konteks: dibuka di laptop/desktop, sering di luar ruangan pada siang hari,
-  layar Windows dengan skala 150% (lebar CSS efektif 841 px). Karena itu
-  kontras dan ukuran target sentuh diutamakan dibanding kepadatan data.
+## Lima tema
 
-## Palet
+| Id | Nama |
+| --- | --- |
+| `kebun-air` | Kebun Air (bawaan) |
+| `catatan-lapangan` | Catatan Lapangan |
+| `panel-instrumen` | Panel Instrumen |
+| `tanah-lumut` | Tanah & Lumut |
+| `lumina` | Lumina |
 
-| Peran | Nilai | Dipakai untuk |
-| --- | --- | --- |
-| Utama | `#0f5238` (hijau tua) | tombol utama, aksen teks, ikon aktif |
-| Utama terang | `#95d4b3`, `#b1f0ce` | aksen teks di mode gelap, indikator fokus sidebar |
-| Aksen status | `#b45309` / amber | peringatan, ambang keluar, ikan mati |
-| Bahaya | `#dc2626` → ditimpa di mode gelap | galat, tombol hapus |
-| Netral | `#f8fafb` (permukaan), `#d9e3e9` (latar terang), `#e5e7eb` (garis) | permukaan kartu, latar, pemisah |
+Setiap tema punya mode terang dan gelap. Pilihan pengguna disimpan di
+`localStorage` pada kunci `jagofarm.tampilan` sebagai
+`{ "tema": "kebun-air", "mode": "sistem" }`, dengan mode `terang`, `gelap`, atau
+`sistem`. Di DOM, `<html>` membawa `data-theme` dan `data-mode` (`light` atau
+`dark`). Skrip kecil di `index.html` menerapkannya sebelum cat pertama; daftar
+nilainya dijaga `tests/design/boot-theme.test.mjs`, dan hash skripnya harus sama
+dengan yang ada di `deploy/Caddyfile`.
 
-- Latar memakai gradien lembut dua tingkat (`#e7eef2 → #d9e3e9 → #c4d3db` di
-  mode terang) dengan **satu alasan**: memisahkan bidang kartu dari latar.
-  Kartu putih di atas latar lebih teduh menghasilkan pemisahan 1.21:1,
-  sedangkan latar hampir putih membuat kartu menyatu (1.07:1).
-- Mode gelap memakai gradien hijau-hitam (`#131715 → #191c1d → #0d1210`).
-- Warna kategori perangkat berasal dari data, tetapi selalu dilewatkan kelas
-  `.kat-icon` supaya kontrasnya aman di mode gelap.
+Tata letak sama untuk semua tema. Yang berbeda hanya warna, huruf, radius, dan
+perlakuan permukaan.
 
-## Tipografi
+## Menambah halaman
 
-- Judul: **Manrope** (500-800) — dipakai untuk `h1`-`h6` dan angka besar.
-- Teks: **Hanken Grotesk** (400-700) — dipakai untuk seluruh isi.
-- Alasan: keduanya punya angka yang mudah dibedakan (0 vs O, 1 vs l) karena
-  halaman ini penuh angka sensor dan rupiah; ini kebutuhan keterbacaan, bukan
-  selera. **[PERLU KONFIRMASI PEMILIK]**
-- Ikon: Material Symbols Outlined (sudah satu set, dipakai konsisten).
-- Label kecil memakai huruf besar + `tracking-wider`; ini bahasa visual untuk
-  "nama kolom/label", dipakai HANYA pada label dan eyebrow, tidak pada isi.
+1. Susun halaman dari komponen bersama. Judul halaman lewat `PageHeader`, yang
+   merender satu-satunya `<h1>` (judul top bar adalah `<p>`).
+2. Warna hanya lewat token Tailwind (`bg-surface`, `text-text-2`, `border-border`,
+   `text-ok-fg`, dan seterusnya). Tidak ada hex, `rgb()`, kelas palet mentah
+   (`text-red-600`), `bg-gradient-*`, atau varian `dark:`.
+3. Ikon hanya lewat `Icon` atau prop `icon` komponen bersama, dengan nama lucide
+   yang ada di `ICON_MAP` (tambahkan namanya di sana bila belum ada). Nama yang
+   tidak dikenal tampil sebagai ikon cadangan.
+4. Status selalu teks ditambah ikon (`StatusPill`, `Alert`), tidak pernah hanya
+   warna. Banner memakai `Alert`, tab memakai `Tabs`, filter memakai `FilterChip`.
+5. Halaman IoT memakai `.iot-touch-targets` supaya target sentuh 44 px.
+6. Teks antarmuka berbahasa Indonesia, tanpa em dash, tanpa emoji, tanpa label
+   huruf kapital di atas judul.
+7. Ratchet berjalan otomatis: `tests/design/no-legacy-styles.test.mjs` memindai
+   semua `src/**/*.jsx` (kecuali `src/pilot/`) dan gagal bila ada gaya lama. Tidak
+   ada daftar yang perlu diperbarui. Jalankan `npm run test:ui` sebelum commit.
 
-## Bentuk dan permukaan
+## Yang tidak dicakup
 
-- Skala radius (aturan di `index.css`): `lg`/`xl` untuk kontrol kecil,
-  `2xl` untuk kartu, `full` untuk keping status, `3xl` hanya panel masuk/daftar.
-- Skala tinggi kontrol: 24 px chip, 32 px aksi dalam tabel, 40 px bawaan
-  (tombol, input, select), 44-88 px untuk kartu pilihan seperti avatar.
-- Kaca (glassmorphism) dipakai sebagai aksen pada kartu dan panel
-  (`.glass-card`, `.glass-panel`). Kolom isian dan top bar **tidak** memakai
-  blur karena tidak ada lapisan apa pun di belakangnya.
-- Bayangan menandai elevasi, bukan hiasan: skala tema `shadow-glass` /
-  `shadow-glass-elevated`. Sidebar tidak memakai bayangan (sudah dipisahkan
-  warnanya sendiri).
-
-## Dial (liveliness)
-
-- **ENERGY 1** — tenang. Aplikasi kerja yang dibuka setiap hari; tidak ada
-  elemen yang "menyapa keras".
-- **RHYTHM 2** — sebagian besar konsisten, dengan beberapa penekanan: satu
-  kartu ringkasan di atas, lalu daftar/tabel.
-- **MOTION 1** — hanya transisi hover dan satu indikator aktivitas. Tidak ada
-  animasi masuk, tidak ada gerakan berulang.
-
-## Larangan yang berlaku (dari antislop, sudah dijalankan)
-
-- Tidak memakai em dash di teks yang dilihat pengguna.
-- Tidak ada foto orang sebagai identitas akun; avatar = inisial pada warna.
-- Tidak ada angka, testimoni, atau klaim keamanan yang dibuat-buat. Seluruh
-  data demo ditandai jelas sebagai data contoh di halaman masuk, sidebar, dan
-  footer.
-- Setiap kontrol punya perilaku nyata; tidak ada tombol mati.
-
-## Status data (penting untuk arah berikutnya)
-
-Seluruh data disimpan di `localStorage`. Rencana penyambungan ke backend pilot
-(Fastify + PostgreSQL di `server/`) sudah dicatat di `README.md`. Ketika itu
-terjadi, arah desain ini yang berlaku: tetap tenang, angka dulu, status selalu
-tertulis (bukan hanya warna).
+- `/pilot` (`src/pilot/`) memakai gayanya sendiri dan di luar design system ini.
+- Warna data tersimpan lama (kategori alat, avatar akun) tidak dipakai langsung;
+  hanya ronanya yang dibaca untuk memilih nada token terdekat.

@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useSmart } from '../../shared/store/SmartStore';
 import { askAquaponik, CHAT_GREETING } from '../services/aquaBot';
-import { Button, Card, Field, FilterChip, Input, PageHeader, Select, StatusPill } from '../../shared/components/ui';
+import { Button, Card, Field, Input, PageHeader, Select, StatusPill } from '../../shared/components/ui';
 import { Icon } from '../../shared/components/Icon.jsx';
 import { CHAT_SUGGESTIONS } from '../data/knowledge.js';
 
@@ -108,9 +108,9 @@ export default function Chatbot() {
                         <p className="text-sm font-semibold text-text-2">Coba tanyakan</p>
                         <div className="flex flex-wrap gap-2">
                           {message.suggestions.map((suggestion) => (
-                            <FilterChip key={suggestion} onClick={() => send(suggestion)} className="!h-auto min-h-8 !whitespace-normal py-1 text-left">
+                            <Button key={suggestion} size="sm" variant="secondary" onClick={() => send(suggestion)} className="!h-auto min-h-8 !whitespace-normal py-1 text-left">
                               {suggestion}
-                            </FilterChip>
+                            </Button>
                           ))}
                         </div>
                       </div>

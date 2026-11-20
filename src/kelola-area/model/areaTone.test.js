@@ -66,3 +66,16 @@ test('ringkasStatusAlat selalu berupa teks + ikon dan formatAngka memakai koma d
   assert.equal(formatAngka(null), '·');
   assert.equal(formatAngka(''), '·');
 });
+
+test('formatNilaiSensor memakai desimal tetap milik sensor (6,80), kosong menjadi titik tengah', async t => {
+  const vite = await createServer({ root: process.cwd(), configFile: false, plugins: [react()], server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
+  t.after(() => vite.close());
+  const { formatNilaiSensor } = await vite.ssrLoadModule('/src/kelola-area/model/areaTampil.js');
+  assert.equal(formatNilaiSensor(6.8, 2), '6,80');
+  assert.equal(formatNilaiSensor(25, 1), '25,0');
+  assert.equal(formatNilaiSensor(1020, 0), '1.020');
+  assert.equal(formatNilaiSensor(null, 2), '·');
+  assert.equal(formatNilaiSensor(undefined, 2), '·');
+  assert.equal(formatNilaiSensor('', 2), '·');
+  assert.equal(formatNilaiSensor(0, 2), '0,00', 'nol yang sungguhan tetap ditampilkan');
+});

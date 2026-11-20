@@ -212,3 +212,23 @@ test('TaskList dengan `to` merender tautan, bukan kotak centang, dan status teks
   assert.match(markup, /data-tone="ok"[\s\S]*?data-icon="circle-check"[\s\S]*?Selesai/);
   assert.match(markup, /data-tone="muted"[\s\S]*?data-icon="circle-minus"[\s\S]*?Belum/);
 });
+
+// Pengganti uji DeviceReadings (komponen lama yang sudah dihapus): pembacaan
+// kosong menampilkan petunjuk provisioning dan WiFi lewat emptyText, tanpa
+// angka 0 dan tanpa status "Normal".
+test('SensorReading tanpa nilai menampilkan emptyText dan bukan nol', async t => {
+  const { SensorReading } = await loadModules(t);
+  const petunjuk = 'Belum ada data. Pastikan alat sudah diprovisioning dan tersambung WiFi.';
+  const markup = render(SensorReading, { name: 'pH Air', value: null, unit: 'pH', status: 'unknown', emptyText: petunjuk });
+  assert.match(markup, /Belum ada data\. Pastikan alat sudah diprovisioning dan tersambung WiFi\./);
+  assert.match(markup, /data-ui="sensor-empty"/);
+  assert.doesNotMatch(markup, />0</);
+  assert.doesNotMatch(markup, />Normal</);
+});
+
+test('SensorReading tanpa nilai dan tanpa emptyText memakai teks bawaan', async t => {
+  const { SensorReading } = await loadModules(t);
+  const markup = render(SensorReading, { name: 'pH Air', value: null, unit: 'pH', status: 'unknown' });
+  assert.match(markup, /Alat belum mengirim pembacaan\./);
+  assert.match(markup, /Belum ada data/);
+});

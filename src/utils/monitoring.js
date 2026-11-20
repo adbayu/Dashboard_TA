@@ -5,14 +5,16 @@ export function attentionBadgeLabel(count) {
   return `[${count}] kejadian perlu perhatian`;
 }
 
-const SANDBOX_CONNECTION_STATES = {
-  online: { label: 'Terhubung', icon: 'wifi', tone: 'ok' },
-  stale: { label: 'Data tertunda', icon: 'schedule', tone: 'warn' },
-  offline: { label: 'Tidak terhubung', icon: 'wifi_off', tone: 'bad' },
+// Status koneksi alat: satu tabel (label, nada, ikon lucide) untuk halaman
+// pengelola IoT dan panel sandbox.
+export const STATUS_KONEKSI = {
+  online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
+  stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },
+  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi-off' },
 };
 
 export function sandboxConnectionStatus(status) {
-  return SANDBOX_CONNECTION_STATES[status] || { label: 'Status tidak diketahui', icon: 'help', tone: 'muted' };
+  return STATUS_KONEKSI[status] || { label: 'Status tidak diketahui', icon: 'circle-help', tone: 'muted' };
 }
 
 export function sandboxCurlExample({ deviceId, scenario = 'normal', apiKeyPrefix } = {}) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
+import { ambangSah, ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiMetrik, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
 import { localDateKey, localMonthKey } from '../../shared/model/localDate.js';
 import { monthlyQuestChecklist } from '../../v-pet/model/petQuests.js';
 import {
@@ -11,7 +11,7 @@ import AreaSection from '../../components/iot/AreaSection.jsx';
 import SensorReading from '../../components/iot/SensorReading.jsx';
 import { formatSensorNumber } from '../../utils/iotPresentation.js';
 import { areaTone } from '../model/areaTone.js';
-import { formatAngka, labelJenisArea } from '../model/areaTampil.js';
+import { formatNilaiSensor, labelJenisArea } from '../model/areaTampil.js';
 
 const emptyHpp = { name: '', qty: 1, unit: 'unit', unitPrice: '' };
 // Pemantauan manual memakai tiga parameter yang sama dengan sensor: pH, suhu, TDS.
@@ -22,13 +22,12 @@ const emptyMati = { jumlah: '', catatan: '' };
 const STATUS_REKAP = {
   aman: { tone: 'ok', icon: 'circle-check', text: 'Aman' },
   waspada: { tone: 'warn', icon: 'triangle-alert', text: 'Waspada' },
-  bahaya: { tone: 'bad', icon: 'circle-alert', text: 'Keluar ambang' },
+  bahaya: { tone: 'bad', icon: 'circle-alert', text: 'Di luar batas' },
   'tanpa-ambang': { tone: 'muted', icon: 'circle-minus', text: 'Tanpa ambang' },
 };
 const IKON_SENSOR = { ph: 'flask-conical', temp: 'thermometer', tds: 'droplet' };
 const IKON_STATUS_ALAT = { online: 'wifi', warning: 'triangle-alert', maintenance: 'wrench', offline: 'wifi-off' };
 const angka = (value, digit) => (value == null ? '·' : formatSensorNumber(value, digit));
-const ambangValid = (ambang) => Array.isArray(ambang) && Number.isFinite(ambang[0]) && Number.isFinite(ambang[1]) && ambang[0] < ambang[1];
 
 function TidakTersedia({ judul, isi, ikon }) {
   return (
@@ -134,12 +133,12 @@ export default function AreaDetail() {
     .map((device) => {
       const kategori = categories.find((c) => c.id === device.categoryId);
       const ambang = ambangUntuk(area, kategori, device.metric.key);
-      const value = Number(device.metric.value);
+      const value = nilaiMetrik(device.metric);
       const posisi = nilaiTerhadapAmbang(value, ambang);
       const status = device.status !== 'online'
         ? 'stale'
-        : !ambangValid(ambang) ? 'no-range' : posisi === 'atas' ? 'high' : posisi === 'bawah' ? 'low' : 'normal';
-      return { device, ambang: ambangValid(ambang) ? ambang : null, value, status };
+        : !ambangSah(ambang) ? 'no-range' : posisi === 'atas' ? 'high' : posisi === 'bawah' ? 'low' : 'normal';
+      return { device, ambang: ambangSah(ambang) ? ambang : null, value, status };
     });
 
   const submitHpp = (event) => {
@@ -202,7 +201,7 @@ export default function AreaDetail() {
       min: s ? angka(s.min, meta.precision) : '·',
       max: s ? angka(s.max, meta.precision) : '·',
       n: s ? s.n : '·',
-      ambang: row.ambang ? `${formatAngka(row.ambang[0])}–${formatAngka(row.ambang[1])}` : '·',
+      ambang: row.ambang ? `${formatNilaiSensor(row.ambang[0], meta.precision)}–${formatNilaiSensor(row.ambang[1], meta.precision)}` : '·',
     };
   });
 
@@ -249,11 +248,11 @@ export default function AreaDetail() {
                       name={meta.label}
                       icon={IKON_SENSOR[device.metric.key]}
                       device={device.code}
-                      value={Number.isFinite(value) ? value : null}
+                      value={value}
                       decimals={meta.precision}
                       unit={meta.unit}
-                      min={ambang?.[0]}
-                      max={ambang?.[1]}
+                      min={ambang ? ambang[0] : undefined}
+                      max={ambang ? ambang[1] : undefined}
                       status={status}
                     />
                   );
@@ -313,9 +312,9 @@ export default function AreaDetail() {
                           <p className="font-semibold">{note.note || 'Catatan pemantauan'}</p>
                           <p className="mt-0.5 text-sm text-text-2">{note.at} · {note.by}</p>
                           <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-num text-sm tabular-nums">
-                            {note.ph != null && <span>pH {formatAngka(note.ph, 2)}</span>}
-                            {note.temp != null && <span>{formatAngka(note.temp, 1)} °C</span>}
-                            {note.tds != null && <span>TDS {formatAngka(note.tds, 0)} ppm</span>}
+                            {note.ph != null && <span>pH {formatNilaiSensor(note.ph, METRIC_META.ph.precision)}</span>}
+                            {note.temp != null && <span>{formatNilaiSensor(note.temp, METRIC_META.temp.precision)} °C</span>}
+                            {note.tds != null && <span>TDS {formatNilaiSensor(note.tds, METRIC_META.tds.precision)} ppm</span>}
                           </p>
                         </div>
                         <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removeMonitoring(note.id)} label="Hapus catatan" />

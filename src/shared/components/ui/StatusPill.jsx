@@ -4,7 +4,7 @@ import { normalizeTone, TONE_BG, TONE_TEXT } from './tones.js';
 
 /**
  * Keping status: ikon + teks berwarna nada. Status tidak pernah hanya warna,
- * jadi kirim `icon` untuk status (nama lucide atau nama Material lama).
+ * jadi kirim `icon` untuk status (nama lucide).
  * `tone` menerima ok | warn | bad | info | muted dan nama lama (brand,
  * success, error, ...), lihat normalizeTone. Di tema Lumina keping menjadi
  * pill bergaris huruf kapital lewat theme-surfaces.css.

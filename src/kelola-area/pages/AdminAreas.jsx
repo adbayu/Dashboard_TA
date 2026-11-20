@@ -5,7 +5,7 @@ import {
 } from '../../shared/components/ui';
 import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
 import { areaTone } from '../model/areaTone.js';
-import { formatAngka, ikonJenisArea, LABEL_JENIS_AREA } from '../model/areaTampil.js';
+import { formatNilaiSensor, ikonJenisArea, LABEL_JENIS_AREA } from '../model/areaTampil.js';
 
 const TYPES = Object.entries(LABEL_JENIS_AREA).map(([value, label]) => ({ value, label }));
 const labelAmbang = (key) => METRIC_META[key].label.replace(' Air', '').replace(' Nutrisi', '');
@@ -145,7 +145,7 @@ export default function AdminAreas() {
                         {kunciAmbang.map((k) => (
                           <span key={k}>
                             {labelAmbang(k)}{' '}
-                            <span className="whitespace-nowrap font-num tabular-nums">{formatAngka(area.targets[k][0])}–{formatAngka(area.targets[k][1])}</span>
+                            <span className="whitespace-nowrap font-num tabular-nums">{formatNilaiSensor(area.targets[k][0], METRIC_META[k].precision)}–{formatNilaiSensor(area.targets[k][1], METRIC_META[k].precision)}</span>
                             {METRIC_META[k].unit !== 'pH' && ` ${METRIC_META[k].unit}`}
                           </span>
                         ))}

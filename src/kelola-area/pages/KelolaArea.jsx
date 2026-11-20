@@ -1,8 +1,8 @@
-import { formatRupiah, useSmart } from '../../shared/store/SmartStore';
+import { formatRupiah, METRIC_META, useSmart } from '../../shared/store/SmartStore';
 import { Alert, Card, EmptyState, PageHeader, StatusPill, Table, Tautan } from '../../shared/components/ui';
 import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
 import { areaTone } from '../model/areaTone.js';
-import { formatAngka, ikonJenisArea, labelJenisArea, ringkasStatusAlat } from '../model/areaTampil.js';
+import { formatNilaiSensor, ikonJenisArea, labelJenisArea, ringkasStatusAlat } from '../model/areaTampil.js';
 
 const angkaId = (nilai) => Number(nilai || 0).toLocaleString('id-ID');
 
@@ -166,9 +166,9 @@ export default function KelolaArea() {
                 id: note.id,
                 at: note.at,
                 area: namaArea(note),
-                ph: formatAngka(note.ph, 2),
-                temp: formatAngka(note.temp, 1),
-                tds: formatAngka(note.tds, 0),
+                ph: formatNilaiSensor(note.ph, METRIC_META.ph.precision),
+                temp: formatNilaiSensor(note.temp, METRIC_META.temp.precision),
+                tds: formatNilaiSensor(note.tds, METRIC_META.tds.precision),
                 note: note.note || '·',
               }))}
             />

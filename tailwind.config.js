@@ -20,37 +20,12 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: "class",
+  // Mode terang/gelap dibaca dari data-mode di <html> (themePreference.js).
+  darkMode: ["selector", '[data-mode="dark"]'],
   theme: {
     extend: {
       colors: {
         ...tokenColors,
-
-        // Alias sementara untuk halaman lama — hapus di Task 14.
-        // Nama warna lama (Material 3) yang masih dipakai di src/ dipetakan ke
-        // token semantik terdekat supaya halaman yang belum dimigrasi tetap
-        // berwarna dan ikut berganti tema. Nama lama yang tak lagi dipakai
-        // sudah dihapus.
-        "on-surface": cssVar("text"),
-        "on-surface-variant": cssVar("text-2"),
-        "outline-variant": cssVar("border"),
-        outline: cssVar("text-2"),
-        "surface-container-lowest": cssVar("surface"),
-        "surface-container-low": cssVar("surface-2"),
-        "surface-container": cssVar("surface-2"),
-        "surface-container-high": cssVar("surface-2"),
-        "surface-container-highest": cssVar("surface-2"),
-        "surface-variant": cssVar("surface-2"),
-        background: cssVar("bg"),
-        "inverse-primary": cssVar("primary"),
-        "primary-fixed-dim": cssVar("primary"),
-        secondary: cssVar("chart-1"),
-        tertiary: cssVar("water-fg"),
-        error: cssVar("bad-fg"),
-        // Dipakai di panel gelap (sidebar, Masuk, Daftar): primary terlalu gelap
-        // di mode terang, jadi dipetakan ke teks aktif sidebar yang selalu terang.
-        "emerald-accent": cssVar("side-active-text"),
-        "emerald-glow": cssVar("primary"),
       },
       borderRadius: {
         DEFAULT: "0.25rem",
@@ -80,16 +55,6 @@ export default {
         head: ["var(--font-head)"],
         body: ["var(--font-body)"],
         num: ["var(--font-num)"],
-
-        // Alias sementara untuk halaman lama — hapus di Task 14.
-        headline: ["var(--font-head)"],
-        "headline-xl": ["var(--font-head)"],
-        "headline-lg": ["var(--font-head)"],
-        "headline-md": ["var(--font-head)"],
-        "body-lg": ["var(--font-body)"],
-        "body-md": ["var(--font-body)"],
-        "label-md": ["var(--font-body)"],
-        "label-sm": ["var(--font-body)"],
       },
       fontSize: {
         "headline-xl": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "700" }],
@@ -100,13 +65,6 @@ export default {
         "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
         "label-md": ["14px", { lineHeight: "20px", fontWeight: "600" }],
         "label-sm": ["12px", { lineHeight: "16px", fontWeight: "500" }],
-      },
-      boxShadow: {
-        glass: "0 8px 32px 0 rgba(15, 82, 56, 0.06)",
-        "glass-elevated": "0 12px 40px 0 rgba(15, 82, 56, 0.12)",
-        // Alias sementara untuk halaman lama — hapus di Task 14.
-        // Masih dipakai di ui.jsx (shadow-emerald-glow); kini berbasis token primary.
-        "emerald-glow": "0 4px 20px rgb(var(--c-primary) / 0.35)",
       },
     },
   },

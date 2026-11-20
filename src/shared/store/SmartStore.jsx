@@ -19,6 +19,7 @@ import { applyKangkungSensorExp } from '../../v-pet/model/kangkungSensorExp.js';
 import { normalizeFishCount, recordDailyMortality, setFishPopulation } from '../../kelola-area/model/fishPopulation';
 import { createPetRecord, isSupportedPetSpecies, migratePetState, patchPetCollection, selectPet } from '../../v-pet/model/petModel';
 import { applyPetQuestClaim, applyPondActivity, migrateGamificationState } from './pondActivityState.js';
+import { migrasiIkonDaftar } from './migrasiIkon.js';
 import { deriveDailyMissions } from '../../gamifikasi/model/pondActivityRewards.js';
 import { localDateKey as hariKey, localMonthKey } from '../model/localDate.js';
 import { pilotApi } from '../../pilot/services/pilotApi.js';
@@ -52,9 +53,9 @@ export const METRIC_RANGE = {
 // Dipakai untuk kartu telemetri, statistik harian, dan form pemantauan manual.
 // oxlint-disable-next-line react/only-export-components -- Shared metric metadata stays beside its provider.
 export const METRIC_META = {
-  ph: { label: 'pH Air', unit: 'pH', icon: 'science', precision: 2 },
-  temp: { label: 'Suhu Air', unit: '°C', icon: 'device_thermostat', precision: 1 },
-  tds: { label: 'TDS Nutrisi', unit: 'ppm', icon: 'water_ec', precision: 0 },
+  ph: { label: 'pH Air', unit: 'pH', icon: 'flask-conical', precision: 2 },
+  temp: { label: 'Suhu Air', unit: '°C', icon: 'thermometer', precision: 1 },
+  tds: { label: 'TDS Nutrisi', unit: 'ppm', icon: 'droplet', precision: 0 },
 };
 // oxlint-disable-next-line react/only-export-components -- Shared metric keys stay beside their provider.
 export const METRIC_KEYS = ['ph', 'temp', 'tds'];
@@ -64,7 +65,7 @@ export const METRIC_KEYS = ['ph', 'temp', 'tds'];
 // yang diatur pengelola → tidak ada ambang. Sebelumnya Dashboard punya daftar
 // AMBANG_TELEMETRI sendiri, List IoT memakai metrik kategori, dan statistik
 // harian memakai area.targets — sehingga satu pembacaan yang sama bisa berlabel
-// "Ideal" di satu halaman dan "Keluar ambang" di halaman lain.
+// "Ideal" di satu halaman dan "Di luar batas" di halaman lain.
 // oxlint-disable-next-line react/only-export-components -- Shared threshold utility stays beside its provider.
 export function ambangUntuk(area, kategori, key) {
   const khusus = area?.targets?.[key];
@@ -72,6 +73,22 @@ export function ambangUntuk(area, kategori, key) {
   const dariKategori = kategori?.metrics?.find((m) => m.key === key);
   if (dariKategori) return [Number(dariKategori.min), Number(dariKategori.max)];
   return null;
+}
+
+// Ambang yang bisa digambar dan dinilai: dua angka terhingga, rendah < tinggi.
+// oxlint-disable-next-line react/only-export-components -- Shared threshold helper stays beside its provider.
+export function ambangSah(ambang) {
+  return Array.isArray(ambang) && Number.isFinite(ambang[0]) && Number.isFinite(ambang[1]) && ambang[0] < ambang[1];
+}
+
+// Nilai pembacaan sebuah alat sebagai angka, atau null bila belum ada data.
+// null atau '' berarti belum ada pembacaan, bukan 0 (Number(null) === 0).
+// oxlint-disable-next-line react/only-export-components -- Shared reading helper stays beside its provider.
+export function nilaiMetrik(metric) {
+  const mentah = metric?.value;
+  if (mentah === null || mentah === undefined || mentah === '') return null;
+  const angka = Number(mentah);
+  return Number.isFinite(angka) ? angka : null;
 }
 
 // Penilaian satu nilai terhadap ambang. Dipakai kartu telemetri, List IoT, dan
@@ -342,6 +359,10 @@ function migrateState(parsed) {
     devices,
     readings,
     kematian: Array.isArray(parsed.kematian) ? parsed.kematian : [],
+    // Nama ikon Material lama pada kategori dan badge tersimpan dipindahkan ke
+    // nama lucide sekali di sini (font Material Symbols sudah dihapus).
+    ...(Array.isArray(parsed.categories) ? { categories: migrasiIkonDaftar(parsed.categories) } : {}),
+    ...(Array.isArray(parsed.badges) ? { badges: migrasiIkonDaftar(parsed.badges) } : {}),
     users: users.map((u) => {
       const seed = SEED_USERS.find(
         (s) =>

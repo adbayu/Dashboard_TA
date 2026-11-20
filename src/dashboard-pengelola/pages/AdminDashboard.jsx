@@ -1,104 +1,10 @@
-import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
-import { EmptyState, PageHeader, STATUS_LABEL, StatusPill, Table, Tautan, TautanTombol } from '../../shared/components/ui';
-import { formatSensorNumber } from '../../utils/iotPresentation.js';
+import { ambangSah, ambangUntuk, formatRupiah, METRIC_KEYS, nilaiMetrik, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
+import { EmptyState, PageHeader, StatusPill, Table, Tautan, TautanTombol } from '../../shared/components/ui';
+import { daftarTindakan } from '../model/daftarTindakan.js';
 import { pillStatusAkun } from '../../kelola-user/model/statusAkun.js';
-
-// Masalah alat menurut status: selalu teks + ikon, tidak pernah hanya warna.
-const MASALAH_ALAT = {
-  offline: { tone: 'bad', icon: 'wifi-off', saran: 'Cek daya, kabel, dan jangkauan sinyal.' },
-  warning: { tone: 'warn', icon: 'triangle-alert', saran: 'Periksa pembacaan dan kondisi alat.' },
-  maintenance: { tone: 'info', icon: 'wrench', saran: 'Selesaikan perawatan lalu aktifkan kembali.' },
-};
-const URUTAN_STATUS = ['offline', 'warning', 'maintenance'];
 
 const tanggalHariIni = () =>
   new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
-
-/**
- * Daftar "Perlu ditangani": satu baris per masalah, urut dari yang paling
- * mendesak. Fungsi murni supaya urutan dan isinya bisa diuji tanpa store.
- * `luarBatas`: [{ device, area, key, value, ambang, posisi }] dari bacaan sensor.
- */
-// oxlint-disable-next-line react/only-export-components -- Pure helper is tested beside its page.
-export function daftarTindakan({ devices = [], areas = [], users = [], kematianHariIni = [], luarBatas = [] }) {
-  const namaArea = (id) => areas.find((a) => a.id === id)?.name;
-  const hasil = [];
-
-  for (const status of URUTAN_STATUS) {
-    for (const device of devices.filter((d) => d.status === status)) {
-      const info = MASALAH_ALAT[status];
-      const baterai = typeof device.battery === 'number' ? ` Baterai ${device.battery}%.` : '';
-      hasil.push({
-        id: `alat-${device.id}`,
-        masalah: STATUS_LABEL[status],
-        tone: info.tone,
-        icon: info.icon,
-        kode: device.code,
-        judul: device.name,
-        rincian: `${namaArea(device.areaId) || 'Belum ditempatkan'}.${baterai} ${info.saran}`,
-        to: '/admin/iot',
-        aksi: 'Periksa alat',
-      });
-    }
-  }
-
-  for (const b of luarBatas) {
-    const meta = METRIC_META[b.key];
-    const f = (n) => formatSensorNumber(n, meta.precision);
-    hasil.push({
-      id: `batas-${b.device.id}`,
-      masalah: 'Di luar batas',
-      tone: 'warn',
-      icon: 'triangle-alert',
-      judul: `${meta.label} ${b.area?.name || b.device.code} ${f(b.value)} ${meta.unit}`,
-      rincian: `Batas area ${f(b.ambang[0])}–${f(b.ambang[1])} ${meta.unit}, nilai ${b.posisi === 'atas' ? 'di atas' : 'di bawah'} batas.`,
-      to: '/monitoring',
-      aksi: 'Lihat monitoring',
-    });
-  }
-
-  for (const row of kematianHariIni) {
-    hasil.push({
-      id: `mati-${row.id}`,
-      masalah: 'Ikan mati',
-      tone: 'warn',
-      icon: 'fish',
-      judul: `${namaArea(row.areaId) || row.areaId}, ${row.jumlah} ekor hari ini`,
-      rincian: row.catatan ? `Catatan pengguna: ${row.catatan}` : 'Dicatat manual oleh pengguna atau pengelola.',
-      to: '/admin/area',
-      aksi: 'Buka area',
-    });
-  }
-
-  for (const device of devices.filter((d) => !d.areaId)) {
-    hasil.push({
-      id: `tanpa-area-${device.id}`,
-      masalah: 'Belum ditempatkan',
-      tone: 'info',
-      icon: 'inbox',
-      kode: device.code,
-      judul: device.name,
-      rincian: 'Alat sudah terdaftar tetapi belum dipasang ke area mana pun.',
-      to: '/admin/area',
-      aksi: 'Tempatkan ke area',
-    });
-  }
-
-  for (const user of users.filter((u) => u.status === 'menunggu')) {
-    hasil.push({
-      id: `akun-${user.id}`,
-      masalah: 'Menunggu persetujuan',
-      tone: 'info',
-      icon: 'clock',
-      judul: `${user.name}, akun Pengelola`,
-      rincian: `Mengajukan akun pada ${user.joinedAt}. Belum bisa masuk sebelum disetujui.`,
-      to: '/admin/pengguna',
-      aksi: 'Tinjau pengajuan',
-    });
-  }
-
-  return hasil;
-}
 
 const KOLOM_TINDAKAN = [
   {
@@ -150,13 +56,13 @@ export default function AdminDashboard() {
 
   // Bacaan yang keluar dari ambang memakai helper bersama store, sama dengan Pantauan.
   const luarBatas = devices
-    // null/'' berarti belum ada data, bukan 0.
-    .filter((d) => d.status === 'online' && d.metric && METRIC_KEYS.includes(d.metric.key)
-      && d.metric.value !== null && d.metric.value !== '' && Number.isFinite(Number(d.metric.value)))
+    // null/'' berarti belum ada data, bukan 0 (nilaiMetrik mengembalikan null).
+    .filter((d) => d.status === 'online' && d.metric && METRIC_KEYS.includes(d.metric.key) && nilaiMetrik(d.metric) !== null)
     .map((device) => {
       const area = areas.find((a) => a.id === device.areaId);
-      const ambang = ambangUntuk(area, categories.find((c) => c.id === device.categoryId), device.metric.key);
-      const value = Number(device.metric.value);
+      const mentah = ambangUntuk(area, categories.find((c) => c.id === device.categoryId), device.metric.key);
+      const ambang = ambangSah(mentah) ? mentah : null;
+      const value = nilaiMetrik(device.metric);
       return { device, area, key: device.metric.key, value, ambang, posisi: nilaiTerhadapAmbang(value, ambang) };
     })
     .filter((b) => b.posisi === 'atas' || b.posisi === 'bawah');

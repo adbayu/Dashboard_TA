@@ -7,7 +7,7 @@ export const SEED_CATEGORIES = [
   {
     id: 'CAT-AIR',
     name: 'Sensor Kualitas Air',
-    icon: 'water_ec',
+    icon: 'droplet',
     color: '#0369a1',
     description: 'Perangkat pengukur parameter kimia & fisika air kolam aquaponik.',
     metrics: [

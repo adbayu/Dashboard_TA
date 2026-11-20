@@ -1,4 +1,5 @@
 import { ambangUntuk, ambilKodeAlat, METRIC_META, nilaiTerhadapAmbang } from '../../store/SmartStore';
+import { formatSensorNumber } from '../../../utils/iotPresentation.js';
 import AksiQr from '../../qr/components/AksiQr';
 import QrCode from '../../qr/components/QrCode';
 import { Badge, Card, Table, TautanTombol, STATUS_LABEL, STATUS_TONE } from '../../components/ui';
@@ -199,7 +200,7 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
           <div className="rounded-card bg-surface-2 p-4">
             <p className="text-sm font-semibold text-text-2">Rentang ideal</p>
             <p className="mt-1 font-num text-lg font-semibold tabular-nums text-text">
-              {ambang ? `${ambang[0]} – ${ambang[1]} ${meta?.unit || ''}` : '·'}
+              {ambang ? `${formatSensorNumber(ambang[0], meta?.precision)} – ${formatSensorNumber(ambang[1], meta?.precision)} ${meta?.unit || ''}` : '·'}
             </p>
             <p className="mt-2 text-sm text-text-2">
               Ditetapkan pengelola di Kategori Device / Kelola Area.

@@ -54,7 +54,7 @@ export default function AdminPoints() {
       key: 'active',
       label: 'Status',
       render: (row) => (
-        <Switch label={row.active ? 'Aktif' : 'Nonaktif'} checked={Boolean(row.active)} onChange={(nyala) => savePointRule({ ...row, active: nyala })} />
+        <Switch label={row.active ? 'Aktif' : 'Nonaktif'} aria-label={`Aktifkan aturan ${row.activity}`} checked={Boolean(row.active)} onChange={(nyala) => savePointRule({ ...row, active: nyala })} />
       ),
     },
     {

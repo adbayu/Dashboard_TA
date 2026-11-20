@@ -9,6 +9,7 @@ import {
   mergeEventPages,
   sandboxConnectionStatus,
   sandboxCurlExample,
+  STATUS_KONEKSI,
   summarizeAreaPoints,
 } from './monitoring.js';
 
@@ -76,8 +77,8 @@ test('contoh curl sandbox hanya memuat prefix key Test dan variabel secret', () 
 
 test('badge koneksi sandbox mengikuti label, ikon, dan tone UX 6.1', () => {
   assert.deepEqual(sandboxConnectionStatus('online'), { label: 'Terhubung', icon: 'wifi', tone: 'ok' });
-  assert.deepEqual(sandboxConnectionStatus('stale'), { label: 'Data tertunda', icon: 'schedule', tone: 'warn' });
-  assert.deepEqual(sandboxConnectionStatus('offline'), { label: 'Tidak terhubung', icon: 'wifi_off', tone: 'bad' });
+  assert.deepEqual(sandboxConnectionStatus('stale'), { label: 'Data tertunda', icon: 'clock', tone: 'warn' });
+  assert.deepEqual(sandboxConnectionStatus('offline'), { label: 'Tidak terhubung', icon: 'wifi-off', tone: 'bad' });
 });
 
 test('scheduler membatasi konkurensi, menolak batch berlebih, dan tidak overlap', async () => {
@@ -137,4 +138,11 @@ test('badge perhatian tidak menghitung sandbox meski offline atau memiliki alert
   ], {
     'sandbox-reading': { readings: [{ state: 'low' }, { state: 'high' }] },
   }), 0);
+});
+
+test('status koneksi memakai satu tabel lucide dan status tak dikenal jatuh ke ikon bantuan', () => {
+  assert.deepEqual(Object.keys(STATUS_KONEKSI), ['online', 'stale', 'offline']);
+  for (const status of Object.values(STATUS_KONEKSI)) assert.doesNotMatch(status.icon, /_/, 'nama ikon lucide, bukan Material');
+  assert.deepEqual(sandboxConnectionStatus('tidak-ada'), { label: 'Status tidak diketahui', icon: 'circle-help', tone: 'muted' });
+  assert.equal(sandboxConnectionStatus('online'), STATUS_KONEKSI.online);
 });

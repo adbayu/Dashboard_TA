@@ -9,7 +9,7 @@ import config from '../../tailwind.config.js'
 const root = new URL('../../', import.meta.url)
 const tokens = JSON.parse(readFileSync(new URL('design/tokens.json', root), 'utf8'))
 const tokenNames = tokens.color.tokens.map((t) => t.name)
-const { colors, fontFamily, borderRadius, boxShadow } = config.theme.extend
+const { colors, fontFamily, borderRadius, boxShadow = {} } = config.theme.extend
 const rgbVar = (name) => `rgb(var(--c-${name}) / <alpha-value>)`
 
 test('setiap token di tokens.json punya warna Tailwind rgb(var(--c-nama))', () => {
@@ -29,31 +29,17 @@ test('keluarga huruf dan radius mengikuti variabel tema', () => {
   assert.equal(borderRadius.pill, 'var(--radius-pill)')
 })
 
-test('alias sementara menunjuk token semantik yang ada', () => {
-  const aliasNames = Object.keys(colors).filter((name) => !tokenNames.includes(name))
-  assert.ok(aliasNames.length > 0)
-  for (const name of aliasNames) {
-    const match = /^rgb\(var\(--c-([a-z0-9-]+)\) \/ <alpha-value>\)$/.exec(colors[name])
-    assert.ok(match, `alias ${name} harus berbentuk rgb(var(--c-token) / <alpha-value>)`)
-    assert.ok(tokenNames.includes(match[1]), `alias ${name} menunjuk token tak dikenal ${match[1]}`)
+test('tidak ada alias warna lama: hanya 39 token, tanpa alias huruf atau bayangan lama', () => {
+  assert.deepEqual(Object.keys(colors).sort(), [...tokenNames].sort())
+  for (const lama of ['on-surface', 'on-surface-variant', 'outline-variant', 'surface-container', 'background', 'secondary', 'tertiary', 'error', 'emerald-accent', 'emerald-glow']) {
+    assert.equal(lama in colors, false, `alias ${lama} seharusnya sudah dihapus`)
   }
-  assert.equal(colors['on-surface-variant'], rgbVar('text-2'))
-  const brief = {
-    'on-surface': 'text',
-    'on-surface-variant': 'text-2',
-    'outline-variant': 'border',
-    outline: 'text-2',
-    'surface-container': 'surface-2',
-    'surface-container-low': 'surface-2',
-    'surface-container-high': 'surface-2',
-    'surface-container-highest': 'surface-2',
-    'surface-container-lowest': 'surface',
-    'inverse-primary': 'primary',
-    error: 'bad-fg',
-  }
-  for (const [alias, target] of Object.entries(brief)) {
-    assert.equal(colors[alias], rgbVar(target), `alias ${alias}`)
-  }
+  assert.deepEqual(Object.keys(fontFamily).sort(), ['body', 'head', 'num'])
+  assert.equal('emerald-glow' in boxShadow, false)
+})
+
+test('mode gelap dibaca dari data-mode, bukan kelas dark', () => {
+  assert.deepEqual(config.darkMode, ['selector', '[data-mode="dark"]'])
 })
 
 test('tidak ada warna hex statis di konfigurasi Tailwind', () => {

@@ -3,10 +3,12 @@
 | Atribut | Isi |
 | --- | --- |
 | Status | Draft v0.1 |
-| Sumber kebenaran | `DESIGN.md`, `tailwind.config.js`, `src/index.css`, `src/components/ui.jsx` |
+| Sumber kebenaran | `DESIGN.md` (penunjuk ke spec dan `design/tokens.json`), `src/shared/components/ui.jsx` |
 | Cakupan | Token yang sudah ada + komponen baru yang dibutuhkan halaman IoT |
 
-Dokumen ini tidak membuat arah visual baru. Semua token diambil dari kode yang sudah ada. Komponen baru dirakit dari komponen `ui.jsx` yang sudah ada, supaya halaman IoT terlihat satu aplikasi dengan halaman lain. Tiga baris bertanda **[PERLU KONFIRMASI PEMILIK]** di `DESIGN.md` tetap berlaku dan belum dijawab.
+> **Bagian token (2.1 sampai 2.3) sudah digantikan.** Token warna, huruf, radius, dan bayangan kini bersumber dari `design/tokens.json` dan spec `docs/superpowers/specs/2026-11-18-design-system-tema-design.md`; ringkasannya ada di `DESIGN.md`. Nama kelas di bagian itu (`text-on-surface`, `glass-card`, `font-headline`, dan seterusnya) sudah dihapus. Bagian lain dokumen ini (komponen IoT, aturan pakai, checklist) tetap berlaku sebagai acuan perilaku.
+
+Dokumen ini tidak membuat arah visual baru. Semua token diambil dari kode yang sudah ada. Komponen baru dirakit dari komponen `ui.jsx` yang sudah ada, supaya halaman IoT terlihat satu aplikasi dengan halaman lain.
 
 ## 1. Dial
 
@@ -17,6 +19,8 @@ Dokumen ini tidak membuat arah visual baru. Semua token diambil dari kode yang s
 | MOTION | 1 | Hanya transisi hover 200 ms dan satu indikator "Live". Angka yang berubah tidak dianimasikan |
 
 ## 2. Token
+
+> **Digantikan.** Lihat `design/tokens.json` dan `DESIGN.md`. Tabel di bawah dipertahankan hanya sebagai catatan sejarah dan tidak boleh dipakai untuk kode baru.
 
 ### 2.1 Warna
 
