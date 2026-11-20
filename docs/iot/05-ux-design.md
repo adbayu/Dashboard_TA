@@ -3,13 +3,13 @@
 | Atribut | Isi |
 | --- | --- |
 | Status | Draft v0.1 |
-| Arah desain | [`DESIGN.md`](../../DESIGN.md) (tema Lumina Aqua, dial ENERGY 1 / RHYTHM 2 / MOTION 1) |
+| Arah desain | [`DESIGN.md`](../../DESIGN.md) (penunjuk ke spec lima tema dan token); dial ENERGY 1 / RHYTHM 2 / MOTION 1 ada di [Design System](06-design-system.md) bagian 1 |
 | Komponen | [Design System](06-design-system.md) |
 | Gambar desain | [design/README.md](design/README.md) |
 
 ## 1. Prinsip
 
-Ketiga prinsip ini diambil dari `DESIGN.md` dan dipakai untuk memutuskan setiap layar IoT:
+Ketiga prinsip ini mengikuti dial di [Design System](06-design-system.md) bagian 1 dan spec tema (lihat `DESIGN.md`), dan dipakai untuk memutuskan setiap layar IoT:
 
 1. **Angka dulu.** Nilai sensor dan statusnya adalah fokus utama setiap layar monitoring. Elemen lain mengikuti.
 2. **Status selalu tertulis.** Warna hanya memperkuat. Setiap status punya label teks dan ikon.

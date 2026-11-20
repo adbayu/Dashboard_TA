@@ -134,11 +134,14 @@ export function Checkbox({ label, invalid, className = '', ...rest }) {
 }
 
 /**
- * Saklar nyala/mati. `onChange(checked)` menerima nilai boolean baru. `aria-label`
- * (opsional) menggantikan nama aksesibel dari teks `label`, mis. saat beberapa
- * saklar berteks sama ada dalam satu tabel.
+ * Saklar nyala/mati. `onChange(checked)` menerima nilai boolean baru.
+ * `aria-labelledby` (opsional, id elemen lain) ditambahkan di depan teks `label`
+ * saklar sendiri sebagai nama aksesibel, mis. "Login harian Aktif" untuk saklar
+ * berteks sama di banyak baris tabel. Nama tetap memuat teks yang tampak
+ * (WCAG 2.5.3 label dalam nama).
  */
-export function Switch({ label, checked, defaultChecked = false, onChange, disabled, 'aria-label': ariaLabel }) {
+export function Switch({ label, checked, defaultChecked = false, onChange, disabled, 'aria-labelledby': rujukan }) {
+  const idTeks = useId();
   const [lokal, setLokal] = useState(defaultChecked);
   const nyala = checked ?? lokal;
   return (
@@ -146,7 +149,7 @@ export function Switch({ label, checked, defaultChecked = false, onChange, disab
       type="button"
       role="switch"
       aria-checked={nyala}
-      aria-label={ariaLabel}
+      aria-labelledby={rujukan ? `${rujukan} ${idTeks}` : undefined}
       disabled={disabled}
       onClick={() => {
         if (checked === undefined) setLokal(!nyala);
@@ -170,7 +173,7 @@ export function Switch({ label, checked, defaultChecked = false, onChange, disab
           )}
         />
       </span>
-      {label}
+      <span id={idTeks}>{label}</span>
     </button>
   );
 }

@@ -22,7 +22,23 @@ function kumpulkanJsx(dir, prefiks, hasil) {
   return hasil;
 }
 
-export const MIGRATED = kumpulkanJsx('src/', 'src/', []).sort();
+// Berkas non-JSX yang dijaga sejak dulu atau dibuat di Fase B. Sengaja bukan
+// semua .js: data seed lama (warna hex avatar/kategori) akan melanggar pola hex.
+export const EKSTRA = [
+  'src/v-pet/styles/pet.css',
+  'src/shared/qr/opsiQr.js',
+  'src/shared/components/ui/tombol.js',
+  'src/shared/components/ui/avatarKeluarga.js',
+  'src/shared/model/rona.js',
+  'src/kelola-area/model/areaTone.js',
+  'src/kelola-area/model/areaTampil.js',
+  'src/kategori-device/model/nadaKategori.js',
+  'src/kelola-user/model/statusAkun.js',
+  'src/dashboard-pengelola/model/daftarTindakan.js',
+  'src/shared/store/migrasiIkon.js',
+];
+
+export const MIGRATED = [...kumpulkanJsx('src/', 'src/', []), ...EKSTRA].sort();
 
 // Hex memakai pola yang diperketat (R9): tidak mengenai entitas HTML
 // (&#8212;) maupun id/kata yang menempel pada '#'.
@@ -166,6 +182,8 @@ test('setiap pola LEGACY terdeteksi oleh findLegacy (uji diri positif)', () => {
 test('semua halaman bebas dari gaya lama', async () => {
   assert.ok(MIGRATED.length >= 60, 'pemindaian menemukan berkas JSX');
   assert.ok(!MIGRATED.some((path) => path.startsWith('src/pilot/')), 'pilot dikecualikan');
+  for (const path of EKSTRA) assert.ok(MIGRATED.includes(path), `${path} ikut dipindai`);
+  assert.ok(EKSTRA.some((path) => path.endsWith('.css')) && EKSTRA.some((path) => path.endsWith('.js')));
   const pelanggaran = [];
   for (const path of MIGRATED) {
     const sumber = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');

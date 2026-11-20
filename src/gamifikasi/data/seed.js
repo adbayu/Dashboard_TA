@@ -10,10 +10,10 @@ export const SEED_POINT_RULES = [
 ];
 
 export const SEED_BADGES = [
-  { id: 'B-1', name: 'Peternak Tekun', icon: 'sprout', minPoints: 200, desc: 'Kumpulkan 200 point' },
-  { id: 'B-2', name: 'Ahli Kualitas Air', icon: 'droplet', minPoints: 750, desc: 'Kumpulkan 750 point' },
-  { id: 'B-3', name: 'Sensor Whisperer', icon: 'radio', minPoints: 1500, desc: 'Kumpulkan 1.500 point' },
-  { id: 'B-4', name: 'Master Akuaponik', icon: 'trophy', minPoints: 3000, desc: 'Kumpulkan 3.000 point' },
+  { id: 'B-1', name: 'Peternak Tekun', icon: 'sprout', minPoints: 200, desc: 'Kumpulkan 200 poin' },
+  { id: 'B-2', name: 'Ahli Kualitas Air', icon: 'droplet', minPoints: 750, desc: 'Kumpulkan 750 poin' },
+  { id: 'B-3', name: 'Sensor Whisperer', icon: 'radio', minPoints: 1500, desc: 'Kumpulkan 1.500 poin' },
+  { id: 'B-4', name: 'Master Akuaponik', icon: 'trophy', minPoints: 3000, desc: 'Kumpulkan 3.000 poin' },
 ];
 
 export const SEED_MISSIONS = [

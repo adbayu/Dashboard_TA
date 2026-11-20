@@ -128,7 +128,7 @@ test('theme-surfaces.css holds the per-theme treatments and is imported', () => 
 test('index.css drops the old glass, gradient, dark hacks, and legacy shims', () => {
   const css = read('../../app/styles/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.doesNotMatch(css, /\.dark\s+\.text-/);
-  assert.doesNotMatch(css, /\.dark/);
+  assert.doesNotMatch(css, /\.dark\b/);
   assert.doesNotMatch(css, /backdrop-filter:\s*blur/);
   assert.doesNotMatch(css, /gradient\(/);
   for (const lama of ['.glass-card', '.glass-panel', '.glass-input', '.panel-inset', '.button-primary', '.button-ghost', '.button-danger', '.material-symbols-outlined', '.kat-icon']) {
@@ -288,14 +288,15 @@ test('Avatar pengguna yang sama berwarna sama di semua tempat memakai prop avata
   }
 });
 
-test('Switch: aria-label opsional menggantikan nama aksesibel, teks tampak tetap', () => {
+test('Switch: aria-labelledby opsional membentuk nama "rujukan + teks tampak"', () => {
   const noop = () => {};
   const tanpa = render(ui.Switch, { label: 'Aktif', checked: true, onChange: noop });
-  assert.doesNotMatch(tanpa, /aria-label=/);
-  const dengan = render(ui.Switch, { label: 'Aktif', 'aria-label': 'Aktifkan aturan Isi data HPP area', checked: true, onChange: noop });
-  assert.match(dengan, /aria-label="Aktifkan aturan Isi data HPP area"/);
+  assert.doesNotMatch(tanpa, /aria-label/);
+  const dengan = render(ui.Switch, { label: 'Aktif', 'aria-labelledby': 'aturan-R-1', checked: true, onChange: noop });
+  const rujukan = dengan.match(/aria-labelledby="aturan-R-1 ([^"]+)"/)?.[1];
+  assert.ok(rujukan, 'rujukan ke teks saklar sendiri ada di belakang rujukan luar');
+  assert.ok(dengan.includes(`<span id="${rujukan}">Aktif</span>`), 'id menunjuk teks yang tampak');
   assert.match(dengan, /role="switch"/);
-  assert.match(dengan, />Aktif<\/button>/, 'teks status tampak tetap');
 });
 
 test('kelas tautan-tombol diturunkan dari varian tombol (hanya :enabled yang berbeda)', async () => {
@@ -308,5 +309,33 @@ test('kelas tautan-tombol diturunkan dari varian tombol (hanya :enabled yang ber
     for (const kelas of hoverTombol) assert.ok(tautan.includes(kelas), `${variant}: tautan memakai ${kelas}`);
     assert.ok(!tautan.some(kelas => kelas.startsWith('enabled:')), `${variant}: tautan tanpa :enabled`);
     assert.ok(!tautan.some(kelas => kelas.startsWith('disabled:')), `${variant}: tautan tanpa gaya nonaktif`);
+  }
+});
+
+test('Avatar: pilihan baru menyimpan id keluarga, didahulukan atas hex lama, dan punya garis 1 px', () => {
+  for (const keluarga of ['leaf', 'water', 'info', 'warn', 'primary']) {
+    const markup = render(ui.Avatar, { avatar: { id: keluarga, keluarga }, nama: 'Budi Santoso', size: 'sm' });
+    assert.match(markup, new RegExp(`data-family="${keluarga}"`));
+    assert.match(classOf(markup, 'span'), /\bborder\b/, 'garis 1 px');
+    assert.match(classOf(markup, 'span'), new RegExp(`border-${keluarga === 'primary' ? 'on-primary' : `${keluarga}-fg`}/70`));
+    assert.doesNotMatch(markup, /style="[^"]*(?:background|color):/);
+  }
+  // keluarga yang dikenal menang atas warna lama; keluarga tak dikenal jatuh ke rona.
+  assert.match(render(ui.Avatar, { avatar: { keluarga: 'water', warna: '#0f5238' }, nama: 'A' }), /data-family="water"/);
+  assert.match(render(ui.Avatar, { avatar: { keluarga: 'ungu', warna: '#0f5238' }, nama: 'A' }), /data-family="leaf"/);
+});
+
+test('AVATAR_PILIHAN: tepat satu pilihan per keluarga token, tanpa hex, dan pemilih memakai kelas keluarga', async () => {
+  const { AVATAR_PILIHAN } = await vite.ssrLoadModule('/src/kelola-user/data/seed.js');
+  assert.deepEqual(AVATAR_PILIHAN.map(item => item.keluarga), ['leaf', 'water', 'info', 'warn', 'primary']);
+  assert.equal(new Set(AVATAR_PILIHAN.map(item => item.nama)).size, 5, 'nama tampak unik');
+  for (const item of AVATAR_PILIHAN) assert.equal(item.warna, undefined, `${item.id}: tanpa hex`);
+  const pilih = render(ui.AvatarPilih, { avatar: AVATAR_PILIHAN[1], nama: 'Budi', terpilih: true, onClick: () => {} });
+  assert.match(pilih, /data-family="water"/);
+  assert.match(pilih, /bg-water-bg text-water-fg/);
+  for (const berkas of ['../../daftar/pages/Daftar.jsx', '../../profil-saya/pages/Profil.jsx']) {
+    const sumber = read(berkas);
+    assert.match(sumber, /Warna \$\{pilihan\.nama\}/);
+    assert.doesNotMatch(sumber, /#[0-9a-f]{3,8}\b/i);
   }
 });

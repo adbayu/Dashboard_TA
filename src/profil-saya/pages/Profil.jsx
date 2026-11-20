@@ -7,6 +7,7 @@ import { ModeToggle } from '../../shared/theme/ModeToggle.jsx';
 import { ThemePicker } from '../../shared/theme/ThemePicker.jsx';
 import { useTampilan } from '../../shared/theme/TampilanProvider.jsx';
 import { teksAktif } from '../../shared/theme/temaInfo.js';
+import { keluargaAvatar } from '../../shared/components/ui/avatarKeluarga.js';
 import { AVATAR_PILIHAN } from '../../kelola-user/data/seed.js';
 import { passwordChangeAvailable } from '../../utils/frontendReview.js';
 import { IOT_SOURCE } from '../../services/iotApi.js';
@@ -158,8 +159,8 @@ export default function Profil() {
                     avatar={pilihan}
                     nama={form.name}
                     size={48}
-                    label={`Warna ${pilihan.id}`}
-                    terpilih={form.avatar?.id === pilihan.id}
+                    label={`Warna ${pilihan.nama}`}
+                    terpilih={Boolean(form.avatar) && keluargaAvatar(form.avatar) === pilihan.keluarga}
                     onClick={() => setForm({ ...form, avatar: pilihan })}
                   />
                 ))}

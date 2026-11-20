@@ -46,7 +46,7 @@ export const KNOWLEDGE = [
   },
   {
     tags: ['v-pet', 'virtual pet', 'gamifikasi', 'point', 'level'],
-    answer: 'Virtual Pet adalah hewan peliharaan digital di dashboard: setiap kali Anda mencatat pemantauan, mengisi HPP, atau menjaga kualitas air, kondisi pet (kenyang, kebahagiaan, kebersihan) naik dan Anda menerima point. Point menaikkan level pet dari Benih sampai Nila Juara dan membuka badge seperti "Ahli Kualitas Air". Semakin rajin pet dipelihara, semakin tinggi posisi Anda di papan peringkat.',
+    answer: 'Virtual Pet adalah hewan peliharaan digital di dashboard: setiap kali Anda mencatat pemantauan, mengisi HPP, atau menjaga kualitas air, kondisi pet (kenyang, kebahagiaan, kebersihan) naik dan Anda menerima poin. Poin menaikkan level pet dari Benih sampai Nila Juara dan membuka badge seperti "Ahli Kualitas Air". Semakin rajin pet dipelihara, semakin tinggi posisi Anda di papan peringkat.',
   },
 ];
 

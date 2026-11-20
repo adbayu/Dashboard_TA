@@ -136,9 +136,19 @@ test('daftarTindakan: status alat selain online dianggap masalah, dengan urutan 
     areas: [{ id: 'A1', name: 'Kolam A' }],
   });
   assert.deepEqual(tindakan.map(item => item.kode), ['E', 'D', 'A', 'B'], 'online tidak muncul; status tak dikenal paling akhir');
-  const takDikenal = tindakan.find(item => item.kode === 'B');
-  assert.equal(takDikenal.masalah, 'stale');
-  assert.ok(takDikenal.icon && takDikenal.tone === 'warn');
+  const tertunda = tindakan.find(item => item.kode === 'B');
+  assert.equal(tertunda.masalah, 'Data tertunda', 'status koneksi IoT memakai labelnya, bukan id mentah');
+  assert.ok(tertunda.icon && tertunda.tone === 'warn');
+
+  const lain = daftarTindakan({
+    devices: [
+      { id: 'x', code: 'X', name: 'Alat X', status: undefined, areaId: 'A1' },
+      { id: 'y', code: 'Y', name: 'Alat Y', status: 'rusak-total', areaId: 'A1' },
+    ],
+    areas: [{ id: 'A1', name: 'Kolam A' }],
+  });
+  assert.equal(lain.find(item => item.kode === 'X').masalah, 'Status tidak diketahui');
+  assert.equal(lain.find(item => item.kode === 'Y').masalah, 'rusak-total');
 });
 
 test('halaman pengelola dan developer: tepat satu h1 lewat PageHeader', async t => {
@@ -231,7 +241,19 @@ test('AdminPoints: tiap saklar aturan bernama aksesibel dengan nama aturannya', 
   const markup = await render(vite, 'AdminPoints', '/admin/point');
   const saklar = [...markup.matchAll(/<button[^>]*role="switch"[^>]*>/g)].map(cocok => cocok[0]);
   assert.ok(saklar.length >= 7, 'satu saklar per aturan seed');
-  for (const tag of saklar) assert.match(tag, /aria-label="Aktifkan aturan [^"]+"/);
-  assert.match(markup, /aria-label="Aktifkan aturan Isi data HPP area"/);
-  assert.equal(new Set(saklar).size, saklar.length, 'nama tiap saklar unik');
+  // Hitung nama aksesibel seperti peramban: gabungan teks elemen yang dirujuk aria-labelledby.
+  const teksDari = id => {
+    const cocok = markup.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`));
+    assert.ok(cocok, `elemen ${id} ada`);
+    return cocok[1];
+  };
+  const nama = saklar.map(tag => {
+    const rujukan = tag.match(/aria-labelledby="([^"]+)"/)?.[1];
+    assert.ok(rujukan, 'saklar memakai aria-labelledby');
+    assert.doesNotMatch(tag, /aria-label="/);
+    return rujukan.split(' ').map(teksDari).join(' ');
+  });
+  assert.ok(nama.includes('Isi data HPP area Aktif'), 'nama memuat aturan dan teks tampak');
+  for (const n of nama) assert.match(n, / (Aktif|Nonaktif)$/, `${n}: memuat teks saklar yang tampak (WCAG 2.5.3)`);
+  assert.equal(new Set(nama).size, nama.length, 'nama tiap saklar unik');
 });

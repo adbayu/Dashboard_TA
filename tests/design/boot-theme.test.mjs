@@ -83,6 +83,7 @@ test('localStorage melempar error: bawaan kebun-air/light, tanpa crash', () => {
   const el = runBoot({ throwing: true })
   assert.equal(el.dataset.theme, 'kebun-air')
   assert.equal(el.dataset.mode, 'light')
+  assert.equal(el.classList.contains('dark'), false, 'kelas dark tidak pernah dipasang')
 })
 
 test('preferensi valid terpakai: lumina + gelap menyalakan data-mode saja, tanpa kelas dark', () => {

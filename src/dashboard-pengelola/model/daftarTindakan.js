@@ -1,6 +1,7 @@
 import { METRIC_META } from '../../shared/store/SmartStore.jsx';
 import { STATUS_LABEL } from '../../shared/components/ui/tones.js';
 import { formatSensorNumber } from '../../utils/iotPresentation.js';
+import { STATUS_KONEKSI } from '../../utils/monitoring.js';
 
 // Masalah alat menurut status: selalu teks + ikon, tidak pernah hanya warna.
 const MASALAH_ALAT = {
@@ -36,7 +37,7 @@ export function daftarTindakan({ devices = [], areas = [], users = [], kematianH
     const baterai = typeof device.battery === 'number' ? ` Baterai ${device.battery}%.` : '';
     hasil.push({
       id: `alat-${device.id}`,
-      masalah: STATUS_LABEL[device.status] || String(device.status || 'Status tidak diketahui'),
+      masalah: STATUS_LABEL[device.status] || STATUS_KONEKSI[device.status]?.label || (device.status ? String(device.status) : 'Status tidak diketahui'),
       tone: info.tone,
       icon: info.icon,
       kode: device.code,

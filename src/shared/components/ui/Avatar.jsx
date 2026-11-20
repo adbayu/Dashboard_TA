@@ -14,17 +14,20 @@ function inisialDari(nama) {
 }
 
 // Keluarga token dipilih lewat avatarKeluarga.js (warna di data hanya dibaca ronanya).
+// Garis 1 px memakai warna teks keluarga (setengah buram) supaya tepi chip tetap
+// terlihat di atas sidebar gelap, juga saat latar chip hampir sama dengan sidebar.
 const KELUARGA_AVATAR = {
-  primary: 'bg-primary text-on-primary',
-  leaf: 'bg-leaf-bg text-leaf-fg',
-  water: 'bg-water-bg text-water-fg',
-  info: 'bg-info-bg text-info-fg',
-  warn: 'bg-warn-bg text-warn-fg',
+  primary: 'bg-primary text-on-primary border-on-primary/70',
+  leaf: 'bg-leaf-bg text-leaf-fg border-leaf-fg/70',
+  water: 'bg-water-bg text-water-fg border-water-fg/70',
+  info: 'bg-info-bg text-info-fg border-info-fg/70',
+  warn: 'bg-warn-bg text-warn-fg border-warn-fg/70',
 };
 
 /**
  * Avatar akun: inisial nama di atas warna keluarga token (lihat keluargaAvatar).
- * Bentuk data avatar = { id, warna, warnaTeks }; hanya `warna` yang dibaca.
+ * Bentuk data avatar = { id, keluarga } (pilihan baru) atau { id, warna, warnaTeks }
+ * (data lama); `keluarga` didahulukan, lalu rona `warna`.
  * `size` boleh angka piksel (lama) atau sm | md | lg.
  */
 export function Avatar({ avatar, nama, name, size = 40, className = '' }) {
@@ -36,7 +39,7 @@ export function Avatar({ avatar, nama, name, size = 40, className = '' }) {
       data-ui="avatar"
       data-family={keluarga}
       className={clsx(
-        'inline-flex select-none items-center justify-center rounded-control font-bold tracking-[0.02em]',
+        'inline-flex select-none items-center justify-center rounded-control border font-bold tracking-[0.02em]',
         KELUARGA_AVATAR[keluarga],
         className,
       )}

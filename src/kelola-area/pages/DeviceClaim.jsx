@@ -153,6 +153,9 @@ export default function DeviceClaim() {
   const viewPreview = activationCode && viewReady ? preview : null;
   const viewError = viewReady ? error : '';
   const returnToQr = location.pathname;
+  // Satu h1 per halaman: kartu pratinjau memuat nama alat sebagai h1; tanpa pratinjau,
+  // judul langkah aktif (masuk, kode aktivasi, hasil klaim) yang menjadi h1.
+  const judulStep = viewPreview ? 'p' : 'h1';
   const previewCard = viewPreview && (
     <Card>
       {viewPreview.label && <p className="mb-3 text-xs font-semibold text-text-2">{viewPreview.label}</p>}
@@ -196,7 +199,7 @@ export default function DeviceClaim() {
 
         {viewState === 'login-required' && (
           <Card>
-            <SectionTitle title="Masuk untuk melanjutkan" />
+            <SectionTitle as={viewPreview ? 'h2' : 'h1'} title="Masuk untuk melanjutkan" />
             <p className="text-[15px] leading-[22px] text-text-2">Masuk diperlukan untuk memeriksa kepemilikan dan mengklaim alat.</p>
             <Link to="/masuk" state={{ from: returnToQr }} className="mt-4 w-full">
               <Button size="lg" icon="log-in" className="!h-[52px] w-full">Masuk untuk klaim</Button>
@@ -224,7 +227,7 @@ export default function DeviceClaim() {
 
         {viewState === 'success' && (
           <Card>
-            <Empty title={`${viewPreview?.device.code || code} sudah masuk ke akun Anda.`} hint="Perangkat berhasil diklaim." icon="circle-check" />
+            <Empty titleAs={judulStep} title={`${viewPreview?.device.code || code} sudah masuk ke akun Anda.`} hint="Perangkat berhasil diklaim." icon="circle-check" />
             {deviceId && <Link to={`/iot/${encodeURIComponent(deviceId)}`} className="mt-4 w-full">
               <Button size="lg" className="!h-[52px] w-full">Buka detail perangkat</Button>
             </Link>}
@@ -233,7 +236,7 @@ export default function DeviceClaim() {
 
         {viewState === 'own' && (
           <Card>
-            <Empty title="Perangkat ini milik akun Anda" hint="Buka halaman detail untuk melihat status, sensor, dan informasi kesehatan yang tersedia." icon="circle-check" />
+            <Empty titleAs={judulStep} title="Perangkat ini milik akun Anda" hint="Buka halaman detail untuk melihat status, sensor, dan informasi kesehatan yang tersedia." icon="circle-check" />
             <Link to={deviceId ? `/iot/${encodeURIComponent(deviceId)}` : '/iot'} className="mt-4 w-full">
               <Button size="lg" className="!h-[52px] w-full">Buka detail perangkat</Button>
             </Link>
@@ -242,19 +245,19 @@ export default function DeviceClaim() {
 
         {viewState === 'claimed' && (
           <Card>
-            <Empty title="Sudah diklaim" hint="Identitas pemilik tidak ditampilkan." icon="lock" />
+            <Empty titleAs={judulStep} title="Sudah diklaim" hint="Identitas pemilik tidak ditampilkan." icon="lock" />
           </Card>
         )}
 
         {viewState === 'other' && (
           <Card>
-            <Empty title="Alat ini sudah dipakai akun lain." hint="Hubungi pengelola kalau ini keliru." icon="lock" />
+            <Empty titleAs={judulStep} title="Alat ini sudah dipakai akun lain." hint="Hubungi pengelola kalau ini keliru." icon="lock" />
           </Card>
         )}
 
         {viewState === 'expired' && (
           <Card>
-            <Empty title="Kode aktivasi QR tidak berlaku." hint="Kode di QR ini sudah kedaluwarsa. Minta pengelola mencetak ulang QR." icon="clock" />
+            <Empty titleAs={judulStep} title="Kode aktivasi QR tidak berlaku." hint="Kode di QR ini sudah kedaluwarsa. Minta pengelola mencetak ulang QR." icon="clock" />
             {viewError && <Alert tone="bad" className="mt-3">{viewError}</Alert>}
             <Button size="lg" variant="secondary" icon="refresh-cw" onClick={() => setAttempt(value => value + 1)} className="mt-4 !h-[52px] w-full">Muat ulang status</Button>
           </Card>
@@ -262,7 +265,7 @@ export default function DeviceClaim() {
 
         {viewState === 'unknown' && (
           <Card>
-            <Empty title="Kode alat tidak dikenal" hint={viewError || 'Periksa kode QR atau hubungi pengelola.'} icon="search-x" />
+            <Empty titleAs={judulStep} title="Kode alat tidak dikenal" hint={viewError || 'Periksa kode QR atau hubungi pengelola.'} icon="search-x" />
             <Button size="lg" variant="secondary" icon="refresh-cw" onClick={() => setAttempt(value => value + 1)} className="mt-4 !h-[52px] w-full">Coba lagi</Button>
           </Card>
         )}
@@ -270,7 +273,7 @@ export default function DeviceClaim() {
         {viewState === 'backend-error' && (
           <Card>
             <div role="alert" className="space-y-4">
-              <Empty title="Backend tidak tersedia" hint={viewError || 'Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.'} icon="cloud-off" />
+              <Empty titleAs={judulStep} title="Backend tidak tersedia" hint={viewError || 'Backend tidak tersedia. Data contoh tidak digunakan sebagai pengganti.'} icon="cloud-off" />
               <Button size="lg" variant="secondary" icon="refresh-cw" onClick={() => setAttempt(value => value + 1)} className="!h-[52px] w-full">Coba lagi</Button>
             </div>
           </Card>
@@ -285,7 +288,7 @@ export default function DeviceClaim() {
 export function ActivationRequiredState({ manualActivationCode, viewError, onManualActivationCodeChange, onSubmit }) {
   return (
     <Card>
-      <SectionTitle title="Masukkan kode aktivasi" />
+      <SectionTitle as="h1" title="Masukkan kode aktivasi" />
       <p className="text-[15px] leading-[22px] text-text-2">Kode tidak tersimpan di alamat halaman. Minta kode yang masih berlaku dari pengelola untuk melanjutkan.</p>
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
         <Field label="Kode aktivasi">
@@ -312,9 +315,14 @@ export function ActivationRequiredState({ manualActivationCode, viewError, onMan
 }
 
 export function DeviceClaimLoadingState() {
-  return <Card><p role="status" className="text-[15px] leading-[22px] text-text-2">Memuat informasi QR...</p></Card>;
+  return (
+    <Card>
+      <h1 className="sr-only">Klaim perangkat</h1>
+      <p role="status" className="text-[15px] leading-[22px] text-text-2">Memuat informasi QR...</p>
+    </Card>
+  );
 }
 
-function SectionTitle({ title }) {
-  return <h2 className="mb-2 font-head text-[19px] font-bold leading-[26px] text-text">{title}</h2>;
+function SectionTitle({ title, as: Judul = 'h2' }) {
+  return <Judul className="mb-2 font-head text-[19px] font-bold leading-[26px] text-text">{title}</Judul>;
 }

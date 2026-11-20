@@ -6,6 +6,7 @@ import { missionActivityDestination } from '../model/missionNavigation.js';
 import { Bar, Button, Card, EmptyState, Modal, PageHeader, StatusPill, Table } from '../../shared/components/ui';
 import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
 import { FOKUS } from '../../shared/components/ui/tones.js';
+import { labelSasaranMisi } from '../model/teksMisi.js';
 
 const angka = (value) => Number(value || 0).toLocaleString('id-ID');
 // Dua kartu sejajar yang turun menjadi satu kolom di layar sempit (artboard misi-poin).
@@ -70,7 +71,7 @@ export default function Gamifikasi() {
                 <li key={mission.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border py-3 first:border-t-0 first:pt-0">
                   <div className="min-w-0 flex-[1_1_220px]">
                     <p className={clsx('font-semibold', mission.done ? 'text-text-2 line-through' : 'text-text')}>{mission.title}</p>
-                    <p className="text-sm text-text-2">Sasaran: {mission.target.replaceAll('-', ' ')}</p>
+                    <p className="text-sm text-text-2">Sasaran: {labelSasaranMisi(mission.target)}</p>
                   </div>
                   {mission.done
                     ? <StatusPill tone="ok" icon="circle-check">Selesai</StatusPill>

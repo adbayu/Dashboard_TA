@@ -20,6 +20,7 @@ import { normalizeFishCount, recordDailyMortality, setFishPopulation } from '../
 import { createPetRecord, isSupportedPetSpecies, migratePetState, patchPetCollection, selectPet } from '../../v-pet/model/petModel';
 import { applyPetQuestClaim, applyPondActivity, migrateGamificationState } from './pondActivityState.js';
 import { migrasiIkonDaftar } from './migrasiIkon.js';
+import { ejaanPoin } from '../../gamifikasi/model/teksMisi.js';
 import { deriveDailyMissions } from '../../gamifikasi/model/pondActivityRewards.js';
 import { localDateKey as hariKey, localMonthKey } from '../model/localDate.js';
 import { pilotApi } from '../../pilot/services/pilotApi.js';
@@ -85,7 +86,7 @@ export function ambangSah(ambang) {
 // null atau '' berarti belum ada pembacaan, bukan 0 (Number(null) === 0).
 // oxlint-disable-next-line react/only-export-components -- Shared reading helper stays beside its provider.
 export function nilaiMetrik(metric) {
-  const mentah = metric?.value;
+  const mentah = typeof metric?.value === 'string' ? metric.value.trim() : metric?.value;
   if (mentah === null || mentah === undefined || mentah === '') return null;
   const angka = Number(mentah);
   return Number.isFinite(angka) ? angka : null;
@@ -204,7 +205,8 @@ function buatRiwayatTanggal(devices, tanggal = hariKey()) {
   for (const device of devices || []) {
     if (!device.areaId || !device.metric || !METRIC_KEYS.includes(device.metric.key)) continue;
     if (!dasarPerArea.has(device.areaId)) dasarPerArea.set(device.areaId, {});
-    dasarPerArea.get(device.areaId)[device.metric.key] = Number(device.metric.value);
+    // Alat tanpa pembacaan (null atau '') tidak menyumbang titik riwayat; bukan 0.
+    dasarPerArea.get(device.areaId)[device.metric.key] = nilaiMetrik(device.metric);
   }
 
   const hariIni = tanggal === hariKey();
@@ -362,7 +364,9 @@ function migrateState(parsed) {
     // Nama ikon Material lama pada kategori dan badge tersimpan dipindahkan ke
     // nama lucide sekali di sini (font Material Symbols sudah dihapus).
     ...(Array.isArray(parsed.categories) ? { categories: migrasiIkonDaftar(parsed.categories) } : {}),
-    ...(Array.isArray(parsed.badges) ? { badges: migrasiIkonDaftar(parsed.badges) } : {}),
+    ...(Array.isArray(parsed.badges)
+      ? { badges: migrasiIkonDaftar(parsed.badges).map((b) => (b && typeof b === 'object' && 'desc' in b ? { ...b, desc: ejaanPoin(b.desc) } : b)) }
+      : {}),
     users: users.map((u) => {
       const seed = SEED_USERS.find(
         (s) =>

@@ -23,6 +23,8 @@ test('nilaiMetrik: null, undefined, kosong, dan non-angka bukan 0', async t => {
   assert.equal(nilaiMetrik({ value: undefined }), null);
   assert.equal(nilaiMetrik({ value: '' }), null);
   assert.equal(nilaiMetrik({ value: 'abc' }), null);
+  assert.equal(nilaiMetrik({ value: '   ' }), null, 'spasi saja bukan 0');
+  assert.equal(nilaiMetrik({ value: ' 6.8 ' }), 6.8, 'spasi di tepi dipangkas');
   assert.equal(nilaiMetrik({ value: Number.NaN }), null);
   assert.equal(nilaiMetrik(undefined), null);
   assert.equal(nilaiMetrik({}), null);
@@ -66,4 +68,10 @@ test('teks "Keluar ambang" tidak lagi dipakai; bahasanya "Di luar batas"', async
     const sumber = await readFile(new URL(berkas, import.meta.url), 'utf8');
     assert.doesNotMatch(sumber.replace(/\/\/.*$/gm, ''), /Keluar ambang/, `${berkas} memakai "Keluar ambang"`);
   }
+});
+
+test('riwayat awal tidak menyemai 0 dari alat tanpa pembacaan', async () => {
+  const sumber = await readFile(new URL('./SmartStore.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(sumber, /Number\(device\.metric\.value\)/);
+  assert.match(sumber, /\[device\.metric\.key\] = nilaiMetrik\(device\.metric\)/);
 });

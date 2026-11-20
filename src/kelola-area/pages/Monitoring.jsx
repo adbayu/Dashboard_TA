@@ -11,6 +11,7 @@ import {
   summarizeAreaPoints,
   AREA_HISTORY_LABEL,
   AREA_HISTORY_REFRESH_MS,
+  STATUS_KONEKSI,
 } from '../../utils/monitoring.js';
 import {
   formatEventMessage,
@@ -25,11 +26,6 @@ const TABS = [
   { id: 'area', label: 'Per area' },
 ];
 
-const DEVICE_STATUSES = {
-  online: { label: 'Terhubung', tone: 'ok', icon: 'wifi' },
-  stale: { label: 'Data tertunda', tone: 'warn', icon: 'clock' },
-  offline: { label: 'Tidak terhubung', tone: 'bad', icon: 'wifi-off' },
-};
 const EVENT_TYPES = [
   { value: 'online', label: 'Terhubung kembali' },
   { value: 'offline', label: 'Tidak terhubung' },
@@ -117,7 +113,7 @@ function EventLogPanel({
 }
 
 function DeviceStatus({ status }) {
-  const value = DEVICE_STATUSES[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'circle-help' };
+  const value = STATUS_KONEKSI[status] || { label: 'Status tidak diketahui', tone: 'muted', icon: 'circle-help' };
   return <Badge tone={value.tone} icon={value.icon}>{value.label}</Badge>;
 }
 

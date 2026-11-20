@@ -61,7 +61,7 @@ test('SmartProvider memindahkan nama ikon lama pada kategori dan badge tersimpan
 
   const tersimpan = {
     categories: [{ id: 'CAT-AIR', name: 'Sensor Kualitas Air', icon: 'water_ec', metrics: [] }],
-    badges: [{ id: 'B-1', name: 'Peternak Tekun', icon: 'potted_plant', minPoints: 200 }, { id: 'B-9', name: 'Kustom', icon: 'ikon-ketik-sendiri', minPoints: 1 }],
+    badges: [{ id: 'B-1', name: 'Peternak Tekun', icon: 'potted_plant', minPoints: 200, desc: 'Kumpulkan 200 point' }, { id: 'B-9', name: 'Kustom', icon: 'ikon-ketik-sendiri', minPoints: 1 }],
   };
   const asli = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', {
@@ -75,7 +75,7 @@ test('SmartProvider memindahkan nama ikon lama pada kategori dan badge tersimpan
 
   function Pembaca() {
     const { categories, badges } = useSmart();
-    return React.createElement('pre', null, JSON.stringify({ kategori: categories.map(c => c.icon), badge: badges.map(b => b.icon) }));
+    return React.createElement('pre', null, JSON.stringify({ kategori: categories.map(c => c.icon), badge: badges.map(b => b.icon), desc: badges.map(b => b.desc) }));
   }
   const markup = renderToStaticMarkup(React.createElement(
     MemoryRouter,
@@ -85,4 +85,5 @@ test('SmartProvider memindahkan nama ikon lama pada kategori dan badge tersimpan
   const hasil = JSON.parse(markup.replace(/<\/?pre>/g, '').replaceAll('&quot;', '"'));
   assert.deepEqual(hasil.kategori, ['droplet']);
   assert.deepEqual(hasil.badge, ['sprout', 'ikon-ketik-sendiri'], 'nama yang tak dikenal dibiarkan; Icon menampilkan ikon cadangan');
+  assert.equal(hasil.desc[0], 'Kumpulkan 200 poin', 'teks badge lama dengan "point" dibetulkan');
 });

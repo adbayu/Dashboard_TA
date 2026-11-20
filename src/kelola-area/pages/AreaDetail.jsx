@@ -497,7 +497,7 @@ export default function AreaDetail() {
           </Card>
 
           {/* ── Panen ── */}
-          <Card title="Catat hasil panen" subtitle="Panen tercatat memberi +100 point.">
+          <Card title="Catat hasil panen" subtitle="Panen tercatat memberi +100 poin.">
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] items-start gap-5">
               <form onSubmit={submitHarvest} className="grid grid-cols-2 gap-3">
                 <Field label="Jumlah">

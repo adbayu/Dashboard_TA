@@ -138,6 +138,6 @@ function buildContextNote(question, context) {
 export const CHAT_GREETING = {
   role: 'bot',
   text:
-    'Halo! Saya asisten aquaponik JagoFarm. Tanyakan apa saja soal kualitas air, pakan ikan, jenis sayur, sensor IoT, sampai cara menghitung HPP kolam. Jawaban saya berbasis basis pengetahuan lokal, bukan hasil mengarang.',
+    'Halo! Saya asisten aquaponik JagoFarm. Tanyakan apa saja soal kualitas air, pakan ikan, jenis sayur, sensor IoT, sampai cara menghitung HPP kolam. Jawaban saya berbasis pengetahuan lokal, bukan hasil mengarang.',
   sources: [],
 };

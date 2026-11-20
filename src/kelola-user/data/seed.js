@@ -16,13 +16,16 @@ export const DEMO_PASSWORD = DEMO_MODE ? 'jagofarm123' : '';
 // Pilihan foto profil dipakai di dua tempat: halaman Daftar (akun baru) dan
 // halaman Profil. Ditaruh di seed supaya daftarnya tidak ditulis dua kali dan
 // tidak bisa berbeda antar halaman.
+// Tepat satu pilihan per keluarga token (R22): leaf, water, info, warn, primary.
+// Pilihan menyimpan id keluarga, bukan hex; warna sebenarnya mengikuti tema aktif
+// (lihat <Avatar>). Avatar lama yang menyimpan hex (teal, biru, merah, dan lain-lain)
+// tetap berwarna lewat rona hex-nya (ui/avatarKeluarga.js).
 export const AVATAR_PILIHAN = [
-  { id: 'hijau', warna: '#0f5238', warnaTeks: '#eafff4' },
-  { id: 'teal', warna: '#0f766e', warnaTeks: '#eafff4' },
-  { id: 'biru', warna: '#1e40af', warnaTeks: '#eafff4' },
-  { id: 'ungu', warna: '#6d28d9', warnaTeks: '#f6f0ff' },
-  { id: 'oranye', warna: '#b45309', warnaTeks: '#fff8ec' },
-  { id: 'merah', warna: '#9f1239', warnaTeks: '#fff1f4' },
+  { id: 'leaf', keluarga: 'leaf', nama: 'Daun' },
+  { id: 'water', keluarga: 'water', nama: 'Air' },
+  { id: 'info', keluarga: 'info', nama: 'Langit' },
+  { id: 'warn', keluarga: 'warn', nama: 'Jingga' },
+  { id: 'primary', keluarga: 'primary', nama: 'Utama' },
 ];
 
 // Isi seed versi lama: foto orang dari Unsplash. Dipakai hanya untuk mengenali

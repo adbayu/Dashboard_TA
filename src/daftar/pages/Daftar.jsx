@@ -5,6 +5,7 @@ import { Alert, AvatarPilih, Button, Card, Checkbox, Field, Input } from '../../
 import { Icon } from '../../shared/components/Icon.jsx';
 import { PublicFrame, PublicPanel, SampleTag } from '../../shared/components/PublicFrame.jsx';
 import { FOKUS } from '../../shared/components/ui/tones.js';
+import { keluargaAvatar } from '../../shared/components/ui/avatarKeluarga.js';
 import { AVATAR_PILIHAN } from '../../kelola-user/data/seed.js';
 
 // Halaman daftar akun sendiri (/daftar).
@@ -231,8 +232,8 @@ export default function Daftar() {
                     avatar={pilihan}
                     nama={form.name}
                     size={44}
-                    label={`Warna ${pilihan.id}`}
-                    terpilih={form.avatar?.id === pilihan.id}
+                    label={`Warna ${pilihan.nama}`}
+                    terpilih={Boolean(form.avatar) && keluargaAvatar(form.avatar) === pilihan.keluarga}
                     onClick={() => setForm({ ...form, avatar: pilihan })}
                   />
                 ))}

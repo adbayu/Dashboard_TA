@@ -46,7 +46,7 @@ export default function AdminPoints() {
   };
 
   const kolomAturan = [
-    { key: 'activity', label: 'Aktivitas', render: (row) => <span className="font-semibold">{row.activity}</span> },
+    { key: 'activity', label: 'Aktivitas', render: (row) => <span id={`aturan-${row.id}`} className="font-semibold">{row.activity}</span> },
     { key: 'points', label: 'Poin', align: 'end', num: true, render: (row) => `+${row.points}` },
     { key: 'daily', label: 'Maks per hari', align: 'end', num: true, render: (row) => `${row.daily}×` },
     { key: 'max', label: 'Poin maksimal', align: 'end', num: true, render: (row) => (row.points * row.daily).toLocaleString('id-ID') },
@@ -54,7 +54,7 @@ export default function AdminPoints() {
       key: 'active',
       label: 'Status',
       render: (row) => (
-        <Switch label={row.active ? 'Aktif' : 'Nonaktif'} aria-label={`Aktifkan aturan ${row.activity}`} checked={Boolean(row.active)} onChange={(nyala) => savePointRule({ ...row, active: nyala })} />
+        <Switch label={row.active ? 'Aktif' : 'Nonaktif'} aria-labelledby={`aturan-${row.id}`} checked={Boolean(row.active)} onChange={(nyala) => savePointRule({ ...row, active: nyala })} />
       ),
     },
     {
