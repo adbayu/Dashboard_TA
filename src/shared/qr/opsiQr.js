@@ -7,7 +7,8 @@
 export function opsiGambarQr(lebar) {
   return {
     width: lebar,
-    margin: 2,
+    // Zona tenang 4 modul sesuai ISO/IEC 18004, tanpa bergantung padding wadah.
+    margin: 4,
     errorCorrectionLevel: 'M',
   };
 }

@@ -86,10 +86,13 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
   if (!device) return null;
 
   const ambang = ambangUntuk(area, kategori, device.metric?.key);
-  const posisi = nilaiTerhadapAmbang(device.metric?.value, ambang);
   const meta = METRIC_META[device.metric?.key];
   const ambangValid = Array.isArray(ambang) && Number.isFinite(Number(ambang[0])) && Number.isFinite(Number(ambang[1])) && Number(ambang[0]) < Number(ambang[1]);
-  const nilai = Number(device.metric?.value);
+  // null/'' berarti belum ada pembacaan; Number(null) akan menjadi 0.
+  const mentah = device.metric?.value;
+  const nilai = mentah == null || mentah === '' || !Number.isFinite(Number(mentah)) ? null : Number(mentah);
+  // Ambang terbalik/rusak tidak dipakai menilai bawah/atas.
+  const posisi = ambangValid ? nilaiTerhadapAmbang(nilai, ambang) : null;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -186,8 +189,8 @@ export default function PanelInfoAlat({ device, cari, kategori, area, aksi }) {
           <SensorReading
             name={meta?.label || device.metric?.key}
             device={device.code}
-            value={Number.isFinite(nilai) ? nilai : null}
-            decimals={Number.isInteger(nilai) ? 0 : 1}
+            value={nilai}
+            decimals={meta?.precision ?? 2}
             unit={meta?.unit}
             min={ambangValid ? Number(ambang[0]) : undefined}
             max={ambangValid ? Number(ambang[1]) : undefined}

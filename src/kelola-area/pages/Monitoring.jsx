@@ -51,12 +51,15 @@ const EVENT_TYPES = [
   { value: 'threshold_clear', label: 'Kembali normal' },
 ];
 // Seri pembanding memakai warna area. Di beberapa palet warnanya sama
-// (Kebun Air: chart-1 = water-fg; Tanah & Lumut: ketiganya sama), jadi tiap
-// seri juga punya pola garis sendiri yang diulang di legenda.
+// (Kebun Air: chart-1 = water-fg; Catatan Lapangan dan Panel Instrumen:
+// water-fg = leaf-fg; Tanah & Lumut: ketiganya sama), jadi pola garis adalah
+// pembeda utama. Ujung garis `butt`: ujung bulat ditambahkan SVG ke setiap
+// ruas putus-putus dan menutup celahnya. Legenda memakai garis yang sama persis.
+const COMPARE_STROKE_WIDTH = '2.5';
 const COMPARE_SERIES = [
   { stroke: 'stroke-chart-1', dash: undefined },
-  { stroke: 'stroke-water-fg', dash: '6 4' },
-  { stroke: 'stroke-leaf-fg', dash: '2 3' },
+  { stroke: 'stroke-water-fg', dash: '8 5' },
+  { stroke: 'stroke-leaf-fg', dash: '2 4' },
 ];
 const SENSOR_HISTORY_LABEL = '24 jam terakhir';
 const EMPTY_DEVICES = [];
@@ -350,13 +353,13 @@ function ComparisonChart({ series, sensor }) {
             return `${x},${y}`;
           }).join(' ');
           const style = COMPARE_SERIES[seriesIndex];
-          return <polyline key={item.device.id} points={coordinates} fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={style.dash} vectorEffect="non-scaling-stroke" className={style.stroke} />;
+          return <polyline key={item.device.id} points={coordinates} fill="none" strokeWidth={COMPARE_STROKE_WIDTH} strokeLinecap="butt" strokeLinejoin="round" strokeDasharray={style.dash} vectorEffect="non-scaling-stroke" className={style.stroke} />;
         })}
       </svg>
       <ul className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] leading-[18px] text-text-2">
         {validSeries.map((item, index) => <li key={item.device.id} className="inline-flex min-w-0 items-center gap-2">
-          <svg width="22" height="8" viewBox="0 0 22 8" aria-hidden="true" className="shrink-0">
-            <line x1="0" y1="4" x2="22" y2="4" strokeWidth="2.5" strokeDasharray={COMPARE_SERIES[index].dash} className={COMPARE_SERIES[index].stroke} />
+          <svg width="28" height="8" viewBox="0 0 28 8" aria-hidden="true" className="shrink-0">
+            <line x1="0" y1="4" x2="28" y2="4" strokeWidth={COMPARE_STROKE_WIDTH} strokeLinecap="butt" strokeDasharray={COMPARE_SERIES[index].dash} className={COMPARE_SERIES[index].stroke} />
           </svg>
           <span className="break-words"><b className="font-semibold text-text">{item.device.name}</b>: {summaries[index].replace(`${item.device.name} `, '')}</span>
         </li>)}

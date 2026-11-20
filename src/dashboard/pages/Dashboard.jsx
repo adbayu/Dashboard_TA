@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiTerhadapAmbang, useSmart } from '../../shared/store/SmartStore';
-import { Alert, Card, EmptyState, PageHeader, STATUS_LABEL, STATUS_TONE, StatusPill, Table } from '../../shared/components/ui';
+import { Alert, Card, EmptyState, PageHeader, STATUS_LABEL, STATUS_TONE, StatusPill, Table, TautanTombol } from '../../shared/components/ui';
 import { Icon } from '../../shared/components/Icon.jsx';
 import { FOKUS } from '../../shared/components/ui/tones.js';
 import AreaSection from '../../components/iot/AreaSection.jsx';
@@ -28,12 +28,6 @@ const angka = (value, digit) => (value == null ? '·' : formatSensorNumber(value
 const jenisArea = (area) => (area?.type === 'growbed' ? 'leaf' : 'water');
 const labelPendek = (key) => METRIC_META[key].label.replace(' Air', '').replace(' Nutrisi', '');
 
-// Tautan berbentuk tombol: atribut data-ui/data-variant sama dengan Button
-// supaya perlakuan tema (mis. glow Lumina) ikut menempel.
-const TAUTAN_TOMBOL = clsx(
-  'inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-transparent bg-primary px-4 text-[15px] font-semibold text-on-primary hover:bg-primary-hover',
-  FOKUS,
-);
 const TAUTAN = clsx('rounded-sm font-semibold text-primary underline decoration-1 underline-offset-[3px] hover:text-primary-hover', FOKUS);
 
 const tanggalHariIni = () =>
@@ -162,9 +156,9 @@ export default function Dashboard() {
           </>
         )}
         action={(
-          <Link to={ringkasan.action.to} data-ui="button" data-variant="primary" className={TAUTAN_TOMBOL}>
+          <TautanTombol to={ringkasan.action.to}>
             {ringkasan.action.label}
-          </Link>
+          </TautanTombol>
         )}
       >
         {ringkasan.body}

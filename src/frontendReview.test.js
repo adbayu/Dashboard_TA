@@ -649,7 +649,8 @@ test('Per area exposes manual refresh without a separate rate budget', async () 
 });
 
 test('package history waits for card visibility and cancels requests when it leaves', async () => {
-  const source = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
+  // Checkout Windows (autocrlf) memberi CRLF; asersi di bawah mencocokkan baris dengan LF.
+  const source = (await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
   const requestEffect = source.match(/useEffect\(\(\) => \{\n    const sensorCodes = JSON\.parse\(sensorKey\);\n    if \(!visible \|\| !sensorCodes\.length \|\| completed\.current\) return undefined;[\s\S]*?\n  \}, \[([^\]]+)\]\);/);
 
   assert.match(source, /function PackageDeviceCard\(/);
@@ -693,6 +694,23 @@ test('comparison chart uses statically discoverable token classes for all three 
   const polyDashes = [...markup.matchAll(/<polyline[^>]*>/g)].map(([tag]) => tag.match(/stroke-dasharray="([^"]*)"/)?.[1] ?? 'solid');
   assert.equal(polyDashes.length, 3);
   assert.equal(new Set(polyDashes).size, 3, 'tiga seri dibedakan pola garis, bukan hanya warna');
+  // Ujung bulat dipasang SVG di setiap ruas putus-putus dan menutup celahnya,
+  // jadi seri putus-putus wajib berujung butt. Contoh garis di legenda harus
+  // memakai pola dan ujung yang sama persis dengan garis grafiknya.
+  const attr = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+  const polylines = [...markup.matchAll(/<polyline[^>]*>/g)].map(([tag]) => tag);
+  const swatches = [...markup.matchAll(/<line[^>]*>/g)].map(([tag]) => tag);
+  assert.equal(swatches.length, 3, 'satu contoh garis per seri di legenda');
+  polylines.forEach((line, index) => {
+    const dash = attr(line, 'stroke-dasharray');
+    const cap = attr(line, 'stroke-linecap') ?? 'butt';
+    if (dash) assert.equal(cap, 'butt', `seri ${index + 1} putus-putus harus berujung butt agar celahnya terlihat`);
+    const swatch = swatches[index];
+    assert.equal(attr(swatch, 'class'), attr(line, 'class'), `warna contoh legenda seri ${index + 1} sama dengan garisnya`);
+    assert.equal(attr(swatch, 'stroke-dasharray'), dash, `pola contoh legenda seri ${index + 1} sama dengan garisnya`);
+    assert.equal(attr(swatch, 'stroke-linecap') ?? 'butt', cap, `ujung contoh legenda seri ${index + 1} sama dengan garisnya`);
+    assert.equal(attr(swatch, 'stroke-width'), attr(line, 'stroke-width'), `tebal contoh legenda seri ${index + 1} sama dengan garisnya`);
+  });
   for (const name of ['one', 'two', 'three']) assert.match(markup, new RegExp(`<li[^>]*>[\\s\\S]*?${name}[\\s\\S]*?</li>`));
   assert.ok(markup.includes('aria-label="Perbandingan pH 24 jam terakhir: one min'));
   assert.ok(markup.includes('maks'));
@@ -1024,8 +1042,36 @@ test('halaman IoT pengguna hanya memakai nama ikon lucide', async t => {
   for (const name of Object.keys(IOT_PAGE_FILES)) {
     const source = await readIotPage(name);
     const inBraces = [...source.matchAll(/\bicon=\{([^}]*)\}/g)].flatMap(match => [...match[1].matchAll(/["']([a-z0-9_-]+)["']/g)].map(inner => inner[1]));
-    const names = [...[...source.matchAll(literal)].map(match => match[1]), ...inBraces].filter(value => Object.hasOwn(ICON_MAP, value) || legacyNames.has(value) || value.includes('_'));
-    const legacy = names.filter(value => legacyNames.has(value) || !Object.hasOwn(ICON_MAP, value));
-    assert.deepEqual(legacy, [], `${name} masih memakai nama ikon Material`);
+    const names = [...[...source.matchAll(literal)].map(match => match[1]), ...inBraces];
+    // Setiap literal ikon harus nama lucide yang ada di ICON_MAP: nama lama
+    // maupun salah ketik (mis. 'wifi-of') sama-sama gagal.
+    const salah = names.filter(value => legacyNames.has(value) || !Object.hasOwn(ICON_MAP, value));
+    assert.deepEqual(salah, [], `${name} memakai nama ikon lama atau tidak dikenal`);
   }
+});
+
+test('PanelInfoAlat: tanpa pembacaan tampil "Belum ada data", ambang terbalik tanpa rentang, presisi metrik dipakai', async t => {
+  const vite = await createServer({ root: process.cwd(), configFile: false, plugins: [react()], server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
+  t.after(() => vite.close());
+  const { default: PanelInfoAlat } = await vite.ssrLoadModule('/src/shared/iot/components/PanelInfoAlat.jsx');
+  const kategori = { name: 'Sensor pH', metrics: [{ key: 'ph', label: 'pH', unit: 'pH', min: 6, max: 8 }] };
+  const alat = value => ({ id: 'a1', code: 'AQ-PH-001', name: 'Sensor pH', status: 'online', battery: 90, metric: { key: 'ph', value }, functions: [] });
+  const render = props => renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(PanelInfoAlat, { kategori, ...props })));
+  const bacaan = markup => markup.match(/<div data-ui="sensor-reading"[^>]*>/)?.[0] || '';
+
+  const kosong = render({ device: alat(null) });
+  assert.match(bacaan(kosong), /data-status="unknown"/, 'nilai null bukan angka 0');
+  assert.doesNotMatch(kosong, /data-ui="sensor-value"/);
+
+  const terbalik = render({ device: alat(7), area: { name: 'Kolam', targets: { ph: [8, 6] } } });
+  assert.match(bacaan(terbalik), /data-status="no-range"/, 'ambang terbalik tidak dinilai bawah/atas');
+
+  const presisi = render({ device: alat(6.85) });
+  assert.match(presisi, /data-ui="sensor-value"[^>]*>6,85</, 'pH 6,85 tidak dibulatkan ke 6,9');
+});
+
+test('Dashboard memakai TautanTombol bersama, bukan salinan kelas tombol', async () => {
+  const source = await readFile(new URL('./dashboard/pages/Dashboard.jsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /TAUTAN_TOMBOL/);
+  assert.match(source, /<TautanTombol\s/);
 });

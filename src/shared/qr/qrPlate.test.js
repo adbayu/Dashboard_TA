@@ -13,6 +13,7 @@ test('gambar QR alat memakai modul gelap di atas zona tenang terang dan terbaca 
   const { opsiGambarQr } = await import('./opsiQr.js');
   const { decodeQrFrame } = await import('../../detail-information/model/qrScanner.js');
   const value = 'https://jagofarm.example/iot/IOT-001';
+  assert.ok(opsiGambarQr(128).margin >= 4, 'zona tenang minimal 4 modul (ISO/IEC 18004)');
   const url = await QRCode.toDataURL(value, opsiGambarQr(128));
   const png = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
 
