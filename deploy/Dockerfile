@@ -21,6 +21,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY index.html vite.config.js postcss.config.js tailwind.config.js ./
+# tailwind.config.js membaca design/tokens.json saat build.
+COPY design ./design
 COPY public ./public
 COPY src ./src
 RUN npm run build
