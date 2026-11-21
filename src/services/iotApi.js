@@ -5,7 +5,8 @@ import { parseContentDispositionFilename } from '../utils/deviceLog.js';
 const DATA_CONTOH = 'Data contoh';
 const KODE_AKTIVASI_CONTOH = 'contoh-kode-aktivasi';
 const DEVICE_CONTOH = {
-  id: 'contoh-device-01',
+  // UUID tetap, karena rute /iot/:id hanya menerima UUID (lihat utils/roleAccess.js).
+  id: '00000000-0000-4000-8000-00000000c001',
   code: 'AQ-CONTOH-001',
   name: 'Sensor kualitas air contoh',
   type: { code: 'AQ-CONTOH', kind: 'satuan', name: 'Sensor contoh' },

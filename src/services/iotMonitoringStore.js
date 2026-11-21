@@ -1,6 +1,6 @@
 import { iotApi } from './iotApi.js';
 import { iotStreamClient } from './iotStream.js';
-import { mergeLatestReading } from '../utils/iotPresentation.js';
+import { mergeLatestReading, statusKoneksiLive } from '../utils/iotPresentation.js';
 
 const SNAPSHOT_CACHE_MS = 5_000;
 const MAX_STREAM_EVENTS = 100;
@@ -313,9 +313,8 @@ export function createIotMonitoringStore({
     const deviceEvents = [...snapshot.deviceEvents, { sequence, event: { ...event, id: id ?? event?.id } }].slice(-MAX_STREAM_EVENTS);
     const devices = snapshot.devices.map(device => {
       if (device.id !== event.deviceId) return device;
-      if (event.type === 'offline') return { ...device, status: 'offline' };
-      if (event.type === 'online') return { ...device, status: 'online' };
-      return device;
+      const status = statusKoneksiLive(device.status, { jenis: 'event', type: event.type }, nowImpl());
+      return status === device.status ? device : { ...device, status };
     });
     const latestByDevice = { ...snapshot.latestByDevice };
     const existing = latestByDevice[event.deviceId];
@@ -353,8 +352,10 @@ export function createIotMonitoringStore({
     const previous = snapshot.latestByDevice[frame.deviceId];
     const next = mergeLatestReading(previous, frame);
     if (!next || next === previous) return;
+    const status = statusKoneksiLive(device.status, { jenis: 'reading', measuredAt: frame.measuredAt }, nowImpl());
     publish(current => ({
       ...current,
+      devices: status === device.status ? current.devices : current.devices.map(item => (item.id === device.id ? { ...item, status } : item)),
       latestState: 'ready',
       latestByDevice: { ...current.latestByDevice, [frame.deviceId]: next },
     }));

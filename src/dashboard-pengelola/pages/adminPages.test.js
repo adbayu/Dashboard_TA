@@ -227,6 +227,26 @@ test('avatar di Kelola pengguna memakai token, bukan warna hex dari seed', async
   assert.doesNotMatch(markup, /data-ui="avatar"[^>]*style="[^"]*background-color/);
 });
 
+test('Kelola pengguna: pengelola yang sedang masuk tidak bisa menghapus atau menurunkan akunnya sendiri', async t => {
+  const vite = await muat(t, { 'import.meta.env.VITE_IOT_SOURCE': JSON.stringify('local') });
+  const asli = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: () => JSON.stringify({ sessionUserId: 'U-004' }), setItem: () => {}, removeItem: () => {} },
+  });
+  t.after(() => {
+    if (asli) Object.defineProperty(globalThis, 'localStorage', asli);
+    else delete globalThis.localStorage;
+  });
+  const markup = await render(vite, 'AdminUsers', '/admin/pengguna');
+  assert.match(markup, /aria-label="Hapus akun Budi Santoso"/, 'akun lain tetap bisa dihapus');
+  assert.doesNotMatch(markup, /aria-label="Hapus akun Hendra Wicaksono"/, 'akun sendiri tanpa tombol hapus');
+  assert.match(markup, /aria-label="Ubah akun Hendra Wicaksono"/, 'akun sendiri tetap bisa diubah');
+
+  const sumber = await baca('AdminUsers');
+  assert.match(sumber, /disabled=\{akunSendiri\}/, 'peran dan status akun sendiri dikunci di modal ubah');
+});
+
 test('halaman pengelola dan developer hanya memakai nama ikon lucide', async t => {
   const vite = await muat(t);
   const { ICON_MAP } = await vite.ssrLoadModule('/src/shared/components/Icon.jsx');

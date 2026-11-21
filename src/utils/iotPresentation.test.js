@@ -11,8 +11,29 @@ import {
   mergeLatestReading,
   resolveTelemetrySnapshot,
   sortEventsByIdDescending,
+  statusKoneksiLive,
   summarizeHistory,
 } from './iotPresentation.js';
+
+const SEKARANG = Date.parse('2026-11-21T06:30:00.000Z');
+const detikLalu = detik => new Date(SEKARANG - detik * 1000).toISOString();
+
+test('statusKoneksiLive: event online/offline dari server langsung dipakai', () => {
+  assert.equal(statusKoneksiLive('offline', { jenis: 'event', type: 'online' }, SEKARANG), 'online');
+  assert.equal(statusKoneksiLive('online', { jenis: 'event', type: 'offline' }, SEKARANG), 'offline');
+});
+
+test('statusKoneksiLive: event ambang tidak mengubah status koneksi', () => {
+  for (const type of ['threshold_low', 'threshold_high', 'threshold_clear']) {
+    assert.equal(statusKoneksiLive('stale', { jenis: 'event', type }, SEKARANG), 'stale', type);
+  }
+});
+
+test('statusKoneksiLive: pembacaan baru dari alat yang belum pernah terhubung menjadikannya online', () => {
+  // Server tidak mengirim event "online" untuk kiriman pertama (lihat server/v1.test.ts).
+  assert.equal(statusKoneksiLive('offline', { jenis: 'reading', measuredAt: detikLalu(4) }, SEKARANG), 'online');
+  assert.equal(statusKoneksiLive('stale', { jenis: 'reading', measuredAt: detikLalu(10) }, SEKARANG), 'online');
+});
 
 test('formatSensorNumber keeps the API null empty and formats real values with Indonesian decimals', () => {
   assert.equal(formatSensorNumber(null, 2), '-');

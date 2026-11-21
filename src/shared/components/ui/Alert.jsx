@@ -17,12 +17,13 @@ const NADA = {
  * memilih lewat `live` ('status' | 'alert'), mis. untuk hasil formulir atau
  * pesan sementara yang baru muncul.
  */
-export function Alert({ tone = 'info', title, children, meta, action, icon, live, className = '' }) {
+export function Alert({ tone = 'info', title, children, meta, action, icon, live, id, className = '' }) {
   const nama = NADA[tone] ? tone : 'info';
   const nada = NADA[nama];
   const role = live === 'status' || live === 'alert' ? live : (nama === 'bad' ? 'alert' : undefined);
   return (
     <div
+      id={id}
       role={role}
       data-ui="alert"
       data-tone={nama}

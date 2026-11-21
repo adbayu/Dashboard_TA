@@ -4,7 +4,7 @@ import { ambangSah, ambangUntuk, formatRupiah, METRIC_KEYS, METRIC_META, nilaiMe
 import { localDateKey, localMonthKey } from '../../shared/model/localDate.js';
 import { monthlyQuestChecklist } from '../../v-pet/model/petQuests.js';
 import {
-  Button, Card, EmptyState, Field, IconButton, Input, NumberInput, PageHeader, Select, STATUS_LABEL, STATUS_TONE,
+  Button, Card, EmptyState, Field, IconButton, Input, KonfirmasiHapus, NumberInput, PageHeader, Select, STATUS_LABEL, STATUS_TONE,
   StatusPill, Table, Tautan, TautanTombol, TextArea,
 } from '../../shared/components/ui';
 import AreaSection from '../../components/iot/AreaSection.jsx';
@@ -12,6 +12,7 @@ import SensorReading from '../../components/iot/SensorReading.jsx';
 import { formatSensorNumber } from '../../utils/iotPresentation.js';
 import { areaTone } from '../model/areaTone.js';
 import { formatNilaiSensor, labelJenisArea } from '../model/areaTampil.js';
+import { buatEntriPemantauan } from '../model/catatanPemantauan.js';
 
 const emptyHpp = { name: '', qty: 1, unit: 'unit', unitPrice: '' };
 // Pemantauan manual memakai tiga parameter yang sama dengan sensor: pH, suhu, TDS.
@@ -66,6 +67,9 @@ export default function AreaDetail() {
   const [hppForm, setHppForm] = useState(emptyHpp);
   const [editingHpp, setEditingHpp] = useState(null);
   const [noteForm, setNoteForm] = useState(emptyNote);
+  const [noteError, setNoteError] = useState('');
+  // { jenis: 'catatan' | 'kematian' | 'hpp', id, nama } selama dialog konfirmasi hapus terbuka.
+  const [hapus, setHapus] = useState(null);
   const [matiForm, setMatiForm] = useState(emptyMati);
   const [harvest, setHarvest] = useState({ qty: '', unit: 'kg', revenue: '', note: '', date: localDateKey() });
   const [cleaningNote, setCleaningNote] = useState('');
@@ -151,13 +155,19 @@ export default function AreaDetail() {
 
   const submitNote = (event) => {
     event.preventDefault();
-    const entry = { areaId: area.id, areaName: area.name, by: currentUser?.name || 'Pengguna' };
-    for (const key of ['ph', 'temp', 'tds']) {
-      if (noteForm[key] !== '' && noteForm[key] != null) entry[key] = Number(noteForm[key]);
+    const { entry, galat } = buatEntriPemantauan(noteForm, { areaId: area.id, areaName: area.name, by: currentUser?.name || 'Pengguna' });
+    if (galat) {
+      setNoteError(galat);
+      return;
     }
-    entry.note = noteForm.note;
     addMonitoring(entry);
+    setNoteError('');
     setNoteForm(emptyNote);
+  };
+  // Galat hilang begitu salah satu parameter diisi, tanpa menunggu kirim ulang.
+  const ubahNote = (key, value) => {
+    setNoteForm({ ...noteForm, [key]: value });
+    if (noteError && key !== 'note' && value !== '') setNoteError('');
   };
 
   const submitMati = (event) => {
@@ -278,20 +288,21 @@ export default function AreaDetail() {
               <form id="form-pemantauan" onSubmit={submitNote} className="flex scroll-mt-24 flex-col gap-3">
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="pH air">
-                    <NumberInput step="0.01" placeholder="6.80" value={noteForm.ph} onChange={(v) => setNoteForm({ ...noteForm, ph: v })} />
+                    <NumberInput step="0.01" placeholder="6.80" value={noteForm.ph} invalid={!!noteError} aria-describedby={noteError ? 'galat-pemantauan' : undefined} onChange={(v) => ubahNote('ph', v)} />
                   </Field>
                   <Field label="Suhu air (°C)">
-                    <NumberInput step="0.1" placeholder="25.8" value={noteForm.temp} onChange={(v) => setNoteForm({ ...noteForm, temp: v })} />
+                    <NumberInput step="0.1" placeholder="25.8" value={noteForm.temp} invalid={!!noteError} aria-describedby={noteError ? 'galat-pemantauan' : undefined} onChange={(v) => ubahNote('temp', v)} />
                   </Field>
                   <Field label="TDS (ppm)">
-                    <NumberInput step="1" placeholder="780" value={noteForm.tds} onChange={(v) => setNoteForm({ ...noteForm, tds: v })} />
+                    <NumberInput step="1" placeholder="780" value={noteForm.tds} invalid={!!noteError} aria-describedby={noteError ? 'galat-pemantauan' : undefined} onChange={(v) => ubahNote('tds', v)} />
                   </Field>
                 </div>
+                {noteError && <p id="galat-pemantauan" role="alert" className="text-sm font-semibold text-bad-fg">{noteError}</p>}
                 <Field label="Catatan kondisi">
                   <TextArea
                     placeholder="cth. Air jernih, nafsu makan ikan normal, daun mulai lebat…"
                     value={noteForm.note}
-                    onChange={(v) => setNoteForm({ ...noteForm, note: v })}
+                    onChange={(v) => ubahNote('note', v)}
                   />
                 </Field>
                 <div>
@@ -317,7 +328,7 @@ export default function AreaDetail() {
                             {note.tds != null && <span>TDS {formatNilaiSensor(note.tds, METRIC_META.tds.precision)} ppm</span>}
                           </p>
                         </div>
-                        <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removeMonitoring(note.id)} label="Hapus catatan" />
+                        <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setHapus({ jenis: 'catatan', id: note.id, nama: `catatan ${note.at}` })} label="Hapus catatan" />
                       </div>
                     </li>
                   ))}
@@ -369,7 +380,7 @@ export default function AreaDetail() {
                         tanggal: row.tanggal,
                         jumlah: `${row.jumlah} ekor`,
                         catatan: row.catatan || '·',
-                        aksi: <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removeKematian(row.id)} label="Hapus catatan (populasi dikembalikan)" />,
+                        aksi: <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setHapus({ jenis: 'kematian', id: row.id, nama: `catatan kematian ${row.tanggal} (${row.jumlah} ekor)` })} label="Hapus catatan (populasi dikembalikan)" />,
                       }))}
                     />
                   )}
@@ -466,7 +477,7 @@ export default function AreaDetail() {
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-1">
                           <IconButton icon="pencil" size="sm" onClick={() => { setEditingHpp(item); setHppForm({ name: item.name, qty: item.qty, unit: item.unit, unitPrice: item.unitPrice, id: item.id }); }} label="Ubah item" />
-                          <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removeHpp(area.id, item.id)} label="Hapus item" />
+                          <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setHapus({ jenis: 'hpp', id: item.id, nama: `item HPP ${item.name}` })} label="Hapus item" />
                         </div>
                       </td>
                     </tr>
@@ -574,6 +585,22 @@ export default function AreaDetail() {
           </Card>
         </div>
       </div>
+
+      <KonfirmasiHapus
+        target={hapus}
+        title="Hapus data area"
+        confirmLabel="Hapus"
+        onCancel={() => setHapus(null)}
+        onConfirm={() => {
+          if (hapus.jenis === 'catatan') removeMonitoring(hapus.id);
+          if (hapus.jenis === 'kematian') removeKematian(hapus.id);
+          if (hapus.jenis === 'hpp') removeHpp(area.id, hapus.id);
+          setHapus(null);
+        }}
+      >
+        <strong className="text-text">{hapus?.nama}</strong> akan dihapus dari {area.name}.
+        {hapus?.jenis === 'kematian' && ' Jumlah populasi dikembalikan.'}
+      </KonfirmasiHapus>
     </div>
   );
 }

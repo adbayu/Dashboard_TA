@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSmart } from '../../shared/store/SmartStore';
 import {
-  Button, Checkbox, EmptyState, Field, IconButton, Input, Modal, NumberInput, PageHeader, Select, Switch, Table,
+  Button, Checkbox, EmptyState, Field, IconButton, Input, KonfirmasiHapus, Modal, NumberInput, PageHeader, Select, Switch, Table,
 } from '../../shared/components/ui';
 import { IkonSlot } from '../../shared/components/ui/IkonSlot.jsx';
 
@@ -17,6 +17,13 @@ export default function AdminPoints() {
   const [editBadge, setEditBadge] = useState(null);
   const [amount, setAmount] = useState(50);
   const [target, setTarget] = useState('');
+  // { jenis: 'aturan' | 'badge', row } selama dialog konfirmasi hapus terbuka.
+  const [hapus, setHapus] = useState(null);
+  const konfirmasiHapus = () => {
+    if (hapus?.jenis === 'aturan') removePointRule(hapus.row.id);
+    if (hapus?.jenis === 'badge') removeBadge(hapus.row.id);
+    setHapus(null);
+  };
 
   // Modal dibuka lewat state sendiri: "Tambah" mengisi form dengan objek
   // kosong yang sama, jadi membandingkan identitas objek tidak pernah membuka modal.
@@ -64,7 +71,7 @@ export default function AdminPoints() {
       render: (row) => (
         <div className="flex flex-nowrap items-center justify-end gap-1">
           <IconButton icon="pencil" size="sm" onClick={() => openRule(row)} label={`Ubah aturan ${row.activity}`} />
-          <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removePointRule(row.id)} label={`Hapus aturan ${row.activity}`} />
+          <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setHapus({ jenis: 'aturan', row })} label={`Hapus aturan ${row.activity}`} />
         </div>
       ),
     },
@@ -165,7 +172,7 @@ export default function AdminPoints() {
                       </p>
                     </div>
                     <IconButton icon="pencil" size="sm" onClick={() => openBadge(row)} label={`Ubah badge ${row.name}`} />
-                    <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => removeBadge(row.id)} label={`Hapus badge ${row.name}`} />
+                    <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setHapus({ jenis: 'badge', row })} label={`Hapus badge ${row.name}`} />
                   </li>
                 ))}
               </ul>
@@ -246,6 +253,18 @@ export default function AdminPoints() {
           </div>
         </form>
       </Modal>
+
+      <KonfirmasiHapus
+        target={hapus}
+        title={hapus?.jenis === 'badge' ? 'Hapus badge' : 'Hapus aturan poin'}
+        confirmLabel={hapus?.jenis === 'badge' ? 'Hapus badge' : 'Hapus aturan'}
+        onCancel={() => setHapus(null)}
+        onConfirm={konfirmasiHapus}
+      >
+        {hapus?.jenis === 'badge'
+          ? <>Badge <strong className="text-text">{hapus.row.name}</strong> akan dihapus dari daftar badge.</>
+          : <>Aturan <strong className="text-text">{hapus?.row.activity}</strong> akan dihapus. Aktivitas ini tidak lagi memberi poin.</>}
+      </KonfirmasiHapus>
     </div>
   );
 }

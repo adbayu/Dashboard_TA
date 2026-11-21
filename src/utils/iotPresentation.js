@@ -137,6 +137,25 @@ export function isMeasurementStale(value, now = Date.now()) {
   return Number.isFinite(timestamp) && now - timestamp > 90_000;
 }
 
+// Status koneksi alat ('online' | 'stale' | 'offline') setelah satu pesan stream.
+// pesan = { jenis: 'event', type } untuk device_event, atau
+//         { jenis: 'reading', measuredAt } untuk frame pembacaan.
+// Server hanya mengirim event 'online' setelah alat pernah 'offline', jadi kiriman
+// pertama alat baru harus dikenali dari frame pembacaan. Aturan server sendiri ada di
+// server/features/kelola-iot/connectionStatus.ts (stale bila diukur >= 90 detik lalu).
+// Hanya pembacaan segar yang membuktikan alat terhubung; frame lama (backlog atau replay
+// saat startup) dan waktu yang tidak valid tidak mengubah status.
+export function statusKoneksiLive(statusSekarang, pesan, now = Date.now()) {
+  if (pesan?.jenis === 'event') {
+    return pesan.type === 'online' || pesan.type === 'offline' ? pesan.type : statusSekarang;
+  }
+  if (pesan?.jenis === 'reading') {
+    const valid = Number.isFinite(Date.parse(pesan.measuredAt || ''));
+    return valid && !isMeasurementStale(pesan.measuredAt, now) ? 'online' : statusSekarang;
+  }
+  return statusSekarang;
+}
+
 export function summarizeHistory(points = []) {
   const valid = points.filter(point => Number.isFinite(Number(point.avg))
     && Number.isFinite(Number(point.min)) && Number.isFinite(Number(point.max)));

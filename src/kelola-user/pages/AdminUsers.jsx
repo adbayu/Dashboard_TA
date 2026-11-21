@@ -27,7 +27,7 @@ const FILTER_STATUS = [
 ];
 
 export default function AdminUsers() {
-  const { users, areas, saveUser, removeUser, adjustPoints, setUserStatus } = useSmart();
+  const { users, areas, saveUser, removeUser, adjustPoints, setUserStatus, currentUser } = useSmart();
   const [form, setForm] = useState(empty);
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
@@ -81,6 +81,9 @@ export default function AdminUsers() {
     });
     closeModal();
   };
+
+  // Menurunkan peran atau menonaktifkan akun sendiri sama saja mengunci diri dari halaman pengelola.
+  const akunSendiri = Boolean(editing && editing.id === currentUser?.id);
 
   const toggleArea = (areaId) => {
     setForm((prev) => ({
@@ -145,7 +148,10 @@ export default function AdminUsers() {
           )}
           <IconButton icon="pencil" size="sm" onClick={() => startEdit(user)} label={`Ubah akun ${user.name}`} />
           <IconButton icon="plus" size="sm" onClick={() => adjustPoints(user.id, 100)} label={`Beri bonus 100 poin untuk ${user.name}`} />
-          <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setConfirm(user)} label={`Hapus akun ${user.name}`} />
+          {/* Akun yang sedang dipakai tidak bisa dihapus dari sini: pengelola akan terkunci dari sistem. */}
+          {user.id !== currentUser?.id && (
+            <IconButton icon="trash-2" variant="danger" size="sm" onClick={() => setConfirm(user)} label={`Hapus akun ${user.name}`} />
+          )}
         </div>
       ),
     },
@@ -274,11 +280,14 @@ export default function AdminUsers() {
             <Field label="Email">
               <Input type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nama@jagofarm.id" required />
             </Field>
-            <Field label="Peran">
-              <Select value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={ROLES} />
+            <Field label="Peran" hint={akunSendiri ? 'Peran akun Anda sendiri tidak bisa diubah dari sini.' : undefined}>
+              <Select value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={ROLES} disabled={akunSendiri} />
             </Field>
-            <Field label="Status akun" hint="Pilih 'Menunggu persetujuan' bila pengajuan pengelola belum diverifikasi.">
-              <Select value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={OPSI_STATUS} />
+            <Field
+              label="Status akun"
+              hint={akunSendiri ? 'Status akun Anda sendiri tidak bisa diubah dari sini.' : "Pilih 'Menunggu persetujuan' bila pengajuan pengelola belum diverifikasi."}
+            >
+              <Select value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={OPSI_STATUS} disabled={akunSendiri} />
             </Field>
             <Field
               label={editing ? 'Password (biarkan kosong bila tidak diganti)' : 'Password awal'}

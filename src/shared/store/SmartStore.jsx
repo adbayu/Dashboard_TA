@@ -632,10 +632,10 @@ export function SmartProvider({ children }) {
         const peranDiminta = data.role === 'pengelola' ? 'pengelola' : 'pengguna';
 
         if (!nama || !email || !password) return { ok: false, pesan: 'Nama, email, dan password wajib diisi.' };
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, pesan: 'Format email tidak valid.' };
-        if (password.length < 6) return { ok: false, pesan: 'Password minimal 6 karakter.' };
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, pesan: 'Format email tidak valid.', field: 'email' };
+        if (password.length < 6) return { ok: false, pesan: 'Password minimal 6 karakter.', field: 'password' };
         if (state.users.some((u) => (u.email || '').toLowerCase() === email)) {
-          return { ok: false, pesan: 'Email ini sudah terdaftar. Coba masuk atau pakai email lain.' };
+          return { ok: false, pesan: 'Email ini sudah terdaftar. Coba masuk atau pakai email lain.', field: 'email' };
         }
 
         const status = peranDiminta === 'pengelola' ? 'menunggu' : 'aktif';
@@ -703,8 +703,8 @@ export function SmartProvider({ children }) {
       changePassword: (lama, baru) => {
         const akun = state.users.find((u) => u.id === state.sessionUserId);
         if (!akun) return { ok: false, pesan: 'Sesi tidak ditemukan.' };
-        if (akun.password !== lama) return { ok: false, pesan: 'Password lama tidak cocok.' };
-        if (!baru || baru.length < 6) return { ok: false, pesan: 'Password baru minimal 6 karakter.' };
+        if (akun.password !== lama) return { ok: false, pesan: 'Password lama tidak cocok.', field: 'lama' };
+        if (!baru || baru.length < 6) return { ok: false, pesan: 'Password baru minimal 6 karakter.', field: 'baru' };
         setState((prev) => ({
           ...prev,
           users: prev.users.map((u) => (u.id === prev.sessionUserId ? { ...u, password: baru } : u)),
@@ -990,7 +990,8 @@ export function SmartProvider({ children }) {
             }),
           };
         }),
-      removeUser: (id) => patch((prev) => ({ users: prev.users.filter((u) => u.id !== id) })),
+      // Akun yang sedang masuk tidak boleh menghapus dirinya sendiri (sesi akan menggantung tanpa akun).
+      removeUser: (id) => patch((prev) => (id === prev.sessionUserId ? {} : { users: prev.users.filter((u) => u.id !== id) })),
 
       // ── Virtual Pet ─────────────────────────────────────────────────────────
       addPet: (settings) => {

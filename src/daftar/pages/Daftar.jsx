@@ -44,6 +44,10 @@ export default function Daftar() {
   const [form, setForm] = useState(FORM_AWAL);
   const [pw, setPw] = useState({ password: '', ulang: '' });
   const [galat, setGalat] = useState('');
+  // Isian yang menyebabkan galat ('email' | 'password' | 'ulang'), supaya ditandai aria-invalid.
+  const [galatField, setGalatField] = useState('');
+  const galatDi = (field) => Boolean(galat) && galatField === field;
+  const ariaGalat = (field) => (galatDi(field) ? 'galat-daftar' : undefined);
   const [lihatPassword, setLihatPassword] = useState(false);
   const [proses, setProses] = useState(false);
   const [berhasil, setBerhasil] = useState(null);
@@ -53,8 +57,10 @@ export default function Daftar() {
   async function kirim(e) {
     e.preventDefault();
     setGalat('');
+    setGalatField('');
     if (pw.password !== pw.ulang) {
       setGalat('Konfirmasi password tidak sama.');
+      setGalatField('ulang');
       return;
     }
     setProses(true);
@@ -62,6 +68,7 @@ export default function Daftar() {
     setProses(false);
     if (!hasil.ok) {
       setGalat(hasil.pesan);
+      setGalatField(hasil.field || '');
       return;
     }
     // register() sudah menyetel sesinya untuk operator farm, jadi tidak perlu
@@ -189,7 +196,7 @@ export default function Daftar() {
                 <Input value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="cth. Rina Kartika" required />
               </Field>
               <Field label="Email">
-                <Input type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nama@jagofarm.id" autoComplete="username" required />
+                <Input type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="nama@jagofarm.id" autoComplete="username" required invalid={galatDi('email')} aria-describedby={ariaGalat('email')} />
               </Field>
               <Field label="Nomor telepon" optional>
                 <Input type="tel" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="cth. 0812-3456-7890" />
@@ -204,6 +211,8 @@ export default function Daftar() {
                   onChange={(v) => setPw({ ...pw, password: v })}
                   autoComplete="new-password"
                   required
+                  invalid={galatDi('password')}
+                  aria-describedby={ariaGalat('password')}
                 />
               </Field>
               <Field label="Ulangi password">
@@ -213,6 +222,8 @@ export default function Daftar() {
                   onChange={(v) => setPw({ ...pw, ulang: v })}
                   autoComplete="new-password"
                   required
+                  invalid={galatDi('ulang')}
+                  aria-describedby={ariaGalat('ulang')}
                 />
               </Field>
             </div>
@@ -240,7 +251,7 @@ export default function Daftar() {
               </div>
             </fieldset>
 
-            {galat && <Alert tone="bad">{galat}</Alert>}
+            {galat && <Alert id="galat-daftar" tone="bad">{galat}</Alert>}
 
             <Button type="submit" size="lg" disabled={proses} className="w-full">
               {proses ? 'Mendaftarkan…' : peran === 'pengelola' ? 'Ajukan akun pengelola' : 'Daftar & masuk'}

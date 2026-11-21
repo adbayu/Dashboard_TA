@@ -5,7 +5,7 @@ import { iotApi } from '../../services/iotApi.js';
 import { Alert, Badge, Button, Card, Empty, Field, FilterChip, Input, PageHeader, Select, StatusPill, Table, Tautan, TautanTombol } from '../../shared/components/ui';
 import { areaFilterOptions } from '../../utils/frontendReview.js';
 import { iotStreamClient } from '../../services/iotStream.js';
-import { formatMeasuredAt, formatSensorNumber, getSensorState, isMeasurementStale, mergeLatestReading, resolveTelemetrySnapshot, sortEventsByIdDescending } from '../../utils/iotPresentation.js';
+import { formatMeasuredAt, formatSensorNumber, getSensorState, isMeasurementStale, mergeLatestReading, resolveTelemetrySnapshot, sortEventsByIdDescending, statusKoneksiLive } from '../../utils/iotPresentation.js';
 import AreaSection from '../../components/iot/AreaSection.jsx';
 import EventList from '../../components/iot/EventList.jsx';
 import LiveIndicator from '../../components/iot/LiveIndicator.jsx';
@@ -110,6 +110,9 @@ export default function ListIot() {
   const [status, setStatus] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [latestByDevice, setLatestByDevice] = useState({});
+  // Status koneksi dari stream, per id alat. Disimpan terpisah dari `result` supaya
+  // efek stream (bergantung pada `devices`) tidak berlangganan ulang tiap pembacaan.
+  const [statusLive, setStatusLive] = useState({});
   const [latestLoading, setLatestLoading] = useState(true);
   const [telemetryError, setTelemetryError] = useState('');
   const [streamStatus, setStreamStatus] = useState('idle');
@@ -123,6 +126,7 @@ export default function ListIot() {
       try {
         const data = await iotApi.getDevices({ userId: currentUser?.id });
         if (!current) return;
+        setStatusLive({});
         setResult(data);
         setState('ready');
       } catch (failure) {
@@ -178,6 +182,11 @@ export default function ListIot() {
       refreshLatestRef.current = null;
     };
 
+    const perbaruiStatus = (device, pesan) => setStatusLive(kini => {
+      const status = statusKoneksiLive(kini[device.id] ?? device.status, pesan);
+      return status === (kini[device.id] ?? device.status) ? kini : { ...kini, [device.id]: status };
+    });
+
     const stop = iotStreamClient.subscribe({
       onStatus: setStreamStatus,
       onRefresh: () => { void refreshLatest(); },
@@ -195,6 +204,11 @@ export default function ListIot() {
         const updated = { ...latestByDeviceRef.current, [frame.deviceId]: next };
         latestByDeviceRef.current = updated;
         setLatestByDevice(updated);
+        if (device) perbaruiStatus(device, { jenis: 'reading', measuredAt: frame.measuredAt });
+      },
+      onDeviceEvent: event => {
+        const device = devices.find(item => item.id === event.deviceId);
+        if (device) perbaruiStatus(device, { jenis: 'event', type: event.type });
       },
     });
 
@@ -205,8 +219,11 @@ export default function ListIot() {
     };
   }, [devices, result?.source]);
 
-  const areas = areaFilterOptions(devices);
-  const filtered = devices.filter(device => {
+  // Status dari stream menimpa status saat halaman dimuat, sampai daftar dimuat ulang.
+  const devicesTampil = devices.map(device => (statusLive[device.id] ? { ...device, status: statusLive[device.id] } : device));
+
+  const areas = areaFilterOptions(devicesTampil);
+  const filtered = devicesTampil.filter(device => {
     const text = [device.name, device.code, device.type?.code, device.type?.name].filter(Boolean).join(' ').toLowerCase();
     return (!search || text.includes(search.trim().toLowerCase()))
       && (!kind || device.type?.kind === kind)
@@ -238,7 +255,7 @@ export default function ListIot() {
 
   if (state === 'error') return <ErrorState title="Daftar alat" message={error} retry={retryList} />;
 
-  if (devices.length === 0) {
+  if (devicesTampil.length === 0) {
     return (
       <div className="iot-touch-targets min-w-0">
         <PageHeader title="Daftar alat" subtitle="Cari alat yang terputus atau datanya tertunda." sample={result?.label || undefined} />
@@ -253,11 +270,11 @@ export default function ListIot() {
   }
 
   const counts = {
-    online: devices.filter(device => device.status === 'online').length,
-    stale: devices.filter(device => device.status === 'stale').length,
-    offline: devices.filter(device => device.status === 'offline').length,
+    online: devicesTampil.filter(device => device.status === 'online').length,
+    stale: devicesTampil.filter(device => device.status === 'stale').length,
+    offline: devicesTampil.filter(device => device.status === 'offline').length,
   };
-  const problems = devices.filter(device => device.status === 'offline' || device.status === 'stale');
+  const problems = devicesTampil.filter(device => device.status === 'offline' || device.status === 'stale');
   const sorted = [...filtered].sort((left, right) => (STATUS_ORDER[left.status] ?? 3) - (STATUS_ORDER[right.status] ?? 3)
     || String(left.code || '').localeCompare(String(right.code || ''), 'id'));
   const hasFilter = Boolean(search || kind || areaRef || status);
@@ -272,7 +289,7 @@ export default function ListIot() {
     <div className="iot-touch-targets min-w-0">
       <PageHeader
         title="Daftar alat"
-        subtitle={`Cari alat yang terputus atau datanya tertunda. ${devices.length} alat terdaftar di akun ini.`}
+        subtitle={`Cari alat yang terputus atau datanya tertunda. ${devicesTampil.length} alat terdaftar di akun ini.`}
         sample={result?.label || undefined}
         actions={<>
           <StreamStatus status={streamStatus} />
@@ -282,11 +299,11 @@ export default function ListIot() {
 
       <div className="flex min-w-0 flex-col gap-4">
         {problems.length > 0 ? (
-          <Alert tone="warn" title={`${problems.length} alat perlu dicek.`} meta={`${counts.online} dari ${devices.length} alat terhubung`}>
+          <Alert tone="warn" title={`${problems.length} alat perlu dicek.`} meta={`${counts.online} dari ${devicesTampil.length} alat terhubung`}>
             Periksa daya dan sinyal WiFi alat yang tidak terhubung atau datanya tertunda.
           </Alert>
         ) : (
-          <Alert tone="ok" title="Semua alat terhubung." meta={`${counts.online} dari ${devices.length} alat terhubung`}>
+          <Alert tone="ok" title="Semua alat terhubung." meta={`${counts.online} dari ${devicesTampil.length} alat terhubung`}>
             Pembacaan terbaru tampil di tabel.
           </Alert>
         )}
@@ -319,7 +336,7 @@ export default function ListIot() {
             <FilterChip
               key={option.value || 'semua'}
               active={status === option.value}
-              count={option.value ? counts[option.value] : devices.length}
+              count={option.value ? counts[option.value] : devicesTampil.length}
               onClick={() => setStatus(option.value)}
             >
               {option.label}
@@ -367,7 +384,7 @@ export default function ListIot() {
               ]}
               rows={sorted}
             />
-            <p className="text-sm text-text-2">Menampilkan {sorted.length} dari {devices.length} alat. Alat yang bermasalah ada di atas.</p>
+            <p className="text-sm text-text-2">Menampilkan {sorted.length} dari {devicesTampil.length} alat. Alat yang bermasalah ada di atas.</p>
           </>
         )}
       </div>
@@ -386,6 +403,8 @@ export function DeviceDetail() {
   const [selectedSensor, setSelectedSensor] = useState('');
   const [streamStatus, setStreamStatus] = useState('idle');
   const [announcement, setAnnouncement] = useState('');
+  // Status koneksi dari stream; null = pakai status saat detail dimuat.
+  const [statusLive, setStatusLive] = useState(null);
   const latestRef = useRef(null);
   const eventsRef = useRef([]);
   const refreshTelemetryRef = useRef(null);
@@ -400,6 +419,7 @@ export function DeviceDetail() {
       latestRef.current = null;
       eventsRef.current = [];
       setTelemetry({ state: 'loading', latest: null, latestError: '', history: {}, historyErrors: {}, events: [], eventsError: '', error: '' });
+      setStatusLive(null);
       setResult(data);
       setLoadedId(id);
       setState('ready');
@@ -492,6 +512,7 @@ export function DeviceDetail() {
           const changes = next.readings.filter(reading => before.has(reading.sensor) && before.get(reading.sensor) !== reading.state);
           if (changes.length) setAnnouncement(changes.map(reading => `${names.get(reading.sensor) || reading.sensor}: ${READING_STATE_LABEL[reading.state]}`).join('. '));
           latestRef.current = next;
+          setStatusLive(kini => statusKoneksiLive(kini ?? device.status, { jenis: 'reading', measuredAt: frame.measuredAt }));
           setTelemetry(current => ({ ...current, latest: next }));
         },
         onDeviceEvent: (event, eventId) => {
@@ -501,6 +522,7 @@ export function DeviceDetail() {
           if (eventsRef.current.some(existing => (existing.id || `${existing.type}-${existing.at}-${existing.sensor || ''}`) === key)) return;
           const events = sortEventsByIdDescending([item, ...eventsRef.current]).slice(0, 10);
           eventsRef.current = events;
+          setStatusLive(kini => statusKoneksiLive(kini ?? device.status, { jenis: 'event', type: event.type }));
           setTelemetry(current => ({ ...current, events }));
         },
       });
@@ -544,7 +566,8 @@ export function DeviceDetail() {
   const retryTelemetry = () => { void refreshTelemetryRef.current?.(); };
   const readingBySensor = new Map((telemetry.latest?.readings || []).map(reading => [reading.sensor, reading]));
   const measuredAt = telemetry.latest?.measuredAt;
-  const stale = device.status !== 'online' || isMeasurementStale(measuredAt);
+  const statusAlat = statusLive ?? device.status;
+  const stale = statusAlat !== 'online' || isMeasurementStale(measuredAt);
   const readingItems = sensors.map(sensor => {
     const reading = readingBySensor.get(sensor.code);
     const value = reading?.value ?? null;
@@ -566,7 +589,7 @@ export function DeviceDetail() {
         </>}
         sample={result.label || undefined}
         actions={<>
-          <DeviceStatus status={device.status} />
+          <DeviceStatus status={statusAlat} />
           {(device.isSandbox || device.is_sandbox) && <Badge tone="info" icon="flask-conical">Sandbox</Badge>}
           <StreamStatus status={streamStatus} />
           <TautanTombol to={`/iot/${encodeURIComponent(device.id)}/log`} variant="secondary" icon="history">Lihat log lengkap</TautanTombol>

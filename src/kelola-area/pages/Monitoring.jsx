@@ -19,6 +19,7 @@ import {
   formatSensorNumber,
   formatThreshold,
 } from '../../utils/iotPresentation.js';
+import { pilihSensorAwal } from '../model/pilihSensorAwal.js';
 
 const TABS = [
   { id: 'package', label: 'Per paket' },
@@ -94,7 +95,7 @@ function EventLogPanel({
           <Field label="Perangkat"><Select value={eventDeviceId} onChange={onDeviceChange} options={devices.map(device => ({ value: device.id, label: `${device.name} · ${device.code}${device.isSandbox || device.is_sandbox ? ' · Sandbox' : ''}` }))} placeholder="Semua perangkat" /></Field>
           <Field label="Jenis kejadian"><Select value={eventType} onChange={onTypeChange} options={EVENT_TYPES} placeholder="Semua kejadian" /></Field>
         </div>
-        <p className="text-sm text-text-2">Halaman mengikuti ID kejadian menurun. Waktu memakai nilai `at` dari API.</p>
+        <p className="text-sm text-text-2">Kejadian terbaru tampil paling atas. Waktu adalah saat kejadian dicatat server.</p>
         {eventState === 'loading' && <p role="status" className="py-2 text-sm text-text-2">Memuat log kejadian...</p>}
         {eventState === 'error' && <ErrorPanel message={eventError} onRetry={onRetry} />}
         {eventState === 'ready' && eventError && <p role="alert" className="text-sm font-semibold text-bad-fg">{eventError}</p>}
@@ -326,7 +327,7 @@ function ComparisonChart({ series, sensor }) {
 
   return (
     <figure className="min-w-0" aria-label={description}>
-      <figcaption className="mb-2 font-semibold text-text">Riwayat {sensorLabel(sensor).toLowerCase()}, {SENSOR_HISTORY_LABEL.toLowerCase()}</figcaption>
+      <figcaption className="mb-2 font-semibold text-text">Riwayat {sensorLabel(sensor)},{SENSOR_HISTORY_LABEL.toLowerCase()}</figcaption>
       <svg className="h-36 w-full overflow-visible border-b border-border" viewBox="0 0 320 120" preserveAspectRatio="none" role="img" aria-label={description}>
         {validSeries.map((item, seriesIndex) => {
           const points = item.points.filter(point => Number.isFinite(Number(point.avg)));
@@ -403,9 +404,7 @@ function MonitoringView({ currentUser }) {
   const packageDevices = useMemo(() => displayDevices.filter(device => device.type?.kind === 'paket'), [displayDevices]);
   const deviceById = useMemo(() => new Map(displayDevices.map(device => [device.id, device])), [displayDevices]);
   const sensorOptions = useMemo(() => sensorTypes.map(sensor => ({ value: sensor.code, label: `${sensor.name || sensor.code}${sensor.unit ? ` (${sensor.unit})` : ''}` })), [sensorTypes]);
-  const selectedSensor = sensorTypes.some(sensor => sensor.code === selectedSensorChoice)
-    ? selectedSensorChoice
-    : sensorTypes[0]?.code || '';
+  const selectedSensor = pilihSensorAwal(sensorTypes, displayDevices, selectedSensorChoice);
   const selectedSensorType = sensorTypes.find(sensor => sensor.code === selectedSensor) || null;
   const sensorState = !selectedSensor ? 'ready' : latestState;
   const sensorError = latestError;
@@ -737,7 +736,7 @@ function MonitoringView({ currentUser }) {
                       { key: 'area', label: 'Area', render: item => <span className="break-words text-text-2 [overflow-wrap:anywhere]">{item.areaRef || 'Area belum diatur'}</span> },
                       { key: 'value', label: 'Nilai', render: item => <>
                         <span className="block font-num font-semibold tabular-nums text-text">{sensorValueText(item)}</span>
-                        <span className="mt-1 inline-flex"><SensorStateBadge state={item.state} /></span>
+                        {item.value != null && <span className="mt-1 inline-flex"><SensorStateBadge state={item.state} /></span>}
                       </> },
                       { key: 'threshold', label: 'Ambang', render: item => <span className="text-sm text-text-2">{formatThreshold(item.threshold, item.unit || '', sensorFor(item).decimals ?? 2)}</span> },
                       { key: 'measuredAt', label: 'Waktu ukur', render: item => <time className="text-sm text-text-2" dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time> },
@@ -755,7 +754,7 @@ function MonitoringView({ currentUser }) {
                     </div>
                     <dl className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 text-sm">
                       <div><dt className="text-text-2">Area</dt><dd className="break-words text-text">{item.areaRef || 'Area belum diatur'}</dd></div>
-                      <div><dt className="text-text-2">Nilai</dt><dd className="break-words font-num font-semibold tabular-nums text-text">{sensorValueText(item)}</dd><dd className="mt-1"><SensorStateBadge state={item.state} /></dd></div>
+                      <div><dt className="text-text-2">Nilai</dt><dd className="break-words font-num font-semibold tabular-nums text-text">{sensorValueText(item)}</dd>{item.value != null && <dd className="mt-1"><SensorStateBadge state={item.state} /></dd>}</div>
                       <div><dt className="text-text-2">Ambang</dt><dd className="break-words text-text-2">{formatThreshold(item.threshold, item.unit || '', sensor.decimals ?? 2)}</dd></div>
                       <div><dt className="text-text-2">Waktu ukur</dt><dd className="break-words text-text-2"><time dateTime={item.measuredAt || undefined}>{dateLabel(item.measuredAt)}</time></dd></div>
                     </dl>
@@ -801,7 +800,7 @@ function MonitoringView({ currentUser }) {
     if (!areas.length) return <div className="space-y-3">{reloadAction}<AreaEmptyState hasArea={false} /></div>;
     return <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-text-2">Ringkasan pembacaan area. {AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel. <span className="font-num tabular-nums">Request area: {areaCounters.started}/{areaCounters.total}</span></p>
+        <p className="text-sm text-text-2">Ringkasan pembacaan area. {AREA_HISTORY_LABEL}. Rata-rata ditimbang berdasarkan jumlah sampel.{areaCounters.started < areaCounters.total && <> <span role="status" className="font-num tabular-nums">Memuat {areaCounters.started} dari {areaCounters.total} area…</span></>}</p>
         {reloadAction}
       </div>
       {areaError && <ErrorPanel message={areaError} onRetry={() => areaRefreshActionRef.current?.()} />}

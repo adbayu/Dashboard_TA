@@ -251,21 +251,30 @@ test('adapter dengan request khusus memakai governor bersama kecuali governor di
   }
 });
 
+test('ID alat contoh mode local bisa dibuka pengelola, sama seperti UUID dari API', async () => {
+  const { roleCanOpenPath } = await import('../utils/roleAccess.js');
+  const { devices } = await createIotApi({ source: 'local' }).getDeviceList();
+  assert.ok(devices.length > 0);
+  for (const device of devices) {
+    assert.equal(roleCanOpenPath('pengelola', `/iot/${encodeURIComponent(device.id)}`), true, device.id);
+  }
+});
+
 test('mode local tidak membuat telemetri atau credential dan menolak rotasi', async () => {
   const api = createIotApi({ source: 'local' });
-  const latest = await api.getDeviceLatest('contoh-device-01');
-  const history = await api.getDeviceReadings('contoh-device-01', {
+  const latest = await api.getDeviceLatest('00000000-0000-4000-8000-00000000c001');
+  const history = await api.getDeviceReadings('00000000-0000-4000-8000-00000000c001', {
     sensor: 'ph',
     from: '2026-10-05T08:00:00.000Z',
     to: '2026-10-06T08:00:00.000Z',
   });
-  const events = await api.getDeviceEvents('contoh-device-01');
+  const events = await api.getDeviceEvents('00000000-0000-4000-8000-00000000c001');
 
   assert.equal(latest.measuredAt, null);
   assert.equal(latest.readings[0].value, null);
   assert.deepEqual(history.points, []);
   assert.deepEqual(events.events, []);
-  assert.throws(() => api.rotateDeviceCredential('contoh-device-01'), /mode API/);
+  assert.throws(() => api.rotateDeviceCredential('00000000-0000-4000-8000-00000000c001'), /mode API/);
 });
 
 test('adapter mempertahankan status dan pesan error server saat rotasi credential gagal', async () => {
@@ -318,7 +327,7 @@ test('adapter mengambil halaman pertama log mentah dengan filter, cursor, dan me
 
 test('mode local log hanya mengembalikan metadata Data contoh tanpa telemetry', async () => {
   const api = createIotApi({ source: 'local' });
-  const result = await api.getDeviceLog('contoh-device-01', {
+  const result = await api.getDeviceLog('00000000-0000-4000-8000-00000000c001', {
     from: '2026-10-14T10:00:00.000Z',
     to: '2026-10-15T10:00:00.000Z',
   });
@@ -328,7 +337,7 @@ test('mode local log hanya mengembalikan metadata Data contoh tanpa telemetry', 
   assert.equal(result.device.hasReadings, false);
   assert.deepEqual(result.points, []);
   assert.equal(result.total, 0);
-  await assert.rejects(api.exportDeviceLog('contoh-device-01', {
+  await assert.rejects(api.exportDeviceLog('00000000-0000-4000-8000-00000000c001', {
     from: '2026-10-14T10:00:00.000Z',
     to: '2026-10-15T10:00:00.000Z',
     tz: 'Asia/Jakarta',

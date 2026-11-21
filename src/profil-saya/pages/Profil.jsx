@@ -29,6 +29,7 @@ export default function Profil() {
   }));
   const [pw, setPw] = useState({ lama: '', baru: '', ulang: '' });
   const [pesanPw, setPesanPw] = useState({ tone: '', text: '' });
+  const galatPw = (field) => pesanPw.tone === 'bad' && pesanPw.field === field;
   const [logoutError, setLogoutError] = useState('');
 
   if (!currentUser) {
@@ -63,12 +64,12 @@ export default function Profil() {
     e.preventDefault();
     setPesanPw({ tone: '', text: '' });
     if (pw.baru !== pw.ulang) {
-      setPesanPw({ tone: 'bad', text: 'Konfirmasi password baru tidak sama.' });
+      setPesanPw({ tone: 'bad', text: 'Konfirmasi password baru tidak sama.', field: 'ulang' });
       return;
     }
     const hasil = changePassword(pw.lama, pw.baru);
     if (!hasil.ok) {
-      setPesanPw({ tone: 'bad', text: hasil.pesan });
+      setPesanPw({ tone: 'bad', text: hasil.pesan, field: hasil.field });
       return;
     }
     setPesanPw({ tone: 'ok', text: 'Password berhasil diganti. Gunakan password baru saat masuk berikutnya.' });
@@ -198,16 +199,16 @@ export default function Profil() {
           {passwordChangeAvailable(IOT_SOURCE) ? (
             <form onSubmit={gantiPassword} className="flex flex-col gap-4">
               <Field label="Password lama">
-                <Input type="password" value={pw.lama} onChange={(v) => setPw({ ...pw, lama: v })} autoComplete="current-password" required />
+                <Input type="password" value={pw.lama} onChange={(v) => setPw({ ...pw, lama: v })} autoComplete="current-password" required invalid={galatPw('lama')} aria-describedby={galatPw('lama') ? 'galat-password' : undefined} />
               </Field>
               <Field label="Password baru">
-                <Input type="password" value={pw.baru} onChange={(v) => setPw({ ...pw, baru: v })} autoComplete="new-password" required />
+                <Input type="password" value={pw.baru} onChange={(v) => setPw({ ...pw, baru: v })} autoComplete="new-password" required invalid={galatPw('baru')} aria-describedby={galatPw('baru') ? 'galat-password' : undefined} />
               </Field>
               <Field label="Ulangi password baru">
-                <Input type="password" value={pw.ulang} onChange={(v) => setPw({ ...pw, ulang: v })} autoComplete="new-password" required />
+                <Input type="password" value={pw.ulang} onChange={(v) => setPw({ ...pw, ulang: v })} autoComplete="new-password" required invalid={galatPw('ulang')} aria-describedby={galatPw('ulang') ? 'galat-password' : undefined} />
               </Field>
 
-              {pesanPw.text && <Alert tone={pesanPw.tone === 'ok' ? 'ok' : 'bad'} live={pesanPw.tone === 'ok' ? 'status' : undefined}>{pesanPw.text}</Alert>}
+              {pesanPw.text && <Alert id="galat-password" tone={pesanPw.tone === 'ok' ? 'ok' : 'bad'} live={pesanPw.tone === 'ok' ? 'status' : undefined}>{pesanPw.text}</Alert>}
 
               <div>
                 <Button type="submit" variant="secondary">Ganti password</Button>

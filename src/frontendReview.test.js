@@ -495,6 +495,60 @@ test('Monitoring retains a filterable, paginated event panel with four request s
   assert.match(sandboxMarkup, /value="sandbox-1"/);
 });
 
+test('Monitoring: nama sensor tidak dikecilkan dan badge status hanya muncul bila ada nilai', async () => {
+  const sumber = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
+  // "pH", "TDS", "EC" peka huruf besar; "Riwayat ph" salah tulis.
+  assert.doesNotMatch(sumber, /sensorLabel\([^)]*\)\.toLowerCase\(\)/);
+  // Tanpa nilai, sel sudah bertuliskan "Belum ada data"; badge "Tanpa ambang" menyesatkan karena ambangnya ada.
+  const badge = sumber.match(/[^\n]*<SensorStateBadge state=\{item\.state\} \/>[^\n]*/g) || [];
+  assert.ok(badge.length >= 2, 'tabel dan kartu ponsel sama-sama memakai badge');
+  for (const baris of badge) assert.match(baris, /item\.value != null &&/, baris.trim());
+  // Istilah teknis API tidak tampil ke pengguna.
+  assert.doesNotMatch(sumber, /Request area:/);
+  assert.doesNotMatch(sumber, /nilai `at`/);
+});
+
+test('Hapus aturan, badge, catatan, kematian, dan HPP selalu lewat dialog konfirmasi', async () => {
+  for (const berkas of ['./sistem-point/pages/AdminPoints.jsx', './kelola-area/pages/AreaDetail.jsx']) {
+    const sumber = await readFile(new URL(berkas, import.meta.url), 'utf8');
+    // Tombol tempat sampah tidak boleh langsung memanggil remove*; data hilang tanpa bisa dibatalkan.
+    assert.doesNotMatch(sumber, /onClick=\{\(\) => remove\w+\(/, berkas);
+    assert.match(sumber, /<KonfirmasiHapus\b/, berkas);
+  }
+});
+
+test('Isian password di Profil dan Daftar ditandai invalid dan terhubung ke pesan galatnya', async () => {
+  for (const berkas of ['./profil-saya/pages/Profil.jsx', './daftar/pages/Daftar.jsx']) {
+    const sumber = await readFile(new URL(berkas, import.meta.url), 'utf8');
+    const isian = (sumber.match(/<Input\b[\s\S]*?\/>/g) || []).filter(tag => /type=[^\n]*password/.test(tag));
+    assert.ok(isian.length >= 2, `${berkas}: isian password ditemukan`);
+    for (const satu of isian) {
+      assert.match(satu, /invalid=\{/, `${berkas}: ${satu}`);
+      assert.match(satu, /aria-describedby=\{/, `${berkas}: ${satu}`);
+    }
+  }
+});
+
+test('KonfirmasiHapus menampilkan isi, tombol Batal, dan label aksi hanya saat ada target', async t => {
+  const vite = await createServer({
+    root: process.cwd(), configFile: false, plugins: [react()],
+    server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent',
+  });
+  t.after(() => vite.close());
+  const { KonfirmasiHapus } = await vite.ssrLoadModule('/src/shared/components/ui.jsx');
+  const render = target => renderToStaticMarkup(jsxDEV(KonfirmasiHapus, {
+    target, title: 'Hapus badge', confirmLabel: 'Hapus badge', onCancel() {}, onConfirm() {},
+    children: 'Badge Ahli Air akan dihapus.',
+  }));
+
+  assert.equal(render(null), '');
+  const html = render({ id: 'B-1' });
+  assert.match(html, /role="dialog"/);
+  assert.match(html, /Badge Ahli Air akan dihapus\./);
+  assert.match(html, />Batal</);
+  assert.equal((html.match(/Hapus badge/g) || []).length, 2, 'judul dan tombol aksi');
+});
+
 test('Sandbox is visibly labeled in Monitoring package/sensor/events and device detail', async () => {
   const monitoringSource = await readFile(new URL('./kelola-area/pages/Monitoring.jsx', import.meta.url), 'utf8');
   const detailSource = await readFile(new URL('./list-iot/pages/ListIot.jsx', import.meta.url), 'utf8');

@@ -30,6 +30,7 @@ export { EmptyState, EmptyState as Empty } from './ui/EmptyState.jsx';
 export { Checkbox, Field, Input, NumberInput, Select, Switch, TextArea } from './ui/Field.jsx';
 export { FilterChip } from './ui/FilterChip.jsx';
 export { Metric, Metric as StatCard } from './ui/Metric.jsx';
+export { KonfirmasiHapus } from './ui/KonfirmasiHapus.jsx';
 export { Modal } from './ui/Modal.jsx';
 export { PageHeader } from './ui/PageHeader.jsx';
 export { StatusPill, StatusPill as Badge } from './ui/StatusPill.jsx';
